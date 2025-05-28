@@ -98,7 +98,7 @@ export default function DashboardPage() {
 
       {/* Right Pane: Chatbot */}
       <div className={cn(
-          "w-full pt-2 pb-2 pr-2 pl-1 md:pt-4 md:pb-4 md:pr-4 md:pl-2 flex flex-col transition-all duration-300 ease-in-out",
+          "w-full pt-2 pb-2 pr-2 pl-1 md:pt-4 md:pb-4 md:pr-4 md:pl-2 flex flex-col transition-all duration-300 ease-in-out overflow-hidden", // Added overflow-hidden
            isChatbotOpen ? 'md:w-1/3' : 'md:w-[72px]' 
         )}
       >
