@@ -8,14 +8,16 @@ import ChatInput from '@/components/chat/ChatInput';
 import { echoUserInput } from '@/ai/flows/echo-user-input';
 import type { EchoUserInputInput } from '@/ai/flows/echo-user-input';
 import { useToast } from "@/hooks/use-toast";
-import { Sparkles } from 'lucide-react';
+import { Sparkles, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import WorkspaceContent from '@/components/workspace/WorkspaceContent';
+import { Button } from '@/components/ui/button';
 
 export default function DashboardPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [conversationContext, setConversationContext] = useState<string>('');
   const { toast } = useToast();
+  const [isChatbotOpen, setIsChatbotOpen] = useState(true);
 
   useEffect(() => {
     setMessages([
@@ -29,6 +31,8 @@ export default function DashboardPage() {
   }, []);
 
   const handleSendMessage = async (text: string) => {
+    if (!isChatbotOpen) setIsChatbotOpen(true); // Open chatbot on send message
+
     const newUserMessage: Message = {
       id: `user-${Date.now()}`,
       text,
@@ -76,25 +80,48 @@ export default function DashboardPage() {
     }
   };
 
+  const toggleChatbot = () => {
+    setIsChatbotOpen(!isChatbotOpen);
+  };
+
   return (
     <div className="flex flex-col md:flex-row flex-1 w-full h-full bg-muted/40">
       {/* Left Pane: Workspace */}
-      <div className="w-full md:w-2/3 p-2 md:p-4 overflow-y-auto">
+      <div className={`w-full ${isChatbotOpen ? 'md:w-2/3' : 'md:flex-1'} p-2 md:p-4 overflow-y-auto transition-all duration-300 ease-in-out`}>
         <WorkspaceContent />
       </div>
 
       {/* Right Pane: Chatbot */}
-      {/* Ensure this pane also allows content to scroll if it overflows */}
-      <div className="w-full md:w-1/3 flex flex-col p-2 md:p-4 md:max-h-full"> {/* max-h-full for md screens to contain chatbot height */}
-        <div className="flex flex-col flex-1 bg-background text-foreground border rounded-lg shadow-sm overflow-hidden h-full min-h-[300px] md:min-h-0"> {/* min-h for mobile, flex-1 for desktop */}
-          <header className="border-b p-4 shadow-sm bg-card">
-            <div className="flex items-center justify-center">
-              <Sparkles className="h-6 w-6 mr-2 text-primary" />
-              <h1 className="text-xl font-semibold text-primary">Chatbot</h1>
-            </div>
+      <div className={`w-full ${isChatbotOpen ? 'md:w-1/3' : 'md:w-auto'} p-2 md:p-4 flex flex-col transition-all duration-300 ease-in-out`}>
+        <div className={`flex flex-col flex-1 bg-background text-foreground border rounded-lg shadow-sm overflow-hidden h-full ${isChatbotOpen ? 'min-h-[300px] md:min-h-0' : ''}`}>
+          <header className={`border-b p-3 md:p-4 shadow-sm bg-card flex items-center ${isChatbotOpen ? 'justify-between' : 'justify-center'}`}>
+            {isChatbotOpen && (
+              <div className="flex items-center mr-2">
+                <Sparkles className="h-6 w-6 mr-2 text-primary shrink-0" />
+                <h1 className="text-xl font-semibold text-primary truncate">Chatbot</h1>
+              </div>
+            )}
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={toggleChatbot}
+              aria-expanded={isChatbotOpen}
+              aria-controls="chatbot-content-area"
+              title={isChatbotOpen ? 'Collapse Chatbot' : 'Expand Chatbot'}
+            >
+              {isChatbotOpen ? <PanelRightClose className="h-5 w-5" /> : <PanelRightOpen className="h-5 w-5" />}
+              <span className="sr-only">{isChatbotOpen ? 'Collapse Chatbot' : 'Expand Chatbot'}</span>
+            </Button>
           </header>
-          <ChatHistory messages={messages} isLoading={isLoading} />
-          <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
+          
+          <div 
+            id="chatbot-content-area"
+            className={`flex flex-col flex-1 overflow-hidden ${!isChatbotOpen ? 'hidden' : ''}`}
+          >
+            {/* Content is always mounted but hidden by parent if chatbot is closed */}
+            <ChatHistory messages={messages} isLoading={isLoading} />
+            <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
+          </div>
         </div>
       </div>
     </div>
