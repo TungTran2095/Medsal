@@ -10,8 +10,8 @@ export default {
   theme: {
   	extend: {
       fontFamily: {
-        sans: ["var(--font-geist-sans)", "system-ui", "sans-serif"],
-        mono: ["var(--font-geist-mono)", "monospace"],
+        sans: ["var(--font-montserrat)", "system-ui", "sans-serif"], // Changed from Geist
+        // mono: ["var(--font-geist-mono)", "monospace"], // Geist Mono removed, can be replaced if a specific mono font is needed
       },
   		colors: {
   			background: 'hsl(var(--background))',
