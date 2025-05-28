@@ -55,7 +55,7 @@ export default function SupabaseTableDataViewer({ tableName, onBack }: SupabaseT
       }
 
     } catch (e: any) {
-      console.error(`Error fetching data for table ${tableName}:`, e);
+      console.error(`Error fetching data for table ${tableName}:`, JSON.stringify(e, null, 2));
       const errorMessage = e.message || "An unexpected error occurred while fetching table data.";
       setError(errorMessage);
       toast({
