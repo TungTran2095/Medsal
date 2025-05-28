@@ -95,7 +95,7 @@ export default function WorkspaceContent() {
     try {
       // Map to Supabase table structure if needed, here assuming it matches PayrollEntry
       const { data, error } = await supabase
-        .from('payrolls') // Your Supabase table name
+        .from('Fulltime') // Changed from 'payrolls' to 'Fulltime'
         .insert(parsedData.map(entry => ({
           employee_id: entry.employee_id,
           employee_name: entry.employee_name,
@@ -109,7 +109,7 @@ export default function WorkspaceContent() {
 
       toast({
         title: "Upload Successful",
-        description: `${parsedData.length} payroll entries uploaded to Supabase.`,
+        description: `${parsedData.length} payroll entries uploaded to Supabase table 'Fulltime'.`,
       });
       setParsedData([]); // Clear data after successful upload
       setSelectedFile(null); 
