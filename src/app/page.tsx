@@ -89,7 +89,7 @@ export default function DashboardPage() {
     <div className="flex flex-col md:flex-row flex-1 w-full h-full bg-muted/40">
       {/* Left Pane: Workspace */}
       <div className={cn(
-          "w-full p-2 md:p-4 overflow-y-auto transition-all duration-300 ease-in-out",
+          "w-full pt-2 pb-2 pl-2 pr-1 md:pt-4 md:pb-4 md:pl-4 md:pr-2 overflow-y-auto transition-all duration-300 ease-in-out",
           isChatbotOpen ? 'md:w-2/3' : 'md:flex-1'
         )}
       >
@@ -98,7 +98,7 @@ export default function DashboardPage() {
 
       {/* Right Pane: Chatbot */}
       <div className={cn(
-          "w-full p-2 md:p-4 flex flex-col transition-all duration-300 ease-in-out",
+          "w-full pt-2 pb-2 pr-2 pl-1 md:pt-4 md:pb-4 md:pr-4 md:pl-2 flex flex-col transition-all duration-300 ease-in-out",
            isChatbotOpen ? 'md:w-1/3' : 'md:w-[72px]' // Changed md:w-auto to md:w-[72px] for closed state
         )}
       >
