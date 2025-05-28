@@ -79,13 +79,13 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col md:flex-row flex-1 w-full h-full bg-muted/40">
       {/* Left Pane: Workspace */}
-      <div className="w-full md:w-1/2 p-2 md:p-4 overflow-y-auto">
+      <div className="w-full md:w-2/3 p-2 md:p-4 overflow-y-auto">
         <WorkspaceContent />
       </div>
 
       {/* Right Pane: Chatbot */}
       {/* Ensure this pane also allows content to scroll if it overflows */}
-      <div className="w-full md:w-1/2 flex flex-col p-2 md:p-4 md:max-h-full"> {/* max-h-full for md screens to contain chatbot height */}
+      <div className="w-full md:w-1/3 flex flex-col p-2 md:p-4 md:max-h-full"> {/* max-h-full for md screens to contain chatbot height */}
         <div className="flex flex-col flex-1 bg-background text-foreground border rounded-lg shadow-sm overflow-hidden h-full min-h-[300px] md:min-h-0"> {/* min-h for mobile, flex-1 for desktop */}
           <header className="border-b p-4 shadow-sm bg-card">
             <div className="flex items-center justify-center">
