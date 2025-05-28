@@ -99,7 +99,7 @@ export default function DashboardPage() {
       {/* Right Pane: Chatbot */}
       <div className={cn(
           "w-full p-2 md:p-4 flex flex-col transition-all duration-300 ease-in-out",
-           isChatbotOpen ? 'md:w-1/3' : 'md:w-auto'
+           isChatbotOpen ? 'md:w-1/3' : 'md:w-[72px]' // Changed md:w-auto to md:w-[72px] for closed state
         )}
       >
         <div className={cn(
@@ -136,8 +136,8 @@ export default function DashboardPage() {
             className={cn(
               "flex flex-col flex-1 overflow-hidden transition-all duration-300 ease-in-out",
               isChatbotOpen
-                ? "opacity-100 max-h-[100vh]" // Use a large max-height for open state
-                : "opacity-0 max-h-0" // Rely on opacity and max-h for collapse
+                ? "opacity-100 max-h-[100vh]"
+                : "opacity-0 max-h-0" 
             )}
           >
             {/* Content is always mounted but visibility/height is transitioned */}
@@ -149,4 +149,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
