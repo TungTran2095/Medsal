@@ -5,73 +5,87 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ListChecks, Loader2, AlertTriangle } from 'lucide-react';
+import { ListChecks, Loader2, AlertTriangle, ArrowLeft } from 'lucide-react';
 import type { SupabaseTable } from '@/types';
+import SupabaseTableDataViewer from './SupabaseTableDataViewer';
 
 export default function SupabaseTableList() {
   const [tables, setTables] = useState<SupabaseTable[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedTableName, setSelectedTableName] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
-    const fetchTables = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const { data, error: rpcError } = await supabase.rpc('get_public_tables');
+    if (!selectedTableName) { // Only fetch table list if no table is selected for viewing
+      fetchTables();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTableName]); // Re-fetch if selectedTableName becomes null
 
-        if (rpcError) {
-          // Log the full error object for better debugging
-          console.error("Supabase RPC Error Object:", JSON.stringify(rpcError, null, 2));
+  const fetchTables = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const { data, error: rpcError } = await supabase.rpc('get_public_tables');
 
-          // Simplified check for "function not found" errors based on codes
-          const isFunctionNotFoundError = rpcError.code === '42883' || rpcError.code === 'PGRST202';
+      if (rpcError) {
+        console.error("Supabase RPC Error Object:", JSON.stringify(rpcError, null, 2));
+        const isFunctionNotFoundError = rpcError.code === '42883' || rpcError.code === 'PGRST202';
 
-          if (isFunctionNotFoundError) {
-             const specificErrorMsg = "The 'get_public_tables' function was not found in your Supabase project. Please create it using the SQL Editor in your Supabase dashboard. See instructions.";
-             setError(specificErrorMsg);
-             toast({
-              title: "RPC Function Missing",
-              description: "The 'get_public_tables' function needs to be created in Supabase.",
-              variant: "destructive",
-            });
-          } else {
-            // Handle other RPC errors more gracefully
-            const message = rpcError.message || 'Unknown RPC error';
-            const details = rpcError.details ? `Details: ${rpcError.details}` : '';
-            const code = rpcError.code ? `Code: ${rpcError.code}` : '';
-            const generalErrorMsg = `RPC Error: ${message} ${details} ${code}`.trim();
-            
-            setError(generalErrorMsg);
-            toast({
-              title: "Error Fetching Tables",
-              description: message,
-              variant: "destructive",
-            });
-          }
-          setTables([]); // Ensure tables are cleared on any RPC error
-        } else if (data) {
-          setTables(data as SupabaseTable[]);
+        if (isFunctionNotFoundError) {
+           const specificErrorMsg = "The 'get_public_tables' function was not found in your Supabase project. Please create it using the SQL Editor in your Supabase dashboard. See instructions in README.md.";
+           setError(specificErrorMsg);
+           toast({
+            title: "RPC Function Missing",
+            description: "The 'get_public_tables' function needs to be created in Supabase.",
+            variant: "destructive",
+          });
+        } else {
+          const message = rpcError.message || 'Unknown RPC error';
+          const details = rpcError.details ? `Details: ${rpcError.details}` : '';
+          const code = rpcError.code ? `Code: ${rpcError.code}` : '';
+          const generalErrorMsg = `RPC Error: ${message} ${details} ${code}`.trim();
+          setError(generalErrorMsg);
+          toast({
+            title: "Error Fetching Tables",
+            description: message,
+            variant: "destructive",
+          });
         }
-      } catch (e: any) { // Catches unexpected errors (e.g., network issues before RPC call, or bugs in this try block)
-        console.error("Unexpected error fetching Supabase tables:", e);
-        const unexpectedErrorMsg = e.message || "An unexpected error occurred. Please check the console.";
-        setError(unexpectedErrorMsg);
-        toast({
-          title: "Unexpected Error",
-          description: unexpectedErrorMsg,
-          variant: "destructive",
-        });
         setTables([]);
-      } finally {
-        setIsLoading(false);
+      } else if (data) {
+        setTables(data as SupabaseTable[]);
       }
-    };
+    } catch (e: any) {
+      console.error("Unexpected error fetching Supabase tables:", e);
+      const unexpectedErrorMsg = e.message || "An unexpected error occurred. Please check the console.";
+      setError(unexpectedErrorMsg);
+      toast({
+        title: "Unexpected Error",
+        description: unexpectedErrorMsg,
+        variant: "destructive",
+      });
+      setTables([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    fetchTables();
-  }, [toast]);
+  const handleTableSelect = (tableName: string) => {
+    setSelectedTableName(tableName);
+  };
+
+  const handleBackToTables = () => {
+    setSelectedTableName(null);
+    // fetchTables will be called by useEffect
+  };
+
+  if (selectedTableName) {
+    return <SupabaseTableDataViewer tableName={selectedTableName} onBack={handleBackToTables} />;
+  }
 
   return (
     <Card className="shadow-md rounded-lg">
@@ -79,8 +93,11 @@ export default function SupabaseTableList() {
         <div className="flex items-center gap-3">
           <ListChecks className="h-8 w-8 text-primary" />
           <div>
-            <CardTitle className="text-xl font-semibold">Supabase Tables</CardTitle>
-            <CardDescription>List of tables in your public Supabase schema.</CardDescription>
+            <CardTitle className="text-xl font-semibold">Supabase Public Tables</CardTitle>
+            <CardDescription>List of tables in your public Supabase schema. Click a table to view its data.</CardDescription>
+            <p className="text-xs text-muted-foreground mt-1">
+              Ensure Row Level Security (RLS) is enabled on your tables if exposing this to non-admin users.
+            </p>
           </div>
         </div>
       </CardHeader>
@@ -96,14 +113,9 @@ export default function SupabaseTableList() {
             <AlertTriangle className="h-8 w-8 mb-2" />
             <p className="font-semibold">Error Loading Tables</p>
             <p className="text-sm text-center">{error}</p>
-            {/* Check if the error message indicates the specific "function not found" scenario */}
             {error.includes("was not found in your Supabase project") && (
                  <p className="text-xs mt-2 text-center">
-                    Please create the `get_public_tables` function in your Supabase SQL editor.
-                    <br />
-                    <code>
-                      create or replace function get_public_tables() returns table (table_name text) language sql as $$ select tablename::text from pg_catalog.pg_tables where schemaname = 'public' order by tablename; $$;
-                    </code>
+                    Please refer to the README.md for instructions on how to create the `get_public_tables` function.
                  </p>
             )}
           </div>
@@ -112,7 +124,7 @@ export default function SupabaseTableList() {
           <p className="text-muted-foreground text-center py-8">No tables found in the public schema or RPC function returned no data.</p>
         )}
         {!isLoading && !error && tables.length > 0 && (
-          <div className="border rounded-md max-h-60 overflow-y-auto">
+          <div className="border rounded-md max-h-80 overflow-y-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -120,8 +132,8 @@ export default function SupabaseTableList() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {tables.map((table, index) => (
-                  <TableRow key={index}>
+                {tables.map((table) => (
+                  <TableRow key={table.table_name} className="hover:bg-muted/50 cursor-pointer" onClick={() => handleTableSelect(table.table_name)}>
                     <TableCell className="font-medium">{table.table_name}</TableCell>
                   </TableRow>
                 ))}

@@ -1,4 +1,5 @@
 
+
 export interface Message {
   id: string;
   text: string;
@@ -22,3 +23,5 @@ export interface SupabasePayrollEntry extends PayrollEntry {
 export interface SupabaseTable {
   table_name: string;
 }
+
+export type DataRow = Record<string, any>;
