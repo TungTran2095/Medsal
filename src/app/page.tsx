@@ -136,8 +136,8 @@ export default function DashboardPage() {
             className={cn(
               "flex flex-col flex-1 overflow-hidden transition-all duration-300 ease-in-out",
               isChatbotOpen
-                ? "opacity-100"
-                : "max-h-0 opacity-0 invisible p-0 m-0 border-0"
+                ? "opacity-100 max-h-[100vh]" // Use a large max-height for open state
+                : "opacity-0 max-h-0" // Rely on opacity and max-h for collapse
             )}
           >
             {/* Content is always mounted but visibility/height is transitioned */}
