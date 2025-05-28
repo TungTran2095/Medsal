@@ -3,8 +3,7 @@ import Link from 'next/link';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
-import { Button } from '@/components/ui/button';
-import { LayoutDashboard, MessageCircle } from 'lucide-react';
+// Removed Button, LayoutDashboard, MessageCircle as they are no longer used in the header
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -17,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Echo Chamber & Workspace',
+  title: 'App Pro Dashboard', // Updated title
   description: 'AI-powered application with Chatbot and Workspace.',
 };
 
@@ -34,23 +33,10 @@ export default function RootLayout({
             <Link href="/" className="text-xl font-semibold text-primary">
               App Pro
             </Link>
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" asChild>
-                <Link href="/">
-                  <MessageCircle className="mr-2 h-5 w-5" />
-                  Chatbot
-                </Link>
-              </Button>
-              <Button variant="ghost" asChild>
-                <Link href="/workspace">
-                  <LayoutDashboard className="mr-2 h-5 w-5" />
-                  Workspace
-                </Link>
-              </Button>
-            </div>
+            {/* Removed navigation buttons for Chatbot and Workspace */}
           </nav>
         </header>
-        <main className="flex-grow container mx-auto py-6">
+        <main className="flex-grow flex flex-col"> {/* Adjusted main for flex layout */}
          {children}
         </main>
         <Toaster />
