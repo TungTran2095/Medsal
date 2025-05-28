@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { Message } from '@/types';
@@ -23,7 +24,7 @@ export default function ChatHistory({ messages, isLoading }: ChatHistoryProps) {
   }, [messages, isLoading]); // Ensure scroll on isLoading change too
 
   return (
-    <ScrollArea className="flex-grow" viewportRef={viewportRef}>
+    <ScrollArea className="flex-1 h-0" viewportRef={viewportRef}> {/* Changed from flex-grow */}
       <div className="p-4 md:p-6 space-y-1"> {/* Reduced space-y for tighter packing */}
         {messages.map((msg) => (
           <ChatMessage key={msg.id} message={msg} />
