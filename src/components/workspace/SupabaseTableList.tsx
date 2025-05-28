@@ -23,28 +23,43 @@ export default function SupabaseTableList() {
         const { data, error: rpcError } = await supabase.rpc('get_public_tables');
 
         if (rpcError) {
-          console.error("RPC Error:", rpcError);
+          // Log the full error object for better debugging
+          console.error("Supabase RPC Error Object:", JSON.stringify(rpcError, null, 2));
+
           // Check for common error indicating function doesn't exist
-          if (rpcError.message.includes("function public.get_public_tables() does not exist") || rpcError.code === '42883') {
-             setError("The 'get_public_tables' function was not found in your Supabase project. Please create it using the SQL Editor in your Supabase dashboard. See instructions.");
+          if (rpcError.message && (rpcError.message.includes("function public.get_public_tables() does not exist") || rpcError.code === '42883')) {
+             const specificErrorMsg = "The 'get_public_tables' function was not found in your Supabase project. Please create it using the SQL Editor in your Supabase dashboard. See instructions.";
+             setError(specificErrorMsg);
              toast({
               title: "RPC Function Missing",
               description: "The 'get_public_tables' function needs to be created in Supabase.",
               variant: "destructive",
             });
           } else {
-            throw rpcError;
+            // Handle other RPC errors more gracefully
+            const message = rpcError.message || 'Unknown RPC error';
+            const details = rpcError.details ? `Details: ${rpcError.details}` : '';
+            const code = rpcError.code ? `Code: ${rpcError.code}` : '';
+            const generalErrorMsg = `RPC Error: ${message} ${details} ${code}`.trim();
+            
+            setError(generalErrorMsg);
+            toast({
+              title: "Error Fetching Tables",
+              description: message,
+              variant: "destructive",
+            });
           }
-          setTables([]);
+          setTables([]); // Ensure tables are cleared on any RPC error
         } else if (data) {
           setTables(data as SupabaseTable[]);
         }
-      } catch (e: any) {
-        console.error("Error fetching Supabase tables:", e);
-        setError(e.message || "Failed to fetch tables. Ensure the RPC function 'get_public_tables' exists and your Supabase connection is configured.");
+      } catch (e: any) { // Catches unexpected errors (e.g., network issues before RPC call, or bugs in this try block)
+        console.error("Unexpected error fetching Supabase tables:", e);
+        const unexpectedErrorMsg = e.message || "An unexpected error occurred. Please check the console.";
+        setError(unexpectedErrorMsg);
         toast({
-          title: "Error Fetching Tables",
-          description: e.message || "Could not retrieve table list from Supabase.",
+          title: "Unexpected Error",
+          description: unexpectedErrorMsg,
           variant: "destructive",
         });
         setTables([]);
