@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Sparkles, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import WorkspaceContent from '@/components/workspace/WorkspaceContent';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 export default function DashboardPage() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -87,14 +88,30 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col md:flex-row flex-1 w-full h-full bg-muted/40">
       {/* Left Pane: Workspace */}
-      <div className={`w-full ${isChatbotOpen ? 'md:w-2/3' : 'md:flex-1'} p-2 md:p-4 overflow-y-auto transition-all duration-300 ease-in-out`}>
+      <div className={cn(
+          "w-full p-2 md:p-4 overflow-y-auto transition-all duration-300 ease-in-out",
+          isChatbotOpen ? 'md:w-2/3' : 'md:flex-1'
+        )}
+      >
         <WorkspaceContent />
       </div>
 
       {/* Right Pane: Chatbot */}
-      <div className={`w-full ${isChatbotOpen ? 'md:w-1/3' : 'md:w-auto'} p-2 md:p-4 flex flex-col transition-all duration-300 ease-in-out`}>
-        <div className={`flex flex-col flex-1 bg-background text-foreground border rounded-lg shadow-sm overflow-hidden h-full ${isChatbotOpen ? 'min-h-[300px] md:min-h-0' : ''}`}>
-          <header className={`border-b p-3 md:p-4 shadow-sm bg-card flex items-center ${isChatbotOpen ? 'justify-between' : 'justify-center'}`}>
+      <div className={cn(
+          "w-full p-2 md:p-4 flex flex-col transition-all duration-300 ease-in-out",
+           isChatbotOpen ? 'md:w-1/3' : 'md:w-auto'
+        )}
+      >
+        <div className={cn(
+            "flex flex-col flex-1 bg-background text-foreground border rounded-lg shadow-sm overflow-hidden h-full",
+            isChatbotOpen ? 'min-h-[300px] md:min-h-0' : ''
+          )}
+        >
+          <header className={cn(
+              "border-b p-3 md:p-4 shadow-sm bg-card flex items-center",
+              isChatbotOpen ? 'justify-between' : 'justify-center'
+            )}
+          >
             {isChatbotOpen && (
               <div className="flex items-center mr-2">
                 <Sparkles className="h-6 w-6 mr-2 text-primary shrink-0" />
@@ -116,9 +133,14 @@ export default function DashboardPage() {
           
           <div 
             id="chatbot-content-area"
-            className={`flex flex-col flex-1 overflow-hidden ${!isChatbotOpen ? 'hidden' : ''}`}
+            className={cn(
+              "flex flex-col flex-1 overflow-hidden transition-all duration-300 ease-in-out",
+              isChatbotOpen
+                ? "opacity-100"
+                : "max-h-0 opacity-0 invisible p-0 m-0 border-0"
+            )}
           >
-            {/* Content is always mounted but hidden by parent if chatbot is closed */}
+            {/* Content is always mounted but visibility/height is transitioned */}
             <ChatHistory messages={messages} isLoading={isLoading} />
             <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
           </div>
@@ -127,3 +149,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+
