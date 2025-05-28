@@ -37,8 +37,8 @@ export default function SupabaseTableDataViewer({ tableName, onBack }: SupabaseT
       const { data: pageData, error: dataError } = await supabase
         .from(tableName)
         .select('*')
-        .range(from, to)
-        .order('id', { ascending: true }); // Assuming 'id' column exists for ordering
+        .range(from, to);
+        // Removed: .order('id', { ascending: true }); // Assuming 'id' column exists for ordering
 
       if (dataError) throw dataError;
 
@@ -78,10 +78,10 @@ export default function SupabaseTableDataViewer({ tableName, onBack }: SupabaseT
   }, [tableName, fetchData]);
   
   useEffect(() => {
-    if (columns.length > 0) { // Only fetch if columns were reset (meaning table changed) or currentPage changed
-        fetchData();
-    }
-  }, [currentPage, columns, fetchData]);
+    // Removed initial check for `columns.length > 0` to ensure fetchData is called on table change.
+    // fetchData itself will handle setting columns if they are empty.
+    fetchData();
+  }, [currentPage, fetchData]); // Only re-fetch if currentPage changes or tableName changes (covered by above useEffect)
 
 
   const renderCellContent = (item: any) => {
