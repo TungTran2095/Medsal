@@ -99,7 +99,7 @@ export default function DashboardPage() {
       {/* Right Pane: Chatbot */}
       <div className={cn(
           "w-full pt-2 pb-2 pr-2 pl-1 md:pt-4 md:pb-4 md:pr-4 md:pl-2 flex flex-col transition-all duration-300 ease-in-out",
-           isChatbotOpen ? 'md:w-1/3' : 'md:w-[72px]' // Changed md:w-auto to md:w-[72px] for closed state
+           isChatbotOpen ? 'md:w-1/3' : 'md:w-[72px]' 
         )}
       >
         <div className={cn(
@@ -108,12 +108,11 @@ export default function DashboardPage() {
           )}
         >
           <header className={cn(
-              "border-b p-3 md:p-4 shadow-sm bg-card flex items-center",
-              isChatbotOpen ? 'justify-between' : 'justify-center'
+              "border-b p-3 md:p-4 shadow-sm bg-card flex items-center justify-end" // Always justify-end
             )}
           >
             {isChatbotOpen && (
-              <div className="flex items-center mr-2">
+              <div className="flex items-center mr-auto"> {/* Added mr-auto */}
                 <Sparkles className="h-6 w-6 mr-2 text-primary shrink-0" />
                 <h1 className="text-xl font-semibold text-primary truncate">Chatbot</h1>
               </div>
