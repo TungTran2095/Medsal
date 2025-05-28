@@ -26,13 +26,8 @@ export default function SupabaseTableList() {
           // Log the full error object for better debugging
           console.error("Supabase RPC Error Object:", JSON.stringify(rpcError, null, 2));
 
-          const isFunctionNotFoundError = rpcError.message && 
-            (
-              (rpcError.message.toLowerCase().includes("public.get_public_tables") && 
-                (rpcError.message.toLowerCase().includes("does not exist") || rpcError.message.toLowerCase().includes("could not find"))) ||
-              rpcError.code === '42883' || // PostgreSQL undefined_function
-              rpcError.code === 'PGRST202'   // PostgREST function not found / incorrect signature
-            );
+          // Simplified check for "function not found" errors based on codes
+          const isFunctionNotFoundError = rpcError.code === '42883' || rpcError.code === 'PGRST202';
 
           if (isFunctionNotFoundError) {
              const specificErrorMsg = "The 'get_public_tables' function was not found in your Supabase project. Please create it using the SQL Editor in your Supabase dashboard. See instructions.";
@@ -101,7 +96,7 @@ export default function SupabaseTableList() {
             <AlertTriangle className="h-8 w-8 mb-2" />
             <p className="font-semibold">Error Loading Tables</p>
             <p className="text-sm text-center">{error}</p>
-            {/* Check if the error message indicates the specific "function not found" scenario we handled */}
+            {/* Check if the error message indicates the specific "function not found" scenario */}
             {error.includes("was not found in your Supabase project") && (
                  <p className="text-xs mt-2 text-center">
                     Please create the `get_public_tables` function in your Supabase SQL editor.
