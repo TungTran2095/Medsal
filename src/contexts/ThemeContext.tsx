@@ -2,7 +2,7 @@
 'use client';
 
 import type { Dispatch, SetStateAction } from 'react';
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useMemo, useCallback } from 'react';
 
 type Theme = 'light' | 'dark';
 
@@ -12,10 +12,9 @@ interface ThemeContextType {
   toggleTheme: () => void;
 }
 
-// Provide a default context to prevent errors if consumed before provider is fully ready,
-// though with the hasMounted logic, children are not rendered until provider is ready.
+// Provide a default context
 const defaultThemeContext: ThemeContextType = {
-  theme: 'light', // Sensible default, server will render based on this if children were rendered.
+  theme: 'light', // Default theme for SSR and before client-side detection
   setTheme: () => {},
   toggleTheme: () => {},
 };
@@ -23,8 +22,7 @@ const defaultThemeContext: ThemeContextType = {
 const ThemeContext = createContext<ThemeContextType>(defaultThemeContext);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  // Initialize theme state. The actual theme will be determined client-side.
-  // Server-Side Rendering will use this initial 'light' state if it were to render children.
+  // Initialize theme state. Server-Side Rendering will use this initial 'light' state.
   const [theme, setTheme] = useState<Theme>('light');
   const [hasMounted, setHasMounted] = useState(false);
 
@@ -34,11 +32,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const storedTheme = localStorage.getItem('app-theme') as Theme | null;
     const preferredTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 
-    if (storedTheme) {
-      setTheme(storedTheme);
-    } else {
-      setTheme(preferredTheme);
-    }
+    // Set the theme based on localStorage or OS preference
+    // This will trigger the second useEffect to apply the class and save to localStorage
+    setTheme(storedTheme || preferredTheme);
   }, []); // Empty dependency array ensures this runs once on mount client-side
 
   useEffect(() => {
@@ -51,23 +47,17 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       }
       localStorage.setItem('app-theme', theme);
     }
-  }, [theme, hasMounted]);
+  }, [theme, hasMounted]); // Re-run when theme or hasMounted status changes
 
-  const toggleTheme = () => {
+  const toggleTheme = useCallback(() => {
     setTheme((prevTheme) => (prevTheme === 'light' ? 'dark' : 'light'));
-  };
+  }, []);
 
-  const contextValue = React.useMemo(() => ({ theme, setTheme, toggleTheme }), [theme]);
+  const contextValue = useMemo(() => ({ theme, setTheme, toggleTheme }), [theme, toggleTheme]);
 
-  // Delay rendering children until hasMounted is true.
-  // This ensures that children are rendered on the client only after the theme
-  // has been properly determined from localStorage/OS preference, preventing
-  // a mismatch with server-rendered HTML (which would be based on initial 'light' theme
-  // or, with this change, effectively nothing if server renders null here too).
-  if (!hasMounted) {
-    return null;
-  }
-
+  // ThemeProvider ALWAYS renders its children and the Context Provider.
+  // It does not return null based on hasMounted, as that caused structural hydration issues.
+  // The effects above handle client-side theme application.
   return (
     <ThemeContext.Provider value={contextValue}>
       {children}
