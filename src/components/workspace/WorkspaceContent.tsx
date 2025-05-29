@@ -13,7 +13,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import SupabaseTableList from './SupabaseTableList';
 import { Separator } from '@/components/ui/separator';
-import TotalSalaryChart from '@/components/charts/TotalSalaryChart'; // New import
+import TotalSalaryChart from '@/components/charts/TotalSalaryChart';
 
 type WorkspaceView = 'dbManagement' | 'dashboard';
 
@@ -252,15 +252,15 @@ export default function WorkspaceContent() {
           <Card className="shadow-md rounded-lg">
             <CardHeader>
               <div className="flex items-center gap-3">
-                 <LayoutDashboard className="h-6 w-6 text-primary" /> {/* Icon size adjusted */}
+                 <LayoutDashboard className="h-6 w-6 text-primary" />
                 <div>
-                    <CardTitle className="text-lg font-semibold">Payroll Dashboard</CardTitle> {/* Size adjusted */}
-                    <CardDescription className="text-xs text-muted-foreground">Analytics and overview of payroll data.</CardDescription> {/* Size adjusted */}
+                    <CardTitle className="text-base font-semibold">Payroll Dashboard</CardTitle>
+                    <CardDescription className="text-xs text-muted-foreground">Analytics and overview of payroll data.</CardDescription>
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="pt-4"> {/* Added padding top */}
-              <h3 className="text-md font-semibold mb-2">Total Fulltime Salary</h3>
+            <CardContent className="pt-4">
+              <h3 className="text-sm font-semibold mb-2">Total Fulltime Salary</h3>
               <TotalSalaryChart />
             </CardContent>
           </Card>
