@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertTriangle } from 'lucide-react'; // AlertTriangle imported
 import { Bar, BarChart, CartesianGrid, LabelList, XAxis, YAxis } from 'recharts';
 import {
   Card,
@@ -32,10 +32,15 @@ interface TotalSalaryChartProps {
   selectedYear?: number | null;
 }
 
+interface ChartError {
+  type: 'rpcMissing' | 'generic';
+  message: string;
+}
+
 export default function TotalSalaryChart({ selectedMonth, selectedYear }: TotalSalaryChartProps) {
   const [totalSalary, setTotalSalary] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ChartError | null>(null);
   const [filterDescription, setFilterDescription] = useState<string>("all periods");
 
   const fetchTotalSalary = useCallback(async () => {
@@ -61,13 +66,13 @@ export default function TotalSalaryChart({ selectedMonth, selectedYear }: TotalS
         rpcArgs.filter_month = selectedMonth;
       }
 
+      const functionName = 'get_total_salary_fulltime';
       const { data, error: rpcError } = await supabase.rpc(
-        'get_total_salary_fulltime',
+        functionName,
         rpcArgs
       );
 
       if (rpcError) {
-        const functionName = 'get_total_salary_fulltime';
         const rpcMessageText = rpcError.message ? String(rpcError.message).toLowerCase() : '';
         
         const isFunctionMissingError =
@@ -76,37 +81,40 @@ export default function TotalSalaryChart({ selectedMonth, selectedYear }: TotalS
           (rpcMessageText.includes(functionName.toLowerCase()) && rpcMessageText.includes('does not exist'));
 
         if (isFunctionMissingError) {
-          // Throw a custom, clear error for the catch block
-          throw new Error(`The '${functionName}' RPC function was not found. Please create it in your Supabase SQL Editor. See instructions in README.md if needed.`);
+          throw { 
+            type: 'rpcMissing', 
+            message: `The '${functionName}' RPC function was not found. Please create it in your Supabase SQL Editor. See instructions in README.md if needed.` 
+          };
         }
-        throw rpcError; // Re-throw other Supabase RPC errors for the catch block
+        throw { type: 'generic', message: rpcError.message || 'An unknown RPC error occurred.'};
       }
 
       const rawTotal = data;
-      // Ensure data is treated as a number, defaulting to 0 if null or undefined.
-      // RPC function is expected to return a single numeric value or null.
       const numericTotal = typeof rawTotal === 'number' ? rawTotal : 0;
       
       setTotalSalary(numericTotal);
 
     } catch (err: any) {
       // The 'err' object here is what was thrown from the try block.
-      let uiErrorMessage = err.message || 'Failed to fetch total salary data via RPC.';
-      setError(uiErrorMessage);
+      if (err.type === 'rpcMissing') {
+        setError(err);
+      } else {
+        setError({ type: 'generic', message: err.message || 'Failed to fetch total salary data via RPC.' });
+      }
       
-      // Improved console logging for better diagnostics
       console.error("Error fetching total salary via RPC. Details:", {
+          type: err.type,
           message: err.message,
           name: err.name,
-          code: err.code, // Supabase errors will have this
-          stack: err.stack, // Stack trace might be helpful
-          originalErrorObject: err // Log the raw error object for full inspection if needed
+          code: err.code, 
+          stack: err.stack, 
+          originalErrorObject: err 
       });
       setTotalSalary(null);
     } finally {
       setIsLoading(false);
     }
-  }, [selectedMonth, selectedYear, supabase]); // Added supabase to dependency array
+  }, [selectedMonth, selectedYear, supabase]);
 
   useEffect(() => {
     fetchTotalSalary();
@@ -124,14 +132,23 @@ export default function TotalSalaryChart({ selectedMonth, selectedYear }: TotalS
     return (
       <Card className="border-destructive/50">
         <CardHeader className="pt-3 pb-2">
-          <CardTitle className="text-destructive text-sm">Error Loading Chart Data</CardTitle>
+          <CardTitle className="text-destructive text-sm flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4" />
+            Error Loading Chart Data
+          </CardTitle>
         </CardHeader>
         <CardContent className="pt-2">
-          <p className="text-xs text-destructive">{error}</p>
-          <p className="text-xs text-muted-foreground mt-1">
-            If the error mentions '{`get_total_salary_fulltime`}', ensure the RPC function is created in Supabase (see README.md).
-            Otherwise, check 'Fulltime' table structure: 'tong_thu_nhap' (numeric or text with numbers that can be cast to double precision), 'thang' (numeric), and 'nam' (numeric) columns.
-          </p>
+          <p className="text-xs text-destructive">{error.message}</p>
+          {error.type === 'rpcMissing' && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Please create the `get_total_salary_fulltime` function in your Supabase SQL Editor. Refer to the README.md for the SQL script.
+            </p>
+          )}
+          {error.type === 'generic' && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Check 'Fulltime' table structure: 'tong_thu_nhap' (numeric or text convertible to double precision), 'thang' (numeric), and 'nam' (numeric) columns.
+            </p>
+          )}
         </CardContent>
       </Card>
     );
