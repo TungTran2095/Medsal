@@ -68,36 +68,45 @@ export default function TotalSalaryChart({ selectedMonth, selectedYear }: TotalS
 
       if (rpcError) {
         const functionName = 'get_total_salary_fulltime';
-        const rpcMessage = rpcError.message ? rpcError.message.toLowerCase() : '';
+        const rpcMessageText = rpcError.message ? String(rpcError.message).toLowerCase() : '';
         
         const isFunctionMissingError =
           rpcError.code === '42883' || // PostgreSQL: undefined_function
-          (rpcError.code === 'PGRST202' && rpcMessage.includes(functionName.toLowerCase())) || // PostgREST: "Could not find the function..."
-          (rpcMessage.includes(functionName.toLowerCase()) && rpcMessage.includes('does not exist'));
+          (rpcError.code === 'PGRST202' && rpcMessageText.includes(functionName.toLowerCase())) || // PostgREST: "Could not find the function..."
+          (rpcMessageText.includes(functionName.toLowerCase()) && rpcMessageText.includes('does not exist'));
 
         if (isFunctionMissingError) {
+          // Throw a custom, clear error for the catch block
           throw new Error(`The '${functionName}' RPC function was not found. Please create it in your Supabase SQL Editor. See instructions in README.md if needed.`);
         }
-        throw rpcError; // Re-throw other RPC errors
+        throw rpcError; // Re-throw other Supabase RPC errors for the catch block
       }
 
-      // The RPC function directly returns the sum.
-      // It might return null if no rows match or if all matching 'tong_thu_nhap' are null.
-      // Ensure data is treated as a number, defaulting to 0 if null or undefined.
       const rawTotal = data;
+      // Ensure data is treated as a number, defaulting to 0 if null or undefined.
+      // RPC function is expected to return a single numeric value or null.
       const numericTotal = typeof rawTotal === 'number' ? rawTotal : 0;
       
       setTotalSalary(numericTotal);
 
     } catch (err: any) {
-      const errorMessage = err.message || 'Failed to fetch total salary data via RPC.';
-      setError(errorMessage);
-      console.error("Error fetching total salary via RPC:", JSON.stringify(err, null, 2));
+      // The 'err' object here is what was thrown from the try block.
+      let uiErrorMessage = err.message || 'Failed to fetch total salary data via RPC.';
+      setError(uiErrorMessage);
+      
+      // Improved console logging for better diagnostics
+      console.error("Error fetching total salary via RPC. Details:", {
+          message: err.message,
+          name: err.name,
+          code: err.code, // Supabase errors will have this
+          stack: err.stack, // Stack trace might be helpful
+          originalErrorObject: err // Log the raw error object for full inspection if needed
+      });
       setTotalSalary(null);
     } finally {
       setIsLoading(false);
     }
-  }, [selectedMonth, selectedYear]);
+  }, [selectedMonth, selectedYear, supabase]); // Added supabase to dependency array
 
   useEffect(() => {
     fetchTotalSalary();
@@ -121,7 +130,7 @@ export default function TotalSalaryChart({ selectedMonth, selectedYear }: TotalS
           <p className="text-xs text-destructive">{error}</p>
           <p className="text-xs text-muted-foreground mt-1">
             If the error mentions '{`get_total_salary_fulltime`}', ensure the RPC function is created in Supabase (see README.md).
-            Otherwise, check 'Fulltime' table structure: 'tong_thu_nhap' (numeric/text with numbers), 'thang' (numeric), and 'nam' (numeric) columns.
+            Otherwise, check 'Fulltime' table structure: 'tong_thu_nhap' (numeric or text with numbers that can be cast to double precision), 'thang' (numeric), and 'nam' (numeric) columns.
           </p>
         </CardContent>
       </Card>
@@ -220,3 +229,4 @@ export default function TotalSalaryChart({ selectedMonth, selectedYear }: TotalS
     </Card>
   );
 }
+
