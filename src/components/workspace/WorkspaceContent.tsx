@@ -24,7 +24,6 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarInset,
-  // SidebarFooter, // Not explicitly used for content but available
 } from '@/components/ui/sidebar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -396,7 +395,6 @@ export default function WorkspaceContent() {
                     </Select>
                      {isLoadingMonths && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
                 </div>
-                <h3 className="text-sm font-semibold mb-1">Total Fulltime Salary</h3>
                 <TotalSalaryChart selectedMonth={selectedMonth} selectedYear={selectedYear}/>
               </CardContent>
             </Card>
