@@ -70,8 +70,9 @@ export default function TotalSalaryChart({ selectedMonth, selectedYear }: TotalS
 
       if (data) {
         const sum = data.reduce((acc, currentRow) => {
-          // Explicitly parse to float and handle NaN
-          const value = parseFloat(String(currentRow.tong_thu_nhap));
+          // Remove commas and then parse to float, handle NaN
+          const valueString = String(currentRow.tong_thu_nhap).replace(/,/g, '');
+          const value = parseFloat(valueString);
           return acc + (isNaN(value) ? 0 : value);
         }, 0);
         setTotalSalary(sum);
@@ -121,7 +122,7 @@ export default function TotalSalaryChart({ selectedMonth, selectedYear }: TotalS
      return (
       <Card>
         <CardHeader className="pt-3 pb-2">
-           <CardTitle className="text-sm">Total Fulltime Salary</CardTitle>
+           <CardTitle className="text-sm text-muted-foreground">Total Fulltime Salary</CardTitle>
            <CardDescription className="text-xs">For: {filterDescription}</CardDescription>
         </CardHeader>
         <CardContent className="pt-2">
