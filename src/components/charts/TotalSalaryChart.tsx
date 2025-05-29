@@ -22,32 +22,54 @@ import {
 
 const chartConfig = {
   totalSalary: {
-    label: 'Total Salary', // Label can remain generic or be updated if needed
+    label: 'Total Salary',
     color: 'hsl(var(--chart-1))',
   },
 } satisfies ChartConfig;
 
-export default function TotalSalaryChart() {
+interface TotalSalaryChartProps {
+  selectedMonth?: number | null;
+  selectedYear?: number | null;
+}
+
+export default function TotalSalaryChart({ selectedMonth, selectedYear }: TotalSalaryChartProps) {
   const [totalSalary, setTotalSalary] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [filterDescription, setFilterDescription] = useState<string>("all periods");
 
   useEffect(() => {
     const fetchTotalSalary = async () => {
       setIsLoading(true);
       setError(null);
+
+      let description = "all periods";
+      if (selectedYear && selectedMonth) {
+        description = `Month ${selectedMonth}, ${selectedYear}`;
+      } else if (selectedYear) {
+        description = `Year ${selectedYear}`;
+      } else if (selectedMonth) {
+        description = `Month ${selectedMonth} (all years)`;
+      }
+      setFilterDescription(description);
+
       try {
-        // NOTE: This fetches all 'tong_thu_nhap' entries and sums them on the client.
-        // For very large tables, consider using a Supabase RPC function for aggregation.
-        // It uses the 'tong_thu_nhap' column.
-        const { data, error: dbError } = await supabase
+        let query = supabase
           .from('Fulltime')
-          .select('tong_thu_nhap'); // Changed 'salary' to 'tong_thu_nhap'
+          .select('tong_thu_nhap');
+
+        if (selectedYear) {
+          query = query.eq('nam', selectedYear);
+        }
+        if (selectedMonth) {
+          query = query.eq('thang', selectedMonth);
+        }
+        
+        const { data, error: dbError } = await query;
 
         if (dbError) throw dbError;
 
         if (data) {
-          // Changed currentRow.salary to currentRow.tong_thu_nhap
           const sum = data.reduce((acc, currentRow) => acc + (currentRow.tong_thu_nhap || 0), 0);
           setTotalSalary(sum);
         } else {
@@ -63,7 +85,7 @@ export default function TotalSalaryChart() {
       }
     };
     fetchTotalSalary();
-  }, []);
+  }, [selectedMonth, selectedYear]);
 
   if (isLoading) {
     return (
@@ -82,8 +104,7 @@ export default function TotalSalaryChart() {
         <CardContent>
           <p className="text-xs text-destructive">{error}</p>
           <p className="text-xs text-muted-foreground mt-1">
-            {/* Updated error guidance */}
-            Please ensure the 'Fulltime' table exists and contains a 'tong_thu_nhap' column with numeric values.
+            Please ensure the 'Fulltime' table exists, contains 'tong_thu_nhap', 'thang', and 'nam' columns with numeric values.
           </p>
         </CardContent>
       </Card>
@@ -93,12 +114,15 @@ export default function TotalSalaryChart() {
   if (totalSalary === null || totalSalary === 0) {
      return (
       <Card>
-        <CardHeader>
+        <CardHeader className="pt-3 pb-2">
            <CardTitle className="text-sm">Total Fulltime Salary</CardTitle>
+           <CardDescription className="text-xs">For: {filterDescription}</CardDescription>
         </CardHeader>
-        <CardContent>
-          {/* Updated guidance message */}
-          <p className="text-xs text-muted-foreground">No salary data found in the 'tong_thu_nhap' column of the 'Fulltime' table or total is zero.</p>
+        <CardContent className="pt-2">
+          <p className="text-xs text-muted-foreground">No salary data found for the selected period or total is zero.</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Data from 'tong_thu_nhap' column in 'Fulltime' table.
+          </p>
         </CardContent>
       </Card>
     );
@@ -106,7 +130,7 @@ export default function TotalSalaryChart() {
 
   const chartData = [
     {
-      category: 'Total Fulltime Salary', // Category label for the chart
+      category: `Salary (${filterDescription})`,
       totalSalary: totalSalary,
     },
   ];
@@ -121,20 +145,19 @@ export default function TotalSalaryChart() {
 
   return (
     <Card>
-      <CardContent className="pt-6">
-         <div className="text-3xl font-bold text-primary mb-2">
+      <CardContent className="pt-4 px-2 pb-2"> {/* Reduced padding */}
+         <div className="text-2xl font-bold text-primary mb-1"> {/* Reduced font size and margin */}
             {formattedTotalSalary}
           </div>
-          <p className="text-xs text-muted-foreground mb-4">
-            {/* Updated description */}
-            Calculated from the 'tong_thu_nhap' column in the 'Fulltime' table.
+          <p className="text-xs text-muted-foreground mb-2"> {/* Reduced margin */}
+            Calculated from 'tong_thu_nhap' for {filterDescription}.
           </p>
-        <ChartContainer config={chartConfig} className="mx-auto aspect-square h-[100px] max-w-xs">
+        <ChartContainer config={chartConfig} className="mx-auto aspect-auto h-[80px] max-w-full"> {/* Reduced height */}
           <BarChart
             accessibilityLayer
             data={chartData}
             layout="vertical"
-            margin={{ left: 0, top: 0, right: 50, bottom: 0 }} // Adjusted margin
+            margin={{ left: 0, top: 0, right: 0, bottom: 0 }} 
           >
             <CartesianGrid horizontal={false} vertical={false} />
             <YAxis
@@ -143,8 +166,8 @@ export default function TotalSalaryChart() {
               tickLine={false}
               tickMargin={0} 
               axisLine={false}
-              className="text-xs"
-              hide // Hiding category label on Y-axis as it's redundant for one bar
+              className="text-xs sr-only" // Hide Y-axis label visually but keep for accessibility
+              hide 
             />
             <XAxis dataKey="totalSalary" type="number" hide />
             <ChartTooltip
@@ -159,22 +182,21 @@ export default function TotalSalaryChart() {
               dataKey="totalSalary"
               fill="var(--color-totalSalary)"
               radius={4}
-              barSize={40}
+              barSize={30} // Reduced bar size
             >
               <LabelList
                 position="right"
                 offset={8}
                 className="fill-foreground text-xs"
-                formatter={(value: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)}
+                formatter={(value: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', notation: 'compact' }).format(value)}
               />
             </Bar>
           </BarChart>
         </ChartContainer>
       </CardContent>
-       <CardFooter className="flex-col items-start gap-2 text-xs">
+       <CardFooter className="flex-col items-start gap-1 text-xs p-2"> {/* Reduced padding and gap */}
         <div className="leading-none text-muted-foreground">
-          {/* Updated description */}
-          Displaying the sum of all salaries from the 'tong_thu_nhap' column in the Fulltime table.
+          Sum of 'tong_thu_nhap' from 'Fulltime' table.
         </div>
       </CardFooter>
     </Card>
