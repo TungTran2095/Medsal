@@ -7,13 +7,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, Banknote } from "lucide-react";
+import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon } from "lucide-react";
 import type { PayrollEntry } from '@/types';
 import { supabase } from '@/lib/supabaseClient';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import SupabaseTableList from './SupabaseTableList';
 import { Separator } from '@/components/ui/separator';
-import TotalSalaryCard from '@/components/dashboard/TotalSalaryCard'; 
+import TotalSalaryCard from '@/components/dashboard/TotalSalaryCard';
 import EmployeeCountCard from '@/components/dashboard/EmployeeCountCard';
 import MonthlySalaryTrendChart from '@/components/charts/MonthlySalaryTrendChart';
 import {
@@ -53,14 +53,14 @@ export default function WorkspaceContent() {
   const [isLoadingCsv, setIsLoadingCsv] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const { toast } = useToast();
-  const [activeView, setActiveView] = useState<WorkspaceView>('dashboard'); 
+  const [activeView, setActiveView] = useState<WorkspaceView>('dashboard');
   const { theme, toggleTheme } = useTheme();
 
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
-  const [selectedYear, setSelectedYear] = useState<number | null>(new Date().getFullYear()); 
+  const [selectedYear, setSelectedYear] = useState<number | null>(new Date().getFullYear());
   const [availableMonths, setAvailableMonths] = useState<number[]>([]);
   const [isLoadingMonths, setIsLoadingMonths] = useState<boolean>(true);
-  
+
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 10 }, (_, i) => currentYear - i);
 
@@ -71,13 +71,12 @@ export default function WorkspaceContent() {
   ];
 
   const fetchDistinctMonths = useCallback(async () => {
-    if (activeView !== 'dashboard') return; 
+    if (activeView !== 'dashboard') return;
     setIsLoadingMonths(true);
     try {
-      // Assuming 'thang' column stores month as a number (1-12) or text like "Tháng 01"
       const { data, error } = await supabase
         .from('Fulltime')
-        .select('thang'); 
+        .select('thang');
 
       if (error) throw error;
 
@@ -87,12 +86,10 @@ export default function WorkspaceContent() {
             data
               .map(item => {
                 if (item.thang === null || item.thang === undefined) return null;
-                // Try to parse if it's text like "Tháng 01"
                 if (typeof item.thang === 'string') {
                   const match = item.thang.match(/\d+/);
                   return match ? parseInt(match[0], 10) : null;
                 }
-                // If it's already a number
                 return Number(item.thang);
               })
               .filter(month => month !== null && month >= 1 && month <= 12) as number[]
@@ -113,11 +110,11 @@ export default function WorkspaceContent() {
     } finally {
       setIsLoadingMonths(false);
     }
-  }, [activeView, toast]); 
+  }, [activeView, toast]);
 
   useEffect(() => {
     fetchDistinctMonths();
-  }, [fetchDistinctMonths]); 
+  }, [fetchDistinctMonths]);
 
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -131,7 +128,7 @@ export default function WorkspaceContent() {
         });
         setSelectedFile(null);
         setParsedData([]);
-        event.target.value = ''; 
+        event.target.value = '';
         return;
       }
       setSelectedFile(file);
@@ -201,19 +198,17 @@ export default function WorkspaceContent() {
         let nam = null;
 
         if (entry.pay_date) {
-          // Attempt to parse various common date formats
-          const datePartsDMY = entry.pay_date.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/); // DD/MM/YYYY or DD-MM-YYYY
-          const datePartsMDY = entry.pay_date.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/); // MM/DD/YYYY or MM-DD-YYYY (less common for pay date but for robustness)
-          const dateISO = entry.pay_date.match(/^\d{4}-\d{2}-\d{2}/); // YYYY-MM-DD
-          
+          const datePartsDMY = entry.pay_date.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+          const datePartsMDY = entry.pay_date.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+          const dateISO = entry.pay_date.match(/^\d{4}-\d{2}-\d{2}/);
+
           if (dateISO) {
              payDateObj = new Date(entry.pay_date);
           } else if (datePartsDMY) {
             payDateObj = new Date(parseInt(datePartsDMY[3]), parseInt(datePartsDMY[2]) - 1, parseInt(datePartsDMY[1]));
-          } else if (datePartsMDY) { // Assuming MM/DD/YYYY if not DMY
+          } else if (datePartsMDY) {
             payDateObj = new Date(parseInt(datePartsMDY[3]), parseInt(datePartsMDY[1]) - 1, parseInt(datePartsMDY[2]));
           } else {
-             // Try direct parsing as a last resort, might be locale-dependent
              payDateObj = new Date(entry.pay_date);
           }
 
@@ -222,17 +217,17 @@ export default function WorkspaceContent() {
             nam = payDateObj.getFullYear();
           } else {
             console.warn(`Invalid date format for pay_date: ${entry.pay_date}. Setting thang and nam to null.`);
-            payDateObj = null; // Reset payDateObj if invalid
+            payDateObj = null;
           }
         }
 
         return {
           employee_id: entry.employee_id,
           employee_name: entry.employee_name,
-          tong_thu_nhap: entry.salary, 
-          pay_date: payDateObj ? payDateObj.toISOString().split('T')[0] : null, // Store as YYYY-MM-DD or null
-          thang: thang, // Store as number
-          nam: nam,   // Store as number
+          tong_thu_nhap: entry.salary,
+          pay_date: payDateObj ? payDateObj.toISOString().split('T')[0] : null,
+          thang: thang,
+          nam: nam,
         };
       });
 
@@ -253,7 +248,7 @@ export default function WorkspaceContent() {
       setSelectedFile(null);
       const fileInput = document.getElementById('payroll-csv-input') as HTMLInputElement;
       if (fileInput) fileInput.value = '';
-      fetchDistinctMonths(); 
+      fetchDistinctMonths();
 
     } catch (error: any) {
       console.error("Supabase upload error:", error);
@@ -268,17 +263,17 @@ export default function WorkspaceContent() {
   };
 
   return (
-    <SidebarProvider defaultOpen={false} > {/* Default to collapsed */}
+    <SidebarProvider defaultOpen={false} >
       <Sidebar collapsible="icon">
         <SidebarHeader>
-           <div className="flex items-center justify-between p-2"> {/* Reduced padding */}
+           <div className="flex items-center justify-between p-2">
             <span className="text-base font-semibold text-sidebar-primary group-data-[state=collapsed]:hidden">
               Workspace
             </span>
-            <SidebarTrigger className="h-7 w-7" /> {/* Smaller trigger */}
+            <SidebarTrigger className="h-7 w-7" />
           </div>
         </SidebarHeader>
-        <SidebarContent className="p-1 flex flex-col"> {/* Reduced padding */}
+        <SidebarContent className="p-1 flex flex-col">
           <SidebarMenu className="flex-grow">
             {navItems.map(item => {
               const IconComponent = item.icon;
@@ -288,9 +283,9 @@ export default function WorkspaceContent() {
                     onClick={() => setActiveView(item.id)}
                     isActive={activeView === item.id}
                     tooltip={{content: item.label, side: "right", align:"center"}}
-                    size="sm" // Smaller menu buttons
+                    size="sm"
                   >
-                    <IconComponent className="h-4 w-4"/> {/* Smaller icons */}
+                    <IconComponent className="h-4 w-4"/>
                     <span>{item.label}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -302,33 +297,33 @@ export default function WorkspaceContent() {
               <Label htmlFor="theme-toggle" className="text-xs text-sidebar-foreground group-data-[state=collapsed]:hidden">
                 Theme
               </Label>
-              <div className="flex items-center gap-2"> {/* Reduced gap */}
-                <Sun className="h-4 w-4 text-sidebar-foreground" /> {/* Smaller icon */}
+              <div className="flex items-center gap-2">
+                <Sun className="h-4 w-4 text-sidebar-foreground" />
                 <Switch
                   id="theme-toggle"
                   checked={theme === 'dark'}
                   onCheckedChange={toggleTheme}
                   aria-label="Toggle theme"
-                  className="h-5 w-9 data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0 [&>span]:h-4 [&>span]:w-4" // Custom size for switch
+                  className="h-5 w-9 data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0 [&>span]:h-4 [&>span]:w-4"
                 />
-                <Moon className="h-4 w-4 text-sidebar-foreground" /> {/* Smaller icon */}
+                <Moon className="h-4 w-4 text-sidebar-foreground" />
               </div>
             </div>
           </div>
         </SidebarContent>
       </Sidebar>
-      <SidebarInset className="flex-grow overflow-y-auto p-1"> {/* Reduced padding */}
-        <div className="space-y-1 h-full"> {/* Reduced spacing */}
+      <SidebarInset className="flex-grow overflow-y-auto p-3 md:p-4"> {/* Adjusted padding for inset */}
+        <div className="space-y-3 h-full"> {/* Adjusted spacing */}
           {activeView === 'dbManagement' && (
             <>
               <Card className="w-full flex flex-col shadow-md rounded-lg">
-                <CardHeader className="items-center border-b pb-2 pt-3"> {/* Reduced padding */}
-                  <FileText className="h-5 w-5 mb-0.5 text-primary" /> {/* Smaller icon */}
-                  <CardTitle className="text-base font-bold">Payroll CSV Import</CardTitle> {/* Smaller title */}
+                <CardHeader className="items-center border-b pb-2 pt-3">
+                  <FileText className="h-5 w-5 mb-0.5 text-primary" />
+                  <CardTitle className="text-base font-bold">Payroll CSV Import</CardTitle>
                   <CardDescription className="text-xs">Import payroll data from CSV files and upload to Supabase 'Fulltime' table.</CardDescription>
                 </CardHeader>
-                <CardContent className="flex-grow flex flex-col p-2 space-y-1"> {/* Reduced padding and spacing */}
-                  <div className="space-y-0.5"> {/* Reduced spacing */}
+                <CardContent className="flex-grow flex flex-col p-2 space-y-1">
+                  <div className="space-y-0.5">
                     <label htmlFor="payroll-csv-input" className="text-xs font-medium">
                       Upload Payroll CSV
                     </label>
@@ -348,7 +343,7 @@ export default function WorkspaceContent() {
                   </div>
 
                   {parsedData.length > 0 && !isLoadingCsv && (
-                    <div className="space-y-1 flex-grow flex flex-col min-h-[80px]"> {/* Reduced min-height */}
+                    <div className="space-y-1 flex-grow flex flex-col min-h-[80px]">
                       <h3 className="text-sm font-semibold">Parsed Data Preview (First 5 Rows)</h3>
                       <div className="border rounded-md overflow-x-auto flex-grow">
                         <Table>
@@ -381,8 +376,8 @@ export default function WorkspaceContent() {
                   )}
                   
                   {(isLoadingCsv && !parsedData.length) && (
-                      <div className="flex flex-col items-center justify-center text-muted-foreground py-2 min-h-[50px]"> {/* Reduced min-height */}
-                          <Loader2 className="h-4 w-4 animate-spin mb-0.5" /> {/* Smaller loader */}
+                      <div className="flex flex-col items-center justify-center text-muted-foreground py-2 min-h-[50px]">
+                          <Loader2 className="h-4 w-4 animate-spin mb-0.5" />
                           <p className="text-xs">Processing file...</p>
                       </div>
                   )}
@@ -402,78 +397,77 @@ export default function WorkspaceContent() {
                 </CardContent>
               </Card>
 
-              <Separator className="my-1"/> {/* Reduced margin */}
+              <Separator className="my-2"/> {/* Adjusted margin */}
 
               <SupabaseTableList />
             </>
           )}
           {activeView === 'dashboard' && (
              <Card className="shadow-md rounded-lg h-full flex flex-col">
-              <CardHeader className="pt-3 pb-2"> {/* Reduced padding */}
-                <div className="flex items-center gap-1.5"> {/* Reduced gap */}
-                  <LayoutDashboard className="h-4 w-4 text-primary" /> {/* Smaller icon */}
+              <CardHeader className="pb-3 pt-4 px-4 md:px-6"> {/* Consistent padding */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <div>
-                    <CardTitle className="text-base font-semibold">Payroll Dashboard</CardTitle> {/* Smaller title */}
-                    <CardDescription className="text-xs text-muted-foreground">
+                    <CardTitle className="text-xl font-semibold text-primary flex items-center gap-2">
+                      <LayoutDashboard className="h-5 w-5" />
+                      Payroll Dashboard
+                    </CardTitle>
+                    <CardDescription className="text-sm text-muted-foreground mt-1">
                       Analytics and overview of payroll data from 'Fulltime' table.
                     </CardDescription>
                   </div>
-                </div>
-                 <div className="flex items-center gap-2 mt-1.5"> {/* Reduced gap and margin */}
-                  <div>
-                    <Label htmlFor="month-filter" className="text-xs">Month</Label>
-                    <Select
-                      value={selectedMonth !== null ? selectedMonth.toString() : "all"}
-                      onValueChange={(value) => setSelectedMonth(value === "all" ? null : parseInt(value))}
-                      disabled={isLoadingMonths}
-                    >
-                      <SelectTrigger id="month-filter" className="h-8 text-xs w-[120px]">
-                        <SelectValue placeholder="Select Month" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Months</SelectItem>
-                        {isLoadingMonths ? (
-                          <SelectItem value="loading" disabled>Loading...</SelectItem>
-                        ) : (
-                          availableMonths.map(month => (
-                            <SelectItem key={month} value={month.toString()}>
-                              {new Date(0, month - 1).toLocaleString('default', { month: 'long' })}
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="year-filter" className="text-xs">Year</Label>
-                    <Select
-                      value={selectedYear !== null ? selectedYear.toString() : "all"}
-                      onValueChange={(value) => setSelectedYear(value === "all" ? null : parseInt(value))}
-                    >
-                      <SelectTrigger id="year-filter" className="h-8 text-xs w-[100px]">
-                        <SelectValue placeholder="Select Year" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Years</SelectItem>
-                        {years.map(year => (
-                          <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="flex items-center gap-3 mt-2 sm:mt-0">
+                    <div>
+                      <Label htmlFor="month-filter" className="text-xs font-medium">Month</Label>
+                      <Select
+                        value={selectedMonth !== null ? selectedMonth.toString() : "all"}
+                        onValueChange={(value) => setSelectedMonth(value === "all" ? null : parseInt(value))}
+                        disabled={isLoadingMonths}
+                      >
+                        <SelectTrigger id="month-filter" className="h-9 text-sm w-full sm:w-[140px] mt-1">
+                          <SelectValue placeholder="Select Month" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Months</SelectItem>
+                          {isLoadingMonths ? (
+                            <SelectItem value="loading" disabled>Loading...</SelectItem>
+                          ) : (
+                            availableMonths.map(month => (
+                              <SelectItem key={month} value={month.toString()}>
+                                {new Date(0, month - 1).toLocaleString('default', { month: 'long' })}
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="year-filter" className="text-xs font-medium">Year</Label>
+                      <Select
+                        value={selectedYear !== null ? selectedYear.toString() : "all"}
+                        onValueChange={(value) => setSelectedYear(value === "all" ? null : parseInt(value))}
+                      >
+                        <SelectTrigger id="year-filter" className="h-9 text-sm w-full sm:w-[120px] mt-1">
+                          <SelectValue placeholder="Select Year" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Years</SelectItem>
+                          {years.map(year => (
+                            <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="pt-2 px-2 pb-2 flex-grow overflow-auto"> {/* Reduced padding */}
-                <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3"> {/* Reduced gap */}
+              <CardContent className="pt-3 px-4 md:px-6 pb-4 flex-grow overflow-auto space-y-4"> {/* Consistent padding and spacing */}
+                <div className="grid gap-4 md:grid-cols-2"> {/* Adjusted gap */}
                     <TotalSalaryCard selectedMonth={selectedMonth} selectedYear={selectedYear} />
                     <EmployeeCountCard selectedMonth={selectedMonth} selectedYear={selectedYear} />
-                    <div className="md:col-span-2 lg:col-span-1"> 
-                    </div>
                 </div>
-                <div className="mt-2"> {/* Reduced margin */}
+                <div className="mt-0"> {/* Removed unnecessary margin top */}
                     <MonthlySalaryTrendChart selectedYear={selectedYear} />
                 </div>
-
               </CardContent>
             </Card>
           )}
@@ -482,3 +476,4 @@ export default function WorkspaceContent() {
     </SidebarProvider>
   );
 }
+

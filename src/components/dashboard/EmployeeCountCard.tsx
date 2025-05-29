@@ -9,7 +9,6 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
-  CardDescription,
 } from "@/components/ui/card";
 
 interface EmployeeCountCardProps {
@@ -90,9 +89,9 @@ export default function EmployeeCountCard({ selectedMonth, selectedYear }: Emplo
 
   if (isLoading) {
     return (
-      <Card>
+      <Card className="h-full">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-3">
-          <CardTitle className="text-sm font-medium"></CardTitle> {/* Removed "Total Employees" text */}
+          <CardTitle className="text-sm font-medium text-muted-foreground">Total Employees</CardTitle>
           <Users className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent className="pt-2">
@@ -106,7 +105,7 @@ export default function EmployeeCountCard({ selectedMonth, selectedYear }: Emplo
 
   if (error) {
     return (
-      <Card className="border-destructive/50">
+      <Card className="border-destructive/50 h-full">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-3">
           <CardTitle className="text-sm font-medium text-destructive">Employee Count Error</CardTitle>
           <AlertTriangle className="h-4 w-4 text-destructive" />
@@ -124,9 +123,9 @@ export default function EmployeeCountCard({ selectedMonth, selectedYear }: Emplo
   }
 
   return (
-    <Card>
+    <Card className="h-full">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-3">
-        <CardTitle className="text-sm font-medium"></CardTitle> {/* Removed "Total Employees" text */}
+        <CardTitle className="text-sm font-medium text-muted-foreground">Total Employees</CardTitle>
         <Users className="h-4 w-4 text-muted-foreground" />
       </CardHeader>
       <CardContent className="pt-2">
@@ -140,3 +139,4 @@ export default function EmployeeCountCard({ selectedMonth, selectedYear }: Emplo
     </Card>
   );
 }
+

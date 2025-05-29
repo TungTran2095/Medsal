@@ -38,7 +38,7 @@ interface MonthlyData {
   month: number;
   year: number;
   total_salary: number;
-  name: string; // For chart display: "MM/YYYY"
+  name: string; 
 }
 
 interface MonthlySalaryTrendChartProps {
@@ -64,8 +64,6 @@ export default function MonthlySalaryTrendChart({ selectedYear }: MonthlySalaryT
       const rpcArgs: { p_filter_year?: number } = {};
       if (selectedYear !== null && selectedYear !== undefined) {
         rpcArgs.p_filter_year = selectedYear;
-      } else {
-        // Handled by RPC default or logic
       }
 
       const functionName = 'get_monthly_salary_trend_fulltime';
@@ -78,14 +76,14 @@ export default function MonthlySalaryTrendChart({ selectedYear }: MonthlySalaryT
         const rpcMessageText = rpcError.message ? String(rpcError.message).toLowerCase() : '';
         
         const isFunctionMissingError =
-          rpcError.code === '42883' || // PostgreSQL: undefined_function
-          (rpcError.code === 'PGRST202' && rpcMessageText.includes(functionName.toLowerCase())) || // PostgREST: "Could not find the function..."
+          rpcError.code === '42883' || 
+          (rpcError.code === 'PGRST202' && rpcMessageText.includes(functionName.toLowerCase())) || 
           (rpcMessageText.includes(functionName.toLowerCase()) && rpcMessageText.includes('does not exist'));
 
         if (isFunctionMissingError) {
           throw new Error(`${CRITICAL_SETUP_ERROR_PREFIX} The Supabase RPC function '${functionName}' is missing. This chart cannot display data without it. Please create this function in your Supabase SQL Editor using the script found in the 'Required SQL Functions' section of README.md.`);
         }
-        throw rpcError; // Re-throw other RPC errors
+        throw rpcError; 
       }
 
       if (data) {
@@ -123,10 +121,10 @@ export default function MonthlySalaryTrendChart({ selectedYear }: MonthlySalaryT
     return (
       <Card className="h-full">
         <CardHeader className="pb-2 pt-3">
-          <CardTitle className="text-sm font-medium">Monthly Salary Trend</CardTitle>
+          <CardTitle className="text-base font-medium">Monthly Salary Trend</CardTitle> {/* Updated size */}
           <CardDescription className="text-xs">Loading trend data...</CardDescription>
         </CardHeader>
-        <CardContent className="flex items-center justify-center h-[200px] pt-2">
+        <CardContent className="flex items-center justify-center h-[250px] pt-2"> {/* Adjusted height to match chart */}
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </CardContent>
       </Card>
@@ -137,7 +135,7 @@ export default function MonthlySalaryTrendChart({ selectedYear }: MonthlySalaryT
     return (
       <Card className="border-destructive/50 h-full">
         <CardHeader className="pb-2 pt-3">
-          <CardTitle className="text-sm font-medium text-destructive flex items-center gap-1">
+          <CardTitle className="text-base font-medium text-destructive flex items-center gap-1"> {/* Updated size */}
             <AlertTriangle className="h-4 w-4" />
             Monthly Trend Error
           </CardTitle>
@@ -158,11 +156,11 @@ export default function MonthlySalaryTrendChart({ selectedYear }: MonthlySalaryT
     return (
      <Card  className="h-full">
        <CardHeader className="pb-2 pt-3">
-          <CardTitle className="text-sm text-muted-foreground">Monthly Salary Trend</CardTitle>
+          <CardTitle className="text-base font-medium text-muted-foreground">Monthly Salary Trend</CardTitle> {/* Updated size */}
           <CardDescription className="text-xs">For: {filterDescription}</CardDescription>
        </CardHeader>
-       <CardContent className="pt-2 flex items-center justify-center h-[200px]">
-         <p className="text-xs text-muted-foreground">No salary data found for the selected period.</p>
+       <CardContent className="pt-2 flex items-center justify-center h-[250px]"> {/* Adjusted height */}
+         <p className="text-sm text-muted-foreground">No salary data found for the selected period.</p> {/* Updated size */}
        </CardContent>
      </Card>
    );
@@ -171,7 +169,7 @@ export default function MonthlySalaryTrendChart({ selectedYear }: MonthlySalaryT
   return (
     <Card  className="h-full">
       <CardHeader className="pb-2 pt-3">
-        <CardTitle className="text-sm font-medium">Monthly Salary Trend</CardTitle>
+        <CardTitle className="text-base font-medium">Monthly Salary Trend</CardTitle> {/* Updated size */}
         <CardDescription className="text-xs">
           Total salary ('tong_thu_nhap') per month for {filterDescription}.
         </CardDescription>
@@ -198,23 +196,22 @@ export default function MonthlySalaryTrendChart({ selectedYear }: MonthlySalaryT
               <Tooltip
                 content={<ChartTooltipContent 
                     indicator="line"
-                    formatter={(value, name, props) => {
-                        // Assuming name is 'total_salary', adjust if dataKey in <Line> changes
-                        if (typeof value === 'number') { // Check if value is a number before formatting
+                    formatter={(value) => {
+                        if (typeof value === 'number') {
                            return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'VND', minimumFractionDigits: 0, maximumFractionDigits: 0  }).format(value);
                         }
-                        return String(value); // Fallback for non-numeric or unexpected values
+                        return String(value);
                     }}
                 />}
               />
-              <Legend />
+              <Legend wrapperStyle={{ fontSize: '0.75rem' }} /> {/* Smaller legend text */}
               <Line
                 type="monotone"
-                dataKey="total_salary" // This should match the field name from your RPC
+                dataKey="total_salary"
                 stroke="var(--color-totalSalary)"
                 strokeWidth={2}
                 dot={false}
-                name="Total Salary" // This name is used by Legend and potentially Tooltip if not overridden
+                name="Total Salary"
               />
             </LineChart>
           </ResponsiveContainer>
@@ -223,3 +220,4 @@ export default function MonthlySalaryTrendChart({ selectedYear }: MonthlySalaryT
     </Card>
   );
 }
+

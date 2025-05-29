@@ -3,27 +3,25 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { Loader2, AlertTriangle, Banknote } from 'lucide-react'; // Changed icon
+import { Loader2, AlertTriangle, Banknote } from 'lucide-react';
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-// Chart specific imports removed
 
-interface TotalSalaryCardProps { // Renamed from TotalSalaryChartProps
+interface TotalSalaryCardProps {
   selectedMonth?: number | null;
   selectedYear?: number | null;
 }
 
-interface ChartError { // Keeping this name for now, though it's a card error
+interface ChartError {
   type: 'rpcMissing' | 'generic';
   message: string;
 }
 
-export default function TotalSalaryCard({ selectedMonth, selectedYear }: TotalSalaryCardProps) { // Renamed component
+export default function TotalSalaryCard({ selectedMonth, selectedYear }: TotalSalaryCardProps) {
   const [totalSalary, setTotalSalary] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<ChartError | null>(null);
@@ -109,9 +107,9 @@ export default function TotalSalaryCard({ selectedMonth, selectedYear }: TotalSa
 
   if (isLoading) {
     return (
-      <Card>
+      <Card className="h-full">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-3">
-          <CardTitle className="text-sm font-medium">Total Fulltime Salary</CardTitle>
+          <CardTitle className="text-sm font-medium text-muted-foreground">Total Fulltime Salary</CardTitle>
           <Banknote className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent className="pt-2">
@@ -125,7 +123,7 @@ export default function TotalSalaryCard({ selectedMonth, selectedYear }: TotalSa
 
   if (error) {
     return (
-      <Card className="border-destructive/50">
+      <Card className="border-destructive/50 h-full">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-3">
           <CardTitle className="text-destructive text-sm font-medium flex items-center gap-1">
             <AlertTriangle className="h-4 w-4" />
@@ -152,7 +150,7 @@ export default function TotalSalaryCard({ selectedMonth, selectedYear }: TotalSa
 
   if (totalSalary === null || totalSalary === 0) {
      return (
-      <Card>
+      <Card className="h-full">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-3">
            <CardTitle className="text-sm font-medium text-muted-foreground">Total Fulltime Salary</CardTitle>
            <Banknote className="h-4 w-4 text-muted-foreground" />
@@ -162,7 +160,7 @@ export default function TotalSalaryCard({ selectedMonth, selectedYear }: TotalSa
             0 VND
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">
-            No salary data for: {filterDescription}, or total is zero.
+            No salary data for: {filterDescription}.
           </p>
         </CardContent>
       </Card>
@@ -177,9 +175,9 @@ export default function TotalSalaryCard({ selectedMonth, selectedYear }: TotalSa
   }).format(totalSalary);
 
   return (
-    <Card>
+    <Card className="h-full">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-3">
-        <CardTitle className="text-sm font-medium">Total Fulltime Salary</CardTitle>
+        <CardTitle className="text-sm font-medium text-muted-foreground">Total Fulltime Salary</CardTitle>
         <Banknote className="h-4 w-4 text-muted-foreground" />
       </CardHeader>
       <CardContent className="pt-2">
@@ -193,3 +191,4 @@ export default function TotalSalaryCard({ selectedMonth, selectedYear }: TotalSa
     </Card>
   );
 }
+
