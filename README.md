@@ -40,12 +40,12 @@ $$;
 
 #### `get_total_salary_fulltime`
 
-This function is used by the Payroll Dashboard to calculate the total sum of `tong_thu_nhap` from the `Fulltime` table, with optional filters for selected year(s) and month(s). It now correctly parses text-based month columns (e.g., "Tháng 01") into integers and supports an array of months for multi-selection.
+This function is used by the Payroll Dashboard to calculate the total sum of `tong_thu_nhap` from the `Fulltime` table, with optional filters for selected year(s) and month(s). It now correctly parses text-based month columns (e.g., "Tháng 01") into integers and supports an array of months and years for multi-selection.
 
 **SQL Code:**
 ```sql
 CREATE OR REPLACE FUNCTION get_total_salary_fulltime(
-    filter_year INTEGER DEFAULT NULL,
+    filter_years INTEGER[] DEFAULT NULL, -- Array of integers for years
     filter_months INTEGER[] DEFAULT NULL -- Array of integers for months
 )
 RETURNS DOUBLE PRECISION
@@ -53,7 +53,12 @@ LANGUAGE SQL
 AS $$
   SELECT SUM(CAST(REPLACE(tong_thu_nhap::text, ',', '') AS DOUBLE PRECISION))
   FROM "Fulltime"
-  WHERE (filter_year IS NULL OR nam::INTEGER = filter_year)
+  WHERE (
+      filter_years IS NULL OR
+      array_length(filter_years, 1) IS NULL OR
+      array_length(filter_years, 1) = 0 OR
+      nam::INTEGER = ANY(filter_years)
+    )
     AND (
       filter_months IS NULL OR
       array_length(filter_months, 1) IS NULL OR
@@ -65,12 +70,12 @@ $$;
 
 #### `get_employee_count_fulltime`
 
-This function is used by the Payroll Dashboard to count the number of unique employees from the `Fulltime` table, with optional filters for selected year(s) and month(s). It now correctly parses text-based month columns (e.g., "Tháng 01") into integers and supports an array of months for multi-selection.
+This function is used by the Payroll Dashboard to count the number of unique employees from the `Fulltime` table, with optional filters for selected year(s) and month(s). It now correctly parses text-based month columns (e.g., "Tháng 01") into integers and supports an array of months and years for multi-selection.
 
 **SQL Code:**
 ```sql
 CREATE OR REPLACE FUNCTION get_employee_count_fulltime(
-    filter_year INTEGER DEFAULT NULL,
+    filter_years INTEGER[] DEFAULT NULL, -- Array of integers for years
     filter_months INTEGER[] DEFAULT NULL -- Array of integers for months
 )
 RETURNS INTEGER
@@ -78,7 +83,12 @@ LANGUAGE SQL
 AS $$
   SELECT COUNT(DISTINCT employee_id)::INTEGER
   FROM "Fulltime"
-  WHERE (filter_year IS NULL OR nam::INTEGER = filter_year)
+  WHERE (
+      filter_years IS NULL OR
+      array_length(filter_years, 1) IS NULL OR
+      array_length(filter_years, 1) = 0 OR
+      nam::INTEGER = ANY(filter_years)
+    )
     AND (
       filter_months IS NULL OR
       array_length(filter_months, 1) IS NULL OR
@@ -90,12 +100,12 @@ $$;
 
 #### `get_monthly_salary_trend_fulltime`
 
-This function is used by the Payroll Dashboard to fetch the total salary (`tong_thu_nhap`) aggregated per month and year, for a given year. This is used to display the monthly salary trend. It now correctly parses text-based month columns (e.g., "Tháng 01") into integers.
+This function is used by the Payroll Dashboard to fetch the total salary (`tong_thu_nhap`) aggregated per month and year, for given year(s). This is used to display the monthly salary trend. It now correctly parses text-based month columns (e.g., "Tháng 01") into integers and supports an array of years.
 
 **SQL Code:**
 ```sql
 CREATE OR REPLACE FUNCTION get_monthly_salary_trend_fulltime(
-    p_filter_year INTEGER DEFAULT NULL
+    p_filter_years INTEGER[] DEFAULT NULL -- Array of integers for years
 )
 RETURNS TABLE(month INTEGER, year INTEGER, total_salary DOUBLE PRECISION)
 LANGUAGE plpgsql
@@ -107,7 +117,12 @@ BEGIN
         f.nam::INTEGER AS year,
         SUM(CAST(REPLACE(f.tong_thu_nhap::text, ',', '') AS DOUBLE PRECISION)) AS total_salary
     FROM "Fulltime" f
-    WHERE (p_filter_year IS NULL OR f.nam::INTEGER = p_filter_year)
+    WHERE (
+        p_filter_years IS NULL OR
+        array_length(p_filter_years, 1) IS NULL OR
+        array_length(p_filter_years, 1) = 0 OR
+        f.nam::INTEGER = ANY(p_filter_years)
+      )
     GROUP BY f.nam, regexp_replace(f.thang, '\D', '', 'g') -- Group by the extracted numeric month
     ORDER BY f.nam, month; -- Order by the extracted numeric month
 END;

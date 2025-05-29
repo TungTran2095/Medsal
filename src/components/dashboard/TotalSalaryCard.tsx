@@ -12,8 +12,8 @@ import {
 } from "@/components/ui/card";
 
 interface TotalSalaryCardProps {
-  selectedMonths?: number[]; // Updated to array
-  selectedYear?: number | null;
+  selectedMonths?: number[]; 
+  selectedYears?: number[]; // Updated to array
 }
 
 interface ChartError {
@@ -21,7 +21,7 @@ interface ChartError {
   message: string;
 }
 
-export default function TotalSalaryCard({ selectedMonths, selectedYear }: TotalSalaryCardProps) {
+export default function TotalSalaryCard({ selectedMonths, selectedYears }: TotalSalaryCardProps) {
   const [totalSalary, setTotalSalary] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<ChartError | null>(null);
@@ -32,14 +32,16 @@ export default function TotalSalaryCard({ selectedMonths, selectedYear }: TotalS
     setError(null);
 
     let description = "all periods";
-    const yearDesc = selectedYear ? `Year ${selectedYear}` : "All Years";
+    const yearDesc = selectedYears && selectedYears.length > 0 
+      ? `Year(s) ${selectedYears.join(', ')}` 
+      : "All Years";
     const monthDesc = selectedMonths && selectedMonths.length > 0 
       ? `Month(s) ${selectedMonths.join(', ')}` 
       : "All Months";
 
-    if (selectedYear && selectedMonths && selectedMonths.length > 0) {
+    if ((selectedYears && selectedYears.length > 0) && (selectedMonths && selectedMonths.length > 0)) {
       description = `${monthDesc}, ${yearDesc}`;
-    } else if (selectedYear) {
+    } else if (selectedYears && selectedYears.length > 0) {
       description = yearDesc;
     } else if (selectedMonths && selectedMonths.length > 0) {
       description = `${monthDesc} (all years)`;
@@ -48,11 +50,8 @@ export default function TotalSalaryCard({ selectedMonths, selectedYear }: TotalS
     
 
     try {
-      const rpcArgs: { filter_year?: number; filter_months?: number[] } = {};
-      if (selectedYear !== null && selectedYear !== undefined) {
-        rpcArgs.filter_year = selectedYear;
-      }
-      // Pass selectedMonths array; if empty, RPC should treat as no filter or pass null
+      const rpcArgs: { filter_years?: number[]; filter_months?: number[] } = {};
+      rpcArgs.filter_years = selectedYears && selectedYears.length > 0 ? selectedYears : undefined;
       rpcArgs.filter_months = selectedMonths && selectedMonths.length > 0 ? selectedMonths : undefined;
 
 
@@ -105,7 +104,7 @@ export default function TotalSalaryCard({ selectedMonths, selectedYear }: TotalS
     } finally {
       setIsLoading(false);
     }
-  }, [selectedMonths, selectedYear, supabase]);
+  }, [selectedMonths, selectedYears, supabase]);
 
   useEffect(() => {
     fetchTotalSalary();
@@ -141,12 +140,12 @@ export default function TotalSalaryCard({ selectedMonths, selectedYear }: TotalS
           <p className="text-xs text-destructive">{error.message}</p>
           {error.type === 'rpcMissing' && (
             <p className="text-xs text-muted-foreground mt-1">
-              Please create the `get_total_salary_fulltime` function in your Supabase SQL Editor. Refer to the README.md for the SQL script.
+              Please create the `get_total_salary_fulltime` function in your Supabase SQL Editor. Refer to the README.md for the SQL script. Ensure `thang` and `nam` columns in `Fulltime` table are numeric or castable.
             </p>
           )}
           {error.type === 'generic' && (
             <p className="text-xs text-muted-foreground mt-1">
-              Check 'Fulltime' table structure: 'tong_thu_nhap' (numeric or text convertible to double precision), 'thang' (text like 'Tháng 01'), and 'nam' (numeric) columns. Ensure RPC function is updated for text 'thang' parsing.
+              Check 'Fulltime' table structure: 'tong_thu_nhap' (numeric or text convertible to double precision), 'thang' (text like 'Tháng 01', will be parsed to number), and 'nam' (numeric) columns. Ensure RPC function is updated for text 'thang' parsing and correct year handling.
             </p>
           )}
         </CardContent>
@@ -197,4 +196,3 @@ export default function TotalSalaryCard({ selectedMonths, selectedYear }: TotalS
     </Card>
   );
 }
-

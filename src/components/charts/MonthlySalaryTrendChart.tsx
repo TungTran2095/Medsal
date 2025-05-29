@@ -42,12 +42,12 @@ interface MonthlyData {
 }
 
 interface MonthlySalaryTrendChartProps {
-  selectedYear?: number | null;
+  selectedYears?: number[]; // Updated to array
 }
 
 const CRITICAL_SETUP_ERROR_PREFIX = "CRITICAL SETUP REQUIRED:";
 
-export default function MonthlySalaryTrendChart({ selectedYear }: MonthlySalaryTrendChartProps) {
+export default function MonthlySalaryTrendChart({ selectedYears }: MonthlySalaryTrendChartProps) {
   const [chartData, setChartData] = useState<MonthlyData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -57,14 +57,16 @@ export default function MonthlySalaryTrendChart({ selectedYear }: MonthlySalaryT
     setIsLoading(true);
     setError(null);
 
-    let description = selectedYear ? `Year ${selectedYear}` : "all available years";
+    let description = (selectedYears && selectedYears.length > 0) 
+      ? `Year(s) ${selectedYears.join(', ')}` 
+      : "all available years";
     setFilterDescription(description);
     
     try {
-      const rpcArgs: { p_filter_year?: number } = {};
-      if (selectedYear !== null && selectedYear !== undefined) {
-        rpcArgs.p_filter_year = selectedYear;
-      }
+      const rpcArgs: { p_filter_years?: number[] } = {};
+      // Pass the array of years; if empty, RPC should treat as no filter or pass null/undefined
+      rpcArgs.p_filter_years = selectedYears && selectedYears.length > 0 ? selectedYears : undefined;
+
 
       const functionName = 'get_monthly_salary_trend_fulltime';
       const { data, error: rpcError } = await supabase.rpc(
@@ -111,7 +113,7 @@ export default function MonthlySalaryTrendChart({ selectedYear }: MonthlySalaryT
     } finally {
       setIsLoading(false);
     }
-  }, [selectedYear]);
+  }, [selectedYears]);
 
   useEffect(() => {
     fetchMonthlyTrend();
@@ -121,10 +123,10 @@ export default function MonthlySalaryTrendChart({ selectedYear }: MonthlySalaryT
     return (
       <Card className="h-full">
         <CardHeader className="pb-2 pt-3">
-          <CardTitle className="text-base font-medium">Monthly Salary Trend</CardTitle> {/* Updated size */}
+          <CardTitle className="text-base font-medium">Monthly Salary Trend</CardTitle> 
           <CardDescription className="text-xs">Loading trend data...</CardDescription>
         </CardHeader>
-        <CardContent className="flex items-center justify-center h-[250px] pt-2"> {/* Adjusted height to match chart */}
+        <CardContent className="flex items-center justify-center h-[250px] pt-2"> 
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </CardContent>
       </Card>
@@ -135,7 +137,7 @@ export default function MonthlySalaryTrendChart({ selectedYear }: MonthlySalaryT
     return (
       <Card className="border-destructive/50 h-full">
         <CardHeader className="pb-2 pt-3">
-          <CardTitle className="text-base font-medium text-destructive flex items-center gap-1"> {/* Updated size */}
+          <CardTitle className="text-base font-medium text-destructive flex items-center gap-1"> 
             <AlertTriangle className="h-4 w-4" />
             Monthly Trend Error
           </CardTitle>
@@ -156,11 +158,11 @@ export default function MonthlySalaryTrendChart({ selectedYear }: MonthlySalaryT
     return (
      <Card  className="h-full">
        <CardHeader className="pb-2 pt-3">
-          <CardTitle className="text-base font-medium text-muted-foreground">Monthly Salary Trend</CardTitle> {/* Updated size */}
+          <CardTitle className="text-base font-medium text-muted-foreground">Monthly Salary Trend</CardTitle> 
           <CardDescription className="text-xs">For: {filterDescription}</CardDescription>
        </CardHeader>
-       <CardContent className="pt-2 flex items-center justify-center h-[250px]"> {/* Adjusted height */}
-         <p className="text-sm text-muted-foreground">No salary data found for the selected period.</p> {/* Updated size */}
+       <CardContent className="pt-2 flex items-center justify-center h-[250px]"> 
+         <p className="text-sm text-muted-foreground">No salary data found for the selected period.</p> 
        </CardContent>
      </Card>
    );
@@ -169,7 +171,7 @@ export default function MonthlySalaryTrendChart({ selectedYear }: MonthlySalaryT
   return (
     <Card  className="h-full">
       <CardHeader className="pb-2 pt-3">
-        <CardTitle className="text-base font-medium">Monthly Salary Trend</CardTitle> {/* Updated size */}
+        <CardTitle className="text-base font-medium">Monthly Salary Trend</CardTitle> 
         <CardDescription className="text-xs">
           Total salary ('tong_thu_nhap') per month for {filterDescription}.
         </CardDescription>
@@ -204,7 +206,7 @@ export default function MonthlySalaryTrendChart({ selectedYear }: MonthlySalaryT
                     }}
                 />}
               />
-              <Legend wrapperStyle={{ fontSize: '0.75rem' }} /> {/* Smaller legend text */}
+              <Legend wrapperStyle={{ fontSize: '0.75rem' }} /> 
               <Line
                 type="monotone"
                 dataKey="total_salary"
@@ -220,4 +222,3 @@ export default function MonthlySalaryTrendChart({ selectedYear }: MonthlySalaryT
     </Card>
   );
 }
-

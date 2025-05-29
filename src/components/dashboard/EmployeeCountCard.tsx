@@ -12,11 +12,11 @@ import {
 } from "@/components/ui/card";
 
 interface EmployeeCountCardProps {
-  selectedMonths?: number[]; // Updated to array
-  selectedYear?: number | null;
+  selectedMonths?: number[]; 
+  selectedYears?: number[]; // Updated to array
 }
 
-export default function EmployeeCountCard({ selectedMonths, selectedYear }: EmployeeCountCardProps) {
+export default function EmployeeCountCard({ selectedMonths, selectedYears }: EmployeeCountCardProps) {
   const [employeeCount, setEmployeeCount] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -27,14 +27,16 @@ export default function EmployeeCountCard({ selectedMonths, selectedYear }: Empl
     setError(null);
 
     let description = "all periods";
-    const yearDesc = selectedYear ? `Year ${selectedYear}` : "All Years";
+    const yearDesc = selectedYears && selectedYears.length > 0 
+      ? `Year(s) ${selectedYears.join(', ')}` 
+      : "All Years";
     const monthDesc = selectedMonths && selectedMonths.length > 0 
       ? `Month(s) ${selectedMonths.join(', ')}` 
       : "All Months";
 
-    if (selectedYear && selectedMonths && selectedMonths.length > 0) {
+    if ((selectedYears && selectedYears.length > 0) && (selectedMonths && selectedMonths.length > 0)) {
       description = `${monthDesc}, ${yearDesc}`;
-    } else if (selectedYear) {
+    } else if (selectedYears && selectedYears.length > 0) {
       description = yearDesc;
     } else if (selectedMonths && selectedMonths.length > 0) {
       description = `${monthDesc} (all years)`;
@@ -43,10 +45,8 @@ export default function EmployeeCountCard({ selectedMonths, selectedYear }: Empl
 
 
     try {
-      const rpcArgs: { filter_year?: number; filter_months?: number[] } = {};
-      if (selectedYear !== null && selectedYear !== undefined) {
-        rpcArgs.filter_year = selectedYear;
-      }
+      const rpcArgs: { filter_years?: number[]; filter_months?: number[] } = {};
+      rpcArgs.filter_years = selectedYears && selectedYears.length > 0 ? selectedYears : undefined;
       rpcArgs.filter_months = selectedMonths && selectedMonths.length > 0 ? selectedMonths : undefined;
 
 
@@ -86,7 +86,7 @@ export default function EmployeeCountCard({ selectedMonths, selectedYear }: Empl
     } finally {
       setIsLoading(false);
     }
-  }, [selectedMonths, selectedYear]);
+  }, [selectedMonths, selectedYears]);
 
   useEffect(() => {
     fetchEmployeeCount();
@@ -144,4 +144,3 @@ export default function EmployeeCountCard({ selectedMonths, selectedYear }: Empl
     </Card>
   );
 }
-

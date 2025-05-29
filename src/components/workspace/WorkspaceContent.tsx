@@ -17,20 +17,13 @@ import TotalSalaryCard from '@/components/dashboard/TotalSalaryCard';
 import EmployeeCountCard from '@/components/dashboard/EmployeeCountCard';
 import MonthlySalaryTrendChart from '@/components/charts/MonthlySalaryTrendChart';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuLabel,
   DropdownMenuSeparator as DMSR,
   DropdownMenuTrigger,
-  DropdownMenuItem, // Added DropdownMenuItem here
+  DropdownMenuItem,
 } from "@/components/ui/dropdown-menu"
 import {
   SidebarProvider,
@@ -39,7 +32,7 @@ import {
   SidebarTrigger,
   SidebarContent,
   SidebarMenu,
-  SidebarMenuItem as SidebarMenuItemComponent, // Renamed to avoid conflict with shadcn/ui DropdownMenuItem
+  SidebarMenuItem as SidebarMenuItemComponent,
   SidebarMenuButton,
   SidebarInset,
 } from '@/components/ui/sidebar';
@@ -71,12 +64,12 @@ export default function WorkspaceContent() {
   const { theme, toggleTheme } = useTheme();
 
   const [selectedMonths, setSelectedMonths] = useState<number[]>([]);
-  const [selectedYear, setSelectedYear] = useState<number | null>(new Date().getFullYear());
+  const [selectedYears, setSelectedYears] = useState<number[]>([new Date().getFullYear()]); // Default to current year selected
   const [availableMonths, setAvailableMonths] = useState<MonthOption[]>([]);
   const [isLoadingMonths, setIsLoadingMonths] = useState<boolean>(true);
 
   const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 10 }, (_, i) => currentYear - i);
+  const yearOptions = Array.from({ length: 10 }, (_, i) => currentYear - i);
 
 
   const navItems: NavItem[] = [
@@ -102,13 +95,13 @@ export default function WorkspaceContent() {
                 if (item.thang === null || item.thang === undefined) return null;
                 if (typeof item.thang === 'string') {
                   const trimmedThang = item.thang.trim();
-                  const numericPart = trimmedThang.replace(/\D/g, ''); // Remove non-digits
+                  const numericPart = trimmedThang.replace(/\D/g, '');
                   if (numericPart) {
                     return parseInt(numericPart, 10);
                   }
                   return null;
                 }
-                return Number(item.thang); // If it's already a number
+                return Number(item.thang);
               })
               .filter(month => month !== null && !isNaN(month) && month >= 1 && month <= 12) as number[]
           )
@@ -116,7 +109,7 @@ export default function WorkspaceContent() {
         
         const monthOptions = distinctMonthNumbers.map(monthNum => ({
           value: monthNum,
-          label: new Date(0, monthNum - 1).toLocaleString('default', { month: 'long' }) // Format to month name
+          label: new Date(0, monthNum - 1).toLocaleString('default', { month: 'long' })
         }));
         setAvailableMonths(monthOptions);
 
@@ -218,8 +211,8 @@ export default function WorkspaceContent() {
     try {
       const dataToUpload = parsedData.map(entry => {
         let payDateObj = null;
-        let thang: string | null = null; // Explicitly string or null
-        let nam: number | null = null;   // Explicitly number or null
+        let thang: string | null = null; 
+        let nam: number | null = null;   
 
         if (entry.pay_date) {
           const datePartsDMY = entry.pay_date.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
@@ -309,6 +302,28 @@ export default function WorkspaceContent() {
       return selectedMonths.map(mValue => availableMonths.find(am => am.value === mValue)?.label).filter(Boolean).join(', ');
     }
     return `${selectedMonths.length} months selected`;
+  };
+
+  const handleYearSelection = (yearValue: number, checked: boolean) => {
+    setSelectedYears(prevSelected => {
+      const newSelected = new Set(prevSelected);
+      if (checked) {
+        newSelected.add(yearValue);
+      } else {
+        newSelected.delete(yearValue);
+      }
+      return Array.from(newSelected).sort((a,b) => a-b);
+    });
+  };
+
+  const getSelectedYearsText = () => {
+    if (selectedYears.length === 0 || selectedYears.length === yearOptions.length) {
+      return "All Years";
+    }
+    if (selectedYears.length <= 2) {
+      return selectedYears.join(', ');
+    }
+    return `${selectedYears.length} years selected`;
   };
 
 
@@ -497,32 +512,39 @@ export default function WorkspaceContent() {
                       </DropdownMenu>
                     </div>
                     <div>
-                      <Label htmlFor="year-filter" className="text-xs font-medium">Year</Label>
-                      <Select
-                        value={selectedYear !== null ? selectedYear.toString() : "all"}
-                        onValueChange={(value) => setSelectedYear(value === "all" ? null : parseInt(value))}
-                      >
-                        <SelectTrigger id="year-filter" className="h-9 text-sm w-full sm:w-[120px] mt-1">
-                          <SelectValue placeholder="Select Year" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Years</SelectItem>
-                          {years.map(year => (
-                            <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                      <Label htmlFor="year-filter" className="text-xs font-medium">Year(s)</Label>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" className="h-9 text-sm w-full sm:w-[120px] mt-1 justify-between">
+                            <span>{getSelectedYearsText()}</span>
+                            <ChevronDown className="ml-2 h-4 w-4 opacity-50" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="w-[120px]">
+                          <DropdownMenuLabel>Select Years</DropdownMenuLabel>
+                          <DMSR />
+                          {yearOptions.map(year => (
+                            <DropdownMenuCheckboxItem
+                              key={year}
+                              checked={selectedYears.includes(year)}
+                              onCheckedChange={(checked) => handleYearSelection(year, checked as boolean)}
+                            >
+                              {year}
+                            </DropdownMenuCheckboxItem>
                           ))}
-                        </SelectContent>
-                      </Select>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="pt-3 px-3 md:px-4 pb-3 flex-grow overflow-y-auto space-y-3">
                 <div className="grid gap-3 md:grid-cols-2">
-                    <TotalSalaryCard selectedMonths={selectedMonths} selectedYear={selectedYear} />
-                    <EmployeeCountCard selectedMonths={selectedMonths} selectedYear={selectedYear} />
+                    <TotalSalaryCard selectedMonths={selectedMonths} selectedYears={selectedYears} />
+                    <EmployeeCountCard selectedMonths={selectedMonths} selectedYears={selectedYears} />
                 </div>
                 <div className="mt-0">
-                    <MonthlySalaryTrendChart selectedYear={selectedYear} />
+                    <MonthlySalaryTrendChart selectedYears={selectedYears} />
                 </div>
               </CardContent>
             </Card>
@@ -532,4 +554,3 @@ export default function WorkspaceContent() {
     </SidebarProvider>
   );
 }
-
