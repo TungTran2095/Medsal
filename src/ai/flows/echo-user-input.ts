@@ -58,7 +58,11 @@ limit: 2
 filters: [{column: 'salary', operator: 'gt', value: 50000}] // Notice value is a number here
 orderBy: {column: 'employee_name', ascending: true}
 
-After receiving the JSON result from the tool, interpret it and present the information to the user in a natural, readable way. Do not just output the raw JSON. If the tool returns an error, inform the user clearly.
+After receiving the result from the tool:
+- If the tool returns a JSON array of data, you MUST summarize or list this data clearly for the user. Do not just say you fetched it; SHOW or DESCRIBE the data.
+- If the tool returns a message like "No records found...", inform the user of this.
+- If the tool returns an error message (e.g., "Error querying Supabase..."), inform the user clearly about the error, explaining what might have gone wrong (e.g., "I couldn't find a table named X" or "There was an issue with the query parameters").
+Do not output raw JSON.
 
 Previous Context:
 {{#if previousContext}}

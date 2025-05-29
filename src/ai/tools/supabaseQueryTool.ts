@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview A Genkit tool for querying Supabase database tables.
@@ -70,7 +71,7 @@ const QuerySupabaseTableOutputSchema = z.object({
   result: z
     .string()
     .describe(
-      'The query result as a JSON string, or an error message if the query failed.'
+      'The query result as a JSON string, a "No records found..." message, or an error message if the query failed.'
     ),
 });
 
@@ -90,10 +91,6 @@ export const querySupabaseTableTool = ai.defineTool(
 
       if (input.filters && input.filters.length > 0) {
         input.filters.forEach((filter) => {
-          // Supabase client methods like .eq(), .gt() are dynamically called
-          // based on filter.operator. This requires careful handling of 'any' type
-          // for filter.value if we were to be extremely type-safe, but for common cases
-          // Supabase client handles string-to-type conversion well for basic operators.
           if (typeof (query as any)[filter.operator] === 'function') {
             query = (query as any)[filter.operator](
               filter.column,
@@ -107,7 +104,7 @@ export const querySupabaseTableTool = ai.defineTool(
 
       if (input.orderBy) {
         query = query.order(input.orderBy.column, {
-          ascending: input.orderBy.ascending,
+          ascending: input.orderBy.ascending ?? true,
         });
       }
 
@@ -116,14 +113,18 @@ export const querySupabaseTableTool = ai.defineTool(
       const { data, error } = await query;
 
       if (error) {
-        console.error('Supabase query error:', error);
-        return { result: `Error querying Supabase: ${error.message}` };
+        console.error(`Supabase query error for table '${input.tableName}':`, error);
+        return { result: `Error querying Supabase for table '${input.tableName}': ${error.message}. Please check if the table name and query parameters are correct.` };
+      }
+
+      if (!data || data.length === 0) {
+        return { result: `No records found in table '${input.tableName}' matching your criteria.` };
       }
 
       return { result: JSON.stringify(data, null, 2) };
     } catch (e: any) {
-      console.error('Error in querySupabaseTableTool:', e);
-      return { result: `Tool execution error: ${e.message}` };
+      console.error(`Error in querySupabaseTableTool for table '${input.tableName}':`, e);
+      return { result: `Tool execution error while querying table '${input.tableName}': ${e.message}.` };
     }
   }
 );
