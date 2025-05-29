@@ -87,12 +87,16 @@ export default function WorkspaceContent() {
               .map(item => {
                 if (item.thang === null || item.thang === undefined) return null;
                 if (typeof item.thang === 'string') {
-                  const match = item.thang.match(/\d+/);
-                  return match ? parseInt(match[0], 10) : null;
+                  const trimmedThang = item.thang.trim();
+                  const numericPart = trimmedThang.replace(/\D/g, '');
+                  if (numericPart) {
+                    return parseInt(numericPart, 10);
+                  }
+                  return null;
                 }
                 return Number(item.thang);
               })
-              .filter(month => month !== null && month >= 1 && month <= 12) as number[]
+              .filter(month => month !== null && !isNaN(month) && month >= 1 && month <= 12) as number[]
           )
         ).sort((a, b) => a - b);
         setAvailableMonths(distinctMonths);
@@ -199,25 +203,30 @@ export default function WorkspaceContent() {
 
         if (entry.pay_date) {
           const datePartsDMY = entry.pay_date.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
-          const datePartsMDY = entry.pay_date.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
-          const dateISO = entry.pay_date.match(/^\d{4}-\d{2}-\d{2}/);
+          const datePartsMDY = entry.pay_date.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/); // M/D/YYYY or MM/DD/YYYY
+          const dateISO = entry.pay_date.match(/^\d{4}-\d{2}-\d{2}/); // YYYY-MM-DD
 
           if (dateISO) {
              payDateObj = new Date(entry.pay_date);
-          } else if (datePartsDMY) {
+          } else if (datePartsDMY) { // Assuming D/M/YYYY or DD/MM/YYYY
             payDateObj = new Date(parseInt(datePartsDMY[3]), parseInt(datePartsDMY[2]) - 1, parseInt(datePartsDMY[1]));
-          } else if (datePartsMDY) {
+          } else if (datePartsMDY) { // Assuming M/D/YYYY or MM/DD/YYYY
             payDateObj = new Date(parseInt(datePartsMDY[3]), parseInt(datePartsMDY[1]) - 1, parseInt(datePartsMDY[2]));
           } else {
+             // Fallback for other potential simple date formats, might be locale-dependent
              payDateObj = new Date(entry.pay_date);
           }
 
           if (payDateObj && !isNaN(payDateObj.getTime())) {
-            thang = payDateObj.getMonth() + 1;
+            // Format thang as "Tháng XX" for consistency with potential existing data
+            const monthNumber = payDateObj.getMonth() + 1;
+            thang = `Tháng ${String(monthNumber).padStart(2, '0')}`;
             nam = payDateObj.getFullYear();
           } else {
             console.warn(`Invalid date format for pay_date: ${entry.pay_date}. Setting thang and nam to null.`);
-            payDateObj = null;
+            payDateObj = null; // Ensure payDateObj is null if parsing failed
+            thang = null; // Explicitly nullify thang
+            nam = null;   // Explicitly nullify nam
           }
         }
 
@@ -226,8 +235,8 @@ export default function WorkspaceContent() {
           employee_name: entry.employee_name,
           tong_thu_nhap: entry.salary,
           pay_date: payDateObj ? payDateObj.toISOString().split('T')[0] : null,
-          thang: thang,
-          nam: nam,
+          thang: thang, // This will be "Tháng XX" or null
+          nam: nam,     // This will be YYYY or null
         };
       });
 
@@ -248,7 +257,7 @@ export default function WorkspaceContent() {
       setSelectedFile(null);
       const fileInput = document.getElementById('payroll-csv-input') as HTMLInputElement;
       if (fileInput) fileInput.value = '';
-      fetchDistinctMonths();
+      fetchDistinctMonths(); // Re-fetch months after successful upload
 
     } catch (error: any) {
       console.error("Supabase upload error:", error);
@@ -312,8 +321,8 @@ export default function WorkspaceContent() {
           </div>
         </SidebarContent>
       </Sidebar>
-      <SidebarInset className="flex-grow overflow-y-auto p-3 md:p-4"> {/* Adjusted padding for inset */}
-        <div className="space-y-3 h-full"> {/* Adjusted spacing */}
+      <SidebarInset className="flex-grow overflow-y-auto p-3 md:p-4">
+        <div className="space-y-3 h-full">
           {activeView === 'dbManagement' && (
             <>
               <Card className="w-full flex flex-col shadow-md rounded-lg">
@@ -397,14 +406,14 @@ export default function WorkspaceContent() {
                 </CardContent>
               </Card>
 
-              <Separator className="my-2"/> {/* Adjusted margin */}
+              <Separator className="my-2"/>
 
               <SupabaseTableList />
             </>
           )}
           {activeView === 'dashboard' && (
              <Card className="shadow-md rounded-lg h-full flex flex-col">
-              <CardHeader className="pb-3 pt-4 px-4 md:px-6"> {/* Consistent padding */}
+              <CardHeader className="pb-3 pt-4 px-4 md:px-6">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <div>
                     <CardTitle className="text-xl font-semibold text-primary flex items-center gap-2">
@@ -460,12 +469,12 @@ export default function WorkspaceContent() {
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="pt-3 px-4 md:px-6 pb-4 flex-grow overflow-auto space-y-4"> {/* Consistent padding and spacing */}
-                <div className="grid gap-4 md:grid-cols-2"> {/* Adjusted gap */}
+              <CardContent className="pt-3 px-4 md:px-6 pb-4 flex-grow overflow-y-auto space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
                     <TotalSalaryCard selectedMonth={selectedMonth} selectedYear={selectedYear} />
                     <EmployeeCountCard selectedMonth={selectedMonth} selectedYear={selectedYear} />
                 </div>
-                <div className="mt-0"> {/* Removed unnecessary margin top */}
+                <div className="mt-0">
                     <MonthlySalaryTrendChart selectedYear={selectedYear} />
                 </div>
               </CardContent>
