@@ -56,7 +56,7 @@ export default function TotalSalaryChart() {
       } catch (err: any) {
         const errorMessage = err.message || 'Failed to fetch total salary data.';
         setError(errorMessage);
-        console.error("Error fetching total salary:", err);
+        console.error("Error fetching total salary:", JSON.stringify(err, null, 2));
         setTotalSalary(null);
       } finally {
         setIsLoading(false);
