@@ -30,11 +30,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     // This effect runs only on the client, after initial mount.
     setHasMounted(true);
     const storedTheme = localStorage.getItem('app-theme') as Theme | null;
-    const preferredTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-
-    // Set the theme based on localStorage or OS preference
-    // This will trigger the second useEffect to apply the class and save to localStorage
-    setTheme(storedTheme || preferredTheme);
+    
+    // Set the theme based on localStorage, or default to 'light' if nothing is stored.
+    setTheme(storedTheme || 'light');
   }, []); // Empty dependency array ensures this runs once on mount client-side
 
   useEffect(() => {
