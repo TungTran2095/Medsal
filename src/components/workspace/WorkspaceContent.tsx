@@ -131,13 +131,13 @@ export default function WorkspaceContent() {
     setIsUploading(true);
     try {
       const { data, error } = await supabase
-        .from('Fulltime')
+        .from('Fulltime') // Target the 'Fulltime' table
         .insert(parsedData.map(entry => ({
           employee_id: entry.employee_id,
           employee_name: entry.employee_name,
           salary: entry.salary,
           pay_date: entry.pay_date,
-          tong_thu_nhap: entry.salary, // Assuming salary is tong_thu_nhap for now
+          tong_thu_nhap: entry.salary, 
         })));
 
       if (error) {
@@ -167,7 +167,7 @@ export default function WorkspaceContent() {
 
   return (
     <SidebarProvider defaultOpen={true} >
-      <Sidebar collapsible="icon">
+      <Sidebar collapsible="icon"> {/* Ensure sidebar is collapsible to icon only */}
         <SidebarHeader>
            <div className="flex items-center justify-between p-2"> {/* Reduced padding */}
             <span className="text-base font-semibold text-sidebar-primary group-data-[state=collapsed]:hidden">
@@ -299,23 +299,29 @@ export default function WorkspaceContent() {
               </CardHeader>
               <CardContent className="pt-2 px-2 pb-2"> {/* Reduced padding */}
                 <div className="flex flex-wrap gap-2 mb-3 items-center">
-                    <Select onValueChange={(value) => setSelectedMonth(value ? parseInt(value) : null)} value={selectedMonth !== null ? selectedMonth.toString() : ""}>
+                    <Select 
+                        onValueChange={(value) => setSelectedMonth(value === "all" ? null : parseInt(value))} 
+                        value={selectedMonth !== null ? selectedMonth.toString() : "all"}
+                    >
                         <SelectTrigger className="w-full sm:w-[160px] h-8 text-xs">
                             <SelectValue placeholder="Select Month" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="" className="text-xs">All Months</SelectItem>
+                            <SelectItem value="all" className="text-xs">All Months</SelectItem>
                             {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
                                 <SelectItem key={m} value={m.toString()} className="text-xs">Month {m}</SelectItem>
                             ))}
                         </SelectContent>
                     </Select>
-                    <Select onValueChange={(value) => setSelectedYear(value ? parseInt(value) : null)} value={selectedYear !== null ? selectedYear.toString() : ""}>
+                    <Select 
+                        onValueChange={(value) => setSelectedYear(value === "all" ? null : parseInt(value))} 
+                        value={selectedYear !== null ? selectedYear.toString() : "all"}
+                    >
                         <SelectTrigger className="w-full sm:w-[160px] h-8 text-xs">
                             <SelectValue placeholder="Select Year" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="" className="text-xs">All Years</SelectItem>
+                            <SelectItem value="all" className="text-xs">All Years</SelectItem>
                             {years.map(y => (
                                 <SelectItem key={y} value={y.toString()} className="text-xs">{y}</SelectItem>
                             ))}
@@ -332,3 +338,4 @@ export default function WorkspaceContent() {
     </SidebarProvider>
   );
 }
+
