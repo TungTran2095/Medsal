@@ -69,7 +69,11 @@ export default function TotalSalaryChart({ selectedMonth, selectedYear }: TotalS
       if (dbError) throw dbError;
 
       if (data) {
-        const sum = data.reduce((acc, currentRow) => acc + (currentRow.tong_thu_nhap || 0), 0);
+        const sum = data.reduce((acc, currentRow) => {
+          // Explicitly parse to float and handle NaN
+          const value = parseFloat(String(currentRow.tong_thu_nhap));
+          return acc + (isNaN(value) ? 0 : value);
+        }, 0);
         setTotalSalary(sum);
       } else {
         setTotalSalary(0);
