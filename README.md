@@ -16,7 +16,7 @@ To create these functions:
 1.  Go to your Supabase Project.
 2.  Navigate to the **SQL Editor** (usually found in the left sidebar).
 3.  Click on **New query** (or "+ New query").
-4.  For each function below, paste its SQL code into the editor and click **Run**.
+4.  For each function below, paste its SQL code into the editor and click **Run**. Ensure you are copying *only* the SQL function definition block.
 
 #### `get_public_tables`
 
@@ -89,11 +89,11 @@ AS $$
 BEGIN
     RETURN QUERY
     SELECT
-        f.thang::INTEGER AS month,   -- Ensure 'thang' is cast to INTEGER
-        f.nam::INTEGER AS year,     -- Ensure 'nam' is cast to INTEGER
+        f.thang::INTEGER AS month,
+        f.nam::INTEGER AS year,
         SUM(CAST(REPLACE(f.tong_thu_nhap::text, ',', '') AS DOUBLE PRECISION)) AS total_salary
     FROM "Fulltime" f
-    WHERE (p_filter_year IS NULL OR f.nam::INTEGER = p_filter_year) -- Cast f.nam for comparison if it's text
+    WHERE (p_filter_year IS NULL OR f.nam::INTEGER = p_filter_year)
     GROUP BY f.nam, f.thang
     ORDER BY f.nam, f.thang;
 END;
@@ -101,4 +101,3 @@ $$;
 ```
 
 Once these functions are successfully created, the application should be able to list your public tables and display dashboard analytics correctly.
-
