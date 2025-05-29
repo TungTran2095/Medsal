@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/card";
 
 interface TotalSalaryCardProps {
-  selectedMonth?: number | null;
+  selectedMonths?: number[]; // Updated to array
   selectedYear?: number | null;
 }
 
@@ -21,7 +21,7 @@ interface ChartError {
   message: string;
 }
 
-export default function TotalSalaryCard({ selectedMonth, selectedYear }: TotalSalaryCardProps) {
+export default function TotalSalaryCard({ selectedMonths, selectedYear }: TotalSalaryCardProps) {
   const [totalSalary, setTotalSalary] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<ChartError | null>(null);
@@ -32,23 +32,29 @@ export default function TotalSalaryCard({ selectedMonth, selectedYear }: TotalSa
     setError(null);
 
     let description = "all periods";
-    if (selectedYear && selectedMonth) {
-      description = `Month ${selectedMonth}, ${selectedYear}`;
+    const yearDesc = selectedYear ? `Year ${selectedYear}` : "All Years";
+    const monthDesc = selectedMonths && selectedMonths.length > 0 
+      ? `Month(s) ${selectedMonths.join(', ')}` 
+      : "All Months";
+
+    if (selectedYear && selectedMonths && selectedMonths.length > 0) {
+      description = `${monthDesc}, ${yearDesc}`;
     } else if (selectedYear) {
-      description = `Year ${selectedYear}`;
-    } else if (selectedMonth) {
-      description = `Month ${selectedMonth} (all years)`;
+      description = yearDesc;
+    } else if (selectedMonths && selectedMonths.length > 0) {
+      description = `${monthDesc} (all years)`;
     }
     setFilterDescription(description);
+    
 
     try {
-      const rpcArgs: { filter_year?: number; filter_month?: number } = {};
+      const rpcArgs: { filter_year?: number; filter_months?: number[] } = {};
       if (selectedYear !== null && selectedYear !== undefined) {
         rpcArgs.filter_year = selectedYear;
       }
-      if (selectedMonth !== null && selectedMonth !== undefined) {
-        rpcArgs.filter_month = selectedMonth;
-      }
+      // Pass selectedMonths array; if empty, RPC should treat as no filter or pass null
+      rpcArgs.filter_months = selectedMonths && selectedMonths.length > 0 ? selectedMonths : undefined;
+
 
       const functionName = 'get_total_salary_fulltime';
       const { data, error: rpcError } = await supabase.rpc(
@@ -99,7 +105,7 @@ export default function TotalSalaryCard({ selectedMonth, selectedYear }: TotalSa
     } finally {
       setIsLoading(false);
     }
-  }, [selectedMonth, selectedYear, supabase]);
+  }, [selectedMonths, selectedYear, supabase]);
 
   useEffect(() => {
     fetchTotalSalary();
@@ -140,7 +146,7 @@ export default function TotalSalaryCard({ selectedMonth, selectedYear }: TotalSa
           )}
           {error.type === 'generic' && (
             <p className="text-xs text-muted-foreground mt-1">
-              Check 'Fulltime' table structure: 'tong_thu_nhap' (numeric or text convertible to double precision), 'thang' (numeric), and 'nam' (numeric) columns.
+              Check 'Fulltime' table structure: 'tong_thu_nhap' (numeric or text convertible to double precision), 'thang' (text like 'Tháng 01'), and 'nam' (numeric) columns. Ensure RPC function is updated for text 'thang' parsing.
             </p>
           )}
         </CardContent>

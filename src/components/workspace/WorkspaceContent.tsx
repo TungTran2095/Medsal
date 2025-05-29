@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon } from "lucide-react";
+import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, ChevronDown } from "lucide-react";
 import type { PayrollEntry } from '@/types';
 import { supabase } from '@/lib/supabaseClient';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -24,13 +24,22 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator as DMSR,
+  DropdownMenuTrigger,
+  DropdownMenuItem, // Added DropdownMenuItem here
+} from "@/components/ui/dropdown-menu"
+import {
   SidebarProvider,
   Sidebar,
   SidebarHeader,
   SidebarTrigger,
   SidebarContent,
   SidebarMenu,
-  SidebarMenuItem,
+  SidebarMenuItem as SidebarMenuItemComponent, // Renamed to avoid conflict with shadcn/ui DropdownMenuItem
   SidebarMenuButton,
   SidebarInset,
 } from '@/components/ui/sidebar';
@@ -47,6 +56,11 @@ interface NavItem {
   icon: React.ElementType;
 }
 
+interface MonthOption {
+  value: number;
+  label: string;
+}
+
 export default function WorkspaceContent() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<PayrollEntry[]>([]);
@@ -56,9 +70,9 @@ export default function WorkspaceContent() {
   const [activeView, setActiveView] = useState<WorkspaceView>('dashboard');
   const { theme, toggleTheme } = useTheme();
 
-  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
+  const [selectedMonths, setSelectedMonths] = useState<number[]>([]);
   const [selectedYear, setSelectedYear] = useState<number | null>(new Date().getFullYear());
-  const [availableMonths, setAvailableMonths] = useState<number[]>([]);
+  const [availableMonths, setAvailableMonths] = useState<MonthOption[]>([]);
   const [isLoadingMonths, setIsLoadingMonths] = useState<boolean>(true);
 
   const currentYear = new Date().getFullYear();
@@ -81,25 +95,31 @@ export default function WorkspaceContent() {
       if (error) throw error;
 
       if (data) {
-        const distinctMonths = Array.from(
+        const distinctMonthNumbers = Array.from(
           new Set(
             data
               .map(item => {
                 if (item.thang === null || item.thang === undefined) return null;
                 if (typeof item.thang === 'string') {
                   const trimmedThang = item.thang.trim();
-                  const numericPart = trimmedThang.replace(/\D/g, '');
+                  const numericPart = trimmedThang.replace(/\D/g, ''); // Remove non-digits
                   if (numericPart) {
                     return parseInt(numericPart, 10);
                   }
                   return null;
                 }
-                return Number(item.thang);
+                return Number(item.thang); // If it's already a number
               })
               .filter(month => month !== null && !isNaN(month) && month >= 1 && month <= 12) as number[]
           )
         ).sort((a, b) => a - b);
-        setAvailableMonths(distinctMonths);
+        
+        const monthOptions = distinctMonthNumbers.map(monthNum => ({
+          value: monthNum,
+          label: new Date(0, monthNum - 1).toLocaleString('default', { month: 'long' }) // Format to month name
+        }));
+        setAvailableMonths(monthOptions);
+
       } else {
         setAvailableMonths([]);
       }
@@ -198,35 +218,33 @@ export default function WorkspaceContent() {
     try {
       const dataToUpload = parsedData.map(entry => {
         let payDateObj = null;
-        let thang = null;
-        let nam = null;
+        let thang: string | null = null; // Explicitly string or null
+        let nam: number | null = null;   // Explicitly number or null
 
         if (entry.pay_date) {
           const datePartsDMY = entry.pay_date.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
-          const datePartsMDY = entry.pay_date.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/); // M/D/YYYY or MM/DD/YYYY
-          const dateISO = entry.pay_date.match(/^\d{4}-\d{2}-\d{2}/); // YYYY-MM-DD
+          const datePartsMDY = entry.pay_date.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/); 
+          const dateISO = entry.pay_date.match(/^\d{4}-\d{2}-\d{2}/); 
 
           if (dateISO) {
              payDateObj = new Date(entry.pay_date);
-          } else if (datePartsDMY) { // Assuming D/M/YYYY or DD/MM/YYYY
+          } else if (datePartsDMY) { 
             payDateObj = new Date(parseInt(datePartsDMY[3]), parseInt(datePartsDMY[2]) - 1, parseInt(datePartsDMY[1]));
-          } else if (datePartsMDY) { // Assuming M/D/YYYY or MM/DD/YYYY
+          } else if (datePartsMDY) { 
             payDateObj = new Date(parseInt(datePartsMDY[3]), parseInt(datePartsMDY[1]) - 1, parseInt(datePartsMDY[2]));
           } else {
-             // Fallback for other potential simple date formats, might be locale-dependent
              payDateObj = new Date(entry.pay_date);
           }
 
           if (payDateObj && !isNaN(payDateObj.getTime())) {
-            // Format thang as "Tháng XX" for consistency with potential existing data
             const monthNumber = payDateObj.getMonth() + 1;
             thang = `Tháng ${String(monthNumber).padStart(2, '0')}`;
             nam = payDateObj.getFullYear();
           } else {
             console.warn(`Invalid date format for pay_date: ${entry.pay_date}. Setting thang and nam to null.`);
-            payDateObj = null; // Ensure payDateObj is null if parsing failed
-            thang = null; // Explicitly nullify thang
-            nam = null;   // Explicitly nullify nam
+            payDateObj = null; 
+            thang = null; 
+            nam = null;   
           }
         }
 
@@ -235,8 +253,8 @@ export default function WorkspaceContent() {
           employee_name: entry.employee_name,
           tong_thu_nhap: entry.salary,
           pay_date: payDateObj ? payDateObj.toISOString().split('T')[0] : null,
-          thang: thang, // This will be "Tháng XX" or null
-          nam: nam,     // This will be YYYY or null
+          thang: thang, 
+          nam: nam,     
         };
       });
 
@@ -257,7 +275,7 @@ export default function WorkspaceContent() {
       setSelectedFile(null);
       const fileInput = document.getElementById('payroll-csv-input') as HTMLInputElement;
       if (fileInput) fileInput.value = '';
-      fetchDistinctMonths(); // Re-fetch months after successful upload
+      fetchDistinctMonths(); 
 
     } catch (error: any) {
       console.error("Supabase upload error:", error);
@@ -270,6 +288,29 @@ export default function WorkspaceContent() {
       setIsUploading(false);
     }
   };
+
+  const handleMonthSelection = (monthValue: number, checked: boolean) => {
+    setSelectedMonths(prevSelected => {
+      const newSelected = new Set(prevSelected);
+      if (checked) {
+        newSelected.add(monthValue);
+      } else {
+        newSelected.delete(monthValue);
+      }
+      return Array.from(newSelected).sort((a,b) => a-b);
+    });
+  };
+  
+  const getSelectedMonthsText = () => {
+    if (selectedMonths.length === 0 || selectedMonths.length === availableMonths.length) {
+      return "All Months";
+    }
+    if (selectedMonths.length <= 2) {
+      return selectedMonths.map(mValue => availableMonths.find(am => am.value === mValue)?.label).filter(Boolean).join(', ');
+    }
+    return `${selectedMonths.length} months selected`;
+  };
+
 
   return (
     <SidebarProvider defaultOpen={false} >
@@ -287,7 +328,7 @@ export default function WorkspaceContent() {
             {navItems.map(item => {
               const IconComponent = item.icon;
               return (
-                <SidebarMenuItem key={item.id}>
+                <SidebarMenuItemComponent key={item.id}>
                   <SidebarMenuButton
                     onClick={() => setActiveView(item.id)}
                     isActive={activeView === item.id}
@@ -297,7 +338,7 @@ export default function WorkspaceContent() {
                     <IconComponent className="h-4 w-4"/>
                     <span>{item.label}</span>
                   </SidebarMenuButton>
-                </SidebarMenuItem>
+                </SidebarMenuItemComponent>
               );
             })}
           </SidebarMenu>
@@ -321,8 +362,8 @@ export default function WorkspaceContent() {
           </div>
         </SidebarContent>
       </Sidebar>
-      <SidebarInset className="flex-grow overflow-y-auto p-3 md:p-4">
-        <div className="space-y-3 h-full">
+      <SidebarInset className="flex-grow overflow-y-auto p-2 md:p-3">
+        <div className="space-y-2 h-full">
           {activeView === 'dbManagement' && (
             <>
               <Card className="w-full flex flex-col shadow-md rounded-lg">
@@ -413,41 +454,47 @@ export default function WorkspaceContent() {
           )}
           {activeView === 'dashboard' && (
              <Card className="shadow-md rounded-lg h-full flex flex-col">
-              <CardHeader className="pb-3 pt-4 px-4 md:px-6">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                  <div>
-                    <CardTitle className="text-xl font-semibold text-primary flex items-center gap-2">
+              <CardHeader className="pb-3 pt-4 px-3 md:px-4">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                  <div className="flex-1">
+                    <CardTitle className="text-lg font-semibold text-primary flex items-center gap-1.5">
                       <LayoutDashboard className="h-5 w-5" />
                       Payroll Dashboard
                     </CardTitle>
-                    <CardDescription className="text-sm text-muted-foreground mt-1">
+                    <CardDescription className="text-xs text-muted-foreground mt-0.5">
                       Analytics and overview of payroll data from 'Fulltime' table.
                     </CardDescription>
                   </div>
-                  <div className="flex items-center gap-3 mt-2 sm:mt-0">
+                  <div className="flex items-end gap-2 mt-2 sm:mt-0">
                     <div>
-                      <Label htmlFor="month-filter" className="text-xs font-medium">Month</Label>
-                      <Select
-                        value={selectedMonth !== null ? selectedMonth.toString() : "all"}
-                        onValueChange={(value) => setSelectedMonth(value === "all" ? null : parseInt(value))}
-                        disabled={isLoadingMonths}
-                      >
-                        <SelectTrigger id="month-filter" className="h-9 text-sm w-full sm:w-[140px] mt-1">
-                          <SelectValue placeholder="Select Month" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Months</SelectItem>
+                      <Label htmlFor="month-filter" className="text-xs font-medium">Month(s)</Label>
+                       <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" className="h-9 text-sm w-full sm:w-[150px] mt-1 justify-between">
+                            <span>{getSelectedMonthsText()}</span>
+                            <ChevronDown className="ml-2 h-4 w-4 opacity-50" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="w-[150px]">
+                          <DropdownMenuLabel>Select Months</DropdownMenuLabel>
+                          <DMSR />
                           {isLoadingMonths ? (
-                            <SelectItem value="loading" disabled>Loading...</SelectItem>
+                             <DropdownMenuItem disabled>Loading months...</DropdownMenuItem>
+                          ) : availableMonths.length === 0 ? (
+                            <DropdownMenuItem disabled>No months found</DropdownMenuItem>
                           ) : (
                             availableMonths.map(month => (
-                              <SelectItem key={month} value={month.toString()}>
-                                {new Date(0, month - 1).toLocaleString('default', { month: 'long' })}
-                              </SelectItem>
+                              <DropdownMenuCheckboxItem
+                                key={month.value}
+                                checked={selectedMonths.includes(month.value)}
+                                onCheckedChange={(checked) => handleMonthSelection(month.value, checked as boolean)}
+                              >
+                                {month.label}
+                              </DropdownMenuCheckboxItem>
                             ))
                           )}
-                        </SelectContent>
-                      </Select>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                     <div>
                       <Label htmlFor="year-filter" className="text-xs font-medium">Year</Label>
@@ -469,10 +516,10 @@ export default function WorkspaceContent() {
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="pt-3 px-4 md:px-6 pb-4 flex-grow overflow-y-auto space-y-4">
-                <div className="grid gap-4 md:grid-cols-2">
-                    <TotalSalaryCard selectedMonth={selectedMonth} selectedYear={selectedYear} />
-                    <EmployeeCountCard selectedMonth={selectedMonth} selectedYear={selectedYear} />
+              <CardContent className="pt-3 px-3 md:px-4 pb-3 flex-grow overflow-y-auto space-y-3">
+                <div className="grid gap-3 md:grid-cols-2">
+                    <TotalSalaryCard selectedMonths={selectedMonths} selectedYear={selectedYear} />
+                    <EmployeeCountCard selectedMonths={selectedMonths} selectedYear={selectedYear} />
                 </div>
                 <div className="mt-0">
                     <MonthlySalaryTrendChart selectedYear={selectedYear} />

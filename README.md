@@ -40,13 +40,13 @@ $$;
 
 #### `get_total_salary_fulltime`
 
-This function is used by the Payroll Dashboard to calculate the total sum of `tong_thu_nhap` from the `Fulltime` table, with optional filters for month and year. It now correctly parses text-based month columns (e.g., "Tháng 01") into integers.
+This function is used by the Payroll Dashboard to calculate the total sum of `tong_thu_nhap` from the `Fulltime` table, with optional filters for selected year(s) and month(s). It now correctly parses text-based month columns (e.g., "Tháng 01") into integers and supports an array of months for multi-selection.
 
 **SQL Code:**
 ```sql
 CREATE OR REPLACE FUNCTION get_total_salary_fulltime(
     filter_year INTEGER DEFAULT NULL,
-    filter_month INTEGER DEFAULT NULL
+    filter_months INTEGER[] DEFAULT NULL -- Array of integers for months
 )
 RETURNS DOUBLE PRECISION
 LANGUAGE SQL
@@ -54,19 +54,24 @@ AS $$
   SELECT SUM(CAST(REPLACE(tong_thu_nhap::text, ',', '') AS DOUBLE PRECISION))
   FROM "Fulltime"
   WHERE (filter_year IS NULL OR nam::INTEGER = filter_year)
-    AND (filter_month IS NULL OR regexp_replace(thang, '\D', '', 'g')::INTEGER = filter_month);
+    AND (
+      filter_months IS NULL OR
+      array_length(filter_months, 1) IS NULL OR
+      array_length(filter_months, 1) = 0 OR
+      regexp_replace(thang, '\D', '', 'g')::INTEGER = ANY(filter_months)
+    );
 $$;
 ```
 
 #### `get_employee_count_fulltime`
 
-This function is used by the Payroll Dashboard to count the number of unique employees from the `Fulltime` table, with optional filters for month and year. It now correctly parses text-based month columns (e.g., "Tháng 01") into integers.
+This function is used by the Payroll Dashboard to count the number of unique employees from the `Fulltime` table, with optional filters for selected year(s) and month(s). It now correctly parses text-based month columns (e.g., "Tháng 01") into integers and supports an array of months for multi-selection.
 
 **SQL Code:**
 ```sql
 CREATE OR REPLACE FUNCTION get_employee_count_fulltime(
     filter_year INTEGER DEFAULT NULL,
-    filter_month INTEGER DEFAULT NULL
+    filter_months INTEGER[] DEFAULT NULL -- Array of integers for months
 )
 RETURNS INTEGER
 LANGUAGE SQL
@@ -74,7 +79,12 @@ AS $$
   SELECT COUNT(DISTINCT employee_id)::INTEGER
   FROM "Fulltime"
   WHERE (filter_year IS NULL OR nam::INTEGER = filter_year)
-    AND (filter_month IS NULL OR regexp_replace(thang, '\D', '', 'g')::INTEGER = filter_month);
+    AND (
+      filter_months IS NULL OR
+      array_length(filter_months, 1) IS NULL OR
+      array_length(filter_months, 1) = 0 OR
+      regexp_replace(thang, '\D', '', 'g')::INTEGER = ANY(filter_months)
+    );
 $$;
 ```
 
@@ -93,7 +103,7 @@ AS $$
 BEGIN
     RETURN QUERY
     SELECT
-        regexp_replace(f.thang, '\D', '', 'g')::INTEGER AS month,
+        regexp_replace(f.thang, '\D', '', 'g')::INTEGER AS month, -- Extract numeric month
         f.nam::INTEGER AS year,
         SUM(CAST(REPLACE(f.tong_thu_nhap::text, ',', '') AS DOUBLE PRECISION)) AS total_salary
     FROM "Fulltime" f
@@ -104,6 +114,4 @@ END;
 $$;
 ```
 
-Once these functions are successfully created (or updated) in your Supabase SQL Editor, the application should be able to correctly filter and aggregate data even with text-based month values. If you continue to encounter "unterminated dollar-quoted string" errors, please double-check for any invisible characters or ensure the entire function block is being processed correctly by the SQL editor, especially ensuring no comments are between `END;` and the final `$$;`.
-
-```
+Once these functions are successfully created (or updated) in your Supabase SQL Editor, the application should be able to correctly filter and aggregate data. If you continue to encounter "unterminated dollar-quoted string" errors, please double-check for any invisible characters or ensure the entire function block is being processed correctly by the SQL editor, especially ensuring no comments are between `END;` and the final `$$;`.

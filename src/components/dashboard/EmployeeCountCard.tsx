@@ -12,11 +12,11 @@ import {
 } from "@/components/ui/card";
 
 interface EmployeeCountCardProps {
-  selectedMonth?: number | null;
+  selectedMonths?: number[]; // Updated to array
   selectedYear?: number | null;
 }
 
-export default function EmployeeCountCard({ selectedMonth, selectedYear }: EmployeeCountCardProps) {
+export default function EmployeeCountCard({ selectedMonths, selectedYear }: EmployeeCountCardProps) {
   const [employeeCount, setEmployeeCount] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -27,23 +27,28 @@ export default function EmployeeCountCard({ selectedMonth, selectedYear }: Emplo
     setError(null);
 
     let description = "all periods";
-    if (selectedYear && selectedMonth) {
-      description = `Month ${selectedMonth}, ${selectedYear}`;
+    const yearDesc = selectedYear ? `Year ${selectedYear}` : "All Years";
+    const monthDesc = selectedMonths && selectedMonths.length > 0 
+      ? `Month(s) ${selectedMonths.join(', ')}` 
+      : "All Months";
+
+    if (selectedYear && selectedMonths && selectedMonths.length > 0) {
+      description = `${monthDesc}, ${yearDesc}`;
     } else if (selectedYear) {
-      description = `Year ${selectedYear}`;
-    } else if (selectedMonth) {
-      description = `Month ${selectedMonth} (all years)`;
+      description = yearDesc;
+    } else if (selectedMonths && selectedMonths.length > 0) {
+      description = `${monthDesc} (all years)`;
     }
     setFilterDescription(description);
 
+
     try {
-      const rpcArgs: { filter_year?: number; filter_month?: number } = {};
+      const rpcArgs: { filter_year?: number; filter_months?: number[] } = {};
       if (selectedYear !== null && selectedYear !== undefined) {
         rpcArgs.filter_year = selectedYear;
       }
-      if (selectedMonth !== null && selectedMonth !== undefined) {
-        rpcArgs.filter_month = selectedMonth;
-      }
+      rpcArgs.filter_months = selectedMonths && selectedMonths.length > 0 ? selectedMonths : undefined;
+
 
       const functionName = 'get_employee_count_fulltime';
       const { data, error: rpcError } = await supabase.rpc(
@@ -81,7 +86,7 @@ export default function EmployeeCountCard({ selectedMonth, selectedYear }: Emplo
     } finally {
       setIsLoading(false);
     }
-  }, [selectedMonth, selectedYear]);
+  }, [selectedMonths, selectedYear]);
 
   useEffect(() => {
     fetchEmployeeCount();
