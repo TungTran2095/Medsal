@@ -22,13 +22,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${montserrat.variable} font-sans antialiased flex flex-col min-h-screen`}> {/* Apply Montserrat variable and font-sans */}
-        <header className="border-b p-4 shadow-sm bg-card sticky top-0 z-50">
-          <nav className="container mx-auto flex items-center justify-between">
-            <Link href="/" className="text-xl font-semibold text-primary">
-              Echo Chamber {/* Updated App Name */}
-            </Link>
-          </nav>
-        </header>
+        {/* Header removed */}
         <main className="flex-grow flex flex-col">
          {children}
         </main>
