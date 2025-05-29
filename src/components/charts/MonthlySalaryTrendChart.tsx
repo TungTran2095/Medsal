@@ -45,6 +45,8 @@ interface MonthlySalaryTrendChartProps {
   selectedYear?: number | null;
 }
 
+const CRITICAL_SETUP_ERROR_PREFIX = "CRITICAL SETUP REQUIRED:";
+
 export default function MonthlySalaryTrendChart({ selectedYear }: MonthlySalaryTrendChartProps) {
   const [chartData, setChartData] = useState<MonthlyData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -63,25 +65,16 @@ export default function MonthlySalaryTrendChart({ selectedYear }: MonthlySalaryT
       if (selectedYear !== null && selectedYear !== undefined) {
         rpcArgs.p_filter_year = selectedYear;
       } else {
-        // If no year is selected, fetch for current year or all years.
-        // For simplicity, let's default to the current year if no year is selected.
-        // Or, you might decide to not call if no year is selected, or call with p_filter_year = NULL
-        // For this example, if "All Years" means 'no filter', we pass undefined (which becomes NULL in RPC).
-        // If it means "current year", then:
-        // rpcArgs.p_filter_year = new Date().getFullYear();
-        // description = `Year ${new Date().getFullYear()}`;
-        // For this implementation, if selectedYear is null (meaning "All Years"),
-        // we call the RPC with p_filter_year as null to get all data or as per RPC logic.
+        // Handled by RPC default or logic
       }
 
-
+      const functionName = 'get_monthly_salary_trend_fulltime';
       const { data, error: rpcError } = await supabase.rpc(
-        'get_monthly_salary_trend_fulltime',
+        functionName,
         rpcArgs
       );
 
       if (rpcError) {
-        const functionName = 'get_monthly_salary_trend_fulltime';
         const rpcMessageText = rpcError.message ? String(rpcError.message).toLowerCase() : '';
         
         const isFunctionMissingError =
@@ -90,9 +83,9 @@ export default function MonthlySalaryTrendChart({ selectedYear }: MonthlySalaryT
           (rpcMessageText.includes(functionName.toLowerCase()) && rpcMessageText.includes('does not exist'));
 
         if (isFunctionMissingError) {
-          throw new Error(`The '${functionName}' RPC function was not found in your Supabase database. Please ensure it's created correctly using the SQL provided in the README.md. Check for copy-paste errors.`);
+          throw new Error(`${CRITICAL_SETUP_ERROR_PREFIX} The Supabase RPC function '${functionName}' is missing. This chart cannot display data without it. Please create this function in your Supabase SQL Editor using the script found in the 'Required SQL Functions' section of README.md.`);
         }
-        throw rpcError;
+        throw rpcError; // Re-throw other RPC errors
       }
 
       if (data) {
@@ -144,14 +137,16 @@ export default function MonthlySalaryTrendChart({ selectedYear }: MonthlySalaryT
     return (
       <Card className="border-destructive/50 h-full">
         <CardHeader className="pb-2 pt-3">
-          <CardTitle className="text-sm font-medium text-destructive">Monthly Trend Error</CardTitle>
+          <CardTitle className="text-sm font-medium text-destructive flex items-center gap-1">
+            <AlertTriangle className="h-4 w-4" />
+            Monthly Trend Error
+          </CardTitle>
            <CardDescription className="text-xs text-destructive">{error}</CardDescription>
         </CardHeader>
         <CardContent className="pt-2">
-         
-          {error.includes("RPC function was not found") && (
+          {error.startsWith(CRITICAL_SETUP_ERROR_PREFIX) && (
             <p className="text-xs text-muted-foreground mt-1">
-              Please ensure the `get_monthly_salary_trend_fulltime` RPC function is created in Supabase as per the README.md instructions. Double-check for copy-paste errors.
+              Please refer to the `README.md` file, specifically the "Required SQL Functions" section, for instructions on how to create the missing Supabase function. Double-check for copy-paste errors when running the SQL.
             </p>
           )}
         </CardContent>
@@ -204,21 +199,22 @@ export default function MonthlySalaryTrendChart({ selectedYear }: MonthlySalaryT
                 content={<ChartTooltipContent 
                     indicator="line"
                     formatter={(value, name, props) => {
-                        if (name === 'totalSalary' && typeof value === 'number') {
+                        // Assuming name is 'total_salary', adjust if dataKey in <Line> changes
+                        if (typeof value === 'number') { // Check if value is a number before formatting
                            return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'VND', minimumFractionDigits: 0, maximumFractionDigits: 0  }).format(value);
                         }
-                        return String(value);
+                        return String(value); // Fallback for non-numeric or unexpected values
                     }}
                 />}
               />
               <Legend />
               <Line
                 type="monotone"
-                dataKey="total_salary"
+                dataKey="total_salary" // This should match the field name from your RPC
                 stroke="var(--color-totalSalary)"
                 strokeWidth={2}
                 dot={false}
-                name="Total Salary"
+                name="Total Salary" // This name is used by Legend and potentially Tooltip if not overridden
               />
             </LineChart>
           </ResponsiveContainer>

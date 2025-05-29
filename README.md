@@ -102,3 +102,4 @@ $$;
 ```
 
 Once these functions are successfully created, the application should be able to list your public tables and display dashboard analytics correctly. If you encounter errors like "unterminated dollar-quoted string", double-check your copy-pasting process into the SQL editor, ensuring only the function code is included and no extra lines or comments interfere with the `$$` delimiters.
+
