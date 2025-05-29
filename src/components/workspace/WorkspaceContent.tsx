@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, ChangeEvent } from 'react';
+import React, { useState, ChangeEvent, useEffect, useCallback } from 'react';
 import Papa from 'papaparse';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarInset,
-  SidebarFooter, // Added SidebarFooter
+  // SidebarFooter, // Not explicitly used for content but available
 } from '@/components/ui/sidebar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -51,6 +51,8 @@ export default function WorkspaceContent() {
 
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
+  const [availableMonths, setAvailableMonths] = useState<number[]>([]);
+  const [isLoadingMonths, setIsLoadingMonths] = useState<boolean>(false);
 
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 10 }, (_, i) => currentYear - i); // Last 10 years
@@ -174,6 +176,42 @@ export default function WorkspaceContent() {
       setIsUploading(false);
     }
   };
+
+  const fetchDistinctMonths = useCallback(async () => {
+    setIsLoadingMonths(true);
+    try {
+      const { data, error } = await supabase
+        .from('Fulltime')
+        .select('thang');
+
+      if (error) throw error;
+
+      if (data) {
+        const uniqueMonths = [...new Set(
+          data
+            .map(item => item.thang)
+            .filter(month => month !== null && month !== undefined) as number[]
+        )].sort((a, b) => a - b);
+        setAvailableMonths(uniqueMonths);
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error Fetching Months",
+        description: error.message || "Could not load available months for filtering.",
+        variant: "destructive",
+      });
+      setAvailableMonths([]);
+    } finally {
+      setIsLoadingMonths(false);
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    if (activeView === 'dashboard') {
+      fetchDistinctMonths();
+    }
+  }, [activeView, fetchDistinctMonths]);
+
 
   return (
     <SidebarProvider defaultOpen={true} >
@@ -330,13 +368,14 @@ export default function WorkspaceContent() {
                     <Select 
                         onValueChange={(value) => setSelectedMonth(value === "all" ? null : parseInt(value))} 
                         value={selectedMonth !== null ? selectedMonth.toString() : "all"}
+                        disabled={isLoadingMonths}
                     >
                         <SelectTrigger className="w-full sm:w-[160px] h-8 text-xs">
-                            <SelectValue placeholder="Select Month" />
+                            <SelectValue placeholder={isLoadingMonths ? "Loading months..." : "Select Month"} />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all" className="text-xs">All Months</SelectItem>
-                            {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                            {availableMonths.map(m => (
                                 <SelectItem key={m} value={m.toString()} className="text-xs">Month {m}</SelectItem>
                             ))}
                         </SelectContent>
@@ -355,6 +394,7 @@ export default function WorkspaceContent() {
                             ))}
                         </SelectContent>
                     </Select>
+                     {isLoadingMonths && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
                 </div>
                 <h3 className="text-sm font-semibold mb-1">Total Fulltime Salary</h3>
                 <TotalSalaryChart selectedMonth={selectedMonth} selectedYear={selectedYear}/>
@@ -366,3 +406,4 @@ export default function WorkspaceContent() {
     </SidebarProvider>
   );
 }
+
