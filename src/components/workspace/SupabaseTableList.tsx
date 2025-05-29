@@ -84,6 +84,9 @@ export default function SupabaseTableList() {
   };
 
   if (selectedTableName) {
+    // When a table is selected, SupabaseTableDataViewer takes over the full space
+    // as its root Card has h-full and flex flex-col.
+    // The parent of SupabaseTableList (in WorkspaceContent) is a flex-grow area.
     return <SupabaseTableDataViewer tableName={selectedTableName} onBack={handleBackToTables} />;
   }
 
@@ -124,7 +127,7 @@ export default function SupabaseTableList() {
           <p className="text-muted-foreground text-center py-8">No tables found in the public schema or RPC function returned no data.</p>
         )}
         {!isLoading && !error && tables.length > 0 && (
-          <div className="border rounded-md max-h-80 overflow-y-auto">
+          <div className="border rounded-md overflow-y-auto"> {/* Removed max-h-80 */}
             <Table>
               <TableHeader>
                 <TableRow>
