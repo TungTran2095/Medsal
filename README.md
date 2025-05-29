@@ -16,7 +16,10 @@ To create these functions:
 1.  Go to your Supabase Project.
 2.  Navigate to the **SQL Editor** (usually found in the left sidebar).
 3.  Click on **New query** (or "+ New query").
-4.  For each function below, **carefully copy the ENTIRE SQL code block provided** (from `CREATE OR REPLACE FUNCTION` down to the final `$$;`) and paste it into the editor. Ensure no extra characters, comments, or lines are included outside of what's provided for each function block.
+4.  For each function below, **carefully copy the ENTIRE SQL code block provided** (from `CREATE OR REPLACE FUNCTION` down to the final `$$;`) and paste it into the editor.
+    *   **VERY IMPORTANT for "unterminated dollar-quoted string" errors:**
+        *   Ensure your selection is exact.
+        *   **Before clicking RUN, visually inspect the pasted code in the Supabase SQL Editor. If the editor has automatically added any comments (lines starting with `--`, like `-- source: dashboard...`) at the very end of the function block (especially after the `END;` line but before the final `$$;`), you MUST manually delete those comments from the editor before running the SQL. Otherwise, you will get an "unterminated dollar-quoted string" error.**
 5.  Click **Run** for each function.
 
 #### `get_public_tables`
@@ -101,5 +104,4 @@ END;
 $$;
 ```
 
-Once these functions are successfully created, the application should be able to list your public tables and display dashboard analytics correctly. If you encounter errors like "unterminated dollar-quoted string", double-check your copy-pasting process into the SQL editor, ensuring only the function code is included and no extra lines or comments interfere with the `$$` delimiters.
-
+Once these functions are successfully created, the application should be able to list your public tables and display dashboard analytics correctly. If you continue to encounter "unterminated dollar-quoted string" errors after carefully following the copy-paste instructions (including deleting any auto-added comments by the editor before running), please double-check for any invisible characters or ensure the entire function block is being processed correctly by the SQL editor.
