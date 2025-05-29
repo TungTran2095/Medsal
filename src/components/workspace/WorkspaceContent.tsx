@@ -159,7 +159,7 @@ export default function WorkspaceContent() {
 
   return (
     <SidebarProvider defaultOpen={true} >
-      <Sidebar>
+      <Sidebar collapsible="icon"> {/* Added collapsible="icon" here */}
         <SidebarHeader>
            <div className="flex items-center justify-between p-3">
             <span className="text-base font-semibold text-sidebar-primary group-data-[state=collapsed]:hidden">
