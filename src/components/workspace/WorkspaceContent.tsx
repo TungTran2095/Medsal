@@ -13,7 +13,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import SupabaseTableList from './SupabaseTableList';
 import { Separator } from '@/components/ui/separator';
-import Image from 'next/image';
+import TotalSalaryChart from '@/components/charts/TotalSalaryChart'; // New import
 
 type WorkspaceView = 'dbManagement' | 'dashboard';
 
@@ -159,7 +159,7 @@ export default function WorkspaceContent() {
         })}
       </div>
 
-      <div className="flex-grow overflow-y-auto p-4 space-y-6">
+      <div className="flex-grow overflow-y-auto p-4 md:p-6 space-y-6">
         {activeView === 'dbManagement' && (
           <>
             <Card className="w-full flex flex-col shadow-md rounded-lg">
@@ -252,27 +252,16 @@ export default function WorkspaceContent() {
           <Card className="shadow-md rounded-lg">
             <CardHeader>
               <div className="flex items-center gap-3">
-                 <LayoutDashboard className="h-8 w-8 text-primary" />
+                 <LayoutDashboard className="h-6 w-6 text-primary" /> {/* Icon size adjusted */}
                 <div>
-                    <CardTitle className="text-xl font-semibold">Payroll Dashboard</CardTitle>
-                    <CardDescription>Analytics and overview of payroll data. (Placeholder)</CardDescription>
+                    <CardTitle className="text-lg font-semibold">Payroll Dashboard</CardTitle> {/* Size adjusted */}
+                    <CardDescription className="text-xs text-muted-foreground">Analytics and overview of payroll data.</CardDescription> {/* Size adjusted */}
                 </div>
               </div>
             </CardHeader>
-            <CardContent>
-              <div className="flex flex-col items-center justify-center text-muted-foreground p-8 border-2 border-dashed rounded-lg">
-                <LayoutDashboard className="h-16 w-16 mb-4 text-primary/50" />
-                <p className="text-lg font-medium">Dashboard Coming Soon!</p>
-                <p className="text-sm">This area will display charts and key metrics.</p>
-                <Image 
-                    src="https://placehold.co/800x400.png" 
-                    alt="Placeholder Dashboard Chart" 
-                    width={800} 
-                    height={400} 
-                    className="mt-6 rounded-md shadow-md"
-                    data-ai-hint="dashboard chart"
-                />
-              </div>
+            <CardContent className="pt-4"> {/* Added padding top */}
+              <h3 className="text-md font-semibold mb-2">Total Fulltime Salary</h3>
+              <TotalSalaryChart />
             </CardContent>
           </Card>
         )}
