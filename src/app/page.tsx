@@ -98,7 +98,7 @@ export default function DashboardPage() {
 
       {/* Right Pane: Chatbot */}
       <div className={cn(
-          "w-full pt-2 pb-2 pr-2 pl-1 md:pt-4 md:pb-4 md:pr-4 md:pl-2 flex flex-col transition-all duration-300 ease-in-out overflow-hidden", // Added overflow-hidden
+          "w-full pt-2 pb-2 pr-2 pl-1 md:pt-4 md:pb-4 md:pr-4 md:pl-2 flex flex-col transition-all duration-300 ease-in-out overflow-hidden",
            isChatbotOpen ? 'md:w-1/3' : 'md:w-[72px]' 
         )}
       >
@@ -108,15 +108,20 @@ export default function DashboardPage() {
           )}
         >
           <header className={cn(
-              "border-b p-3 md:p-4 shadow-sm bg-card flex items-center justify-end" // Always justify-end
+              "border-b p-3 md:p-4 shadow-sm bg-card flex items-center justify-end"
             )}
           >
-            {isChatbotOpen && (
-              <div className="flex items-center mr-auto"> {/* Added mr-auto */}
-                <Sparkles className="h-6 w-6 mr-2 text-primary shrink-0" />
-                <h1 className="text-xl font-semibold text-primary truncate">Chatbot</h1>
-              </div>
-            )}
+            <div className={cn(
+                "flex items-center mr-auto",
+                "transition-all duration-300 ease-in-out",
+                isChatbotOpen 
+                  ? "opacity-100 max-w-xs" 
+                  : "opacity-0 max-w-0 overflow-hidden pointer-events-none"
+              )}
+            >
+              <Sparkles className="h-6 w-6 mr-2 text-primary shrink-0" />
+              <h1 className="text-xl font-semibold text-primary truncate">Chatbot</h1>
+            </div>
             <Button 
               variant="ghost" 
               size="icon" 
@@ -135,11 +140,10 @@ export default function DashboardPage() {
             className={cn(
               "flex flex-col flex-1 overflow-hidden transition-all duration-300 ease-in-out",
               isChatbotOpen
-                ? "opacity-100 max-h-[100vh]"
-                : "opacity-0 max-h-0" 
+                ? "opacity-100 max-h-[100vh]" // Large max-height for open state
+                : "opacity-0 max-h-0" // Collapse to zero height and fade out
             )}
           >
-            {/* Content is always mounted but visibility/height is transitioned */}
             <ChatHistory messages={messages} isLoading={isLoading} />
             <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
           </div>
