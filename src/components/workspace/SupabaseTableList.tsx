@@ -19,11 +19,11 @@ export default function SupabaseTableList() {
   const { toast } = useToast();
 
   useEffect(() => {
-    if (!selectedTableName) { // Only fetch table list if no table is selected for viewing
+    if (!selectedTableName) {
       fetchTables();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedTableName]); // Re-fetch if selectedTableName becomes null
+  }, [selectedTableName]);
 
   const fetchTables = async () => {
     setIsLoading(true);
@@ -80,64 +80,60 @@ export default function SupabaseTableList() {
 
   const handleBackToTables = () => {
     setSelectedTableName(null);
-    // fetchTables will be called by useEffect
   };
 
   if (selectedTableName) {
-    // When a table is selected, SupabaseTableDataViewer takes over the full space
-    // as its root Card has h-full and flex flex-col.
-    // The parent of SupabaseTableList (in WorkspaceContent) is a flex-grow area.
     return <SupabaseTableDataViewer tableName={selectedTableName} onBack={handleBackToTables} />;
   }
 
   return (
     <Card className="shadow-md rounded-lg">
-      <CardHeader>
-        <div className="flex items-center gap-3">
-          <ListChecks className="h-8 w-8 text-primary" />
+      <CardHeader className="pt-3 pb-2"> {/* Reduced padding */}
+        <div className="flex items-center gap-2"> {/* Reduced gap */}
+          <ListChecks className="h-6 w-6 text-primary" /> {/* Smaller icon */}
           <div>
-            <CardTitle className="text-xl font-semibold">Supabase Public Tables</CardTitle>
-            <CardDescription>List of tables in your public Supabase schema. Click a table to view its data.</CardDescription>
-            <p className="text-xs text-muted-foreground mt-1">
+            <CardTitle className="text-lg font-semibold">Supabase Public Tables</CardTitle> {/* Smaller title */}
+            <CardDescription className="text-xs">List of tables in your public Supabase schema. Click a table to view its data.</CardDescription> {/* Smaller desc */}
+            <p className="text-xs text-muted-foreground mt-0.5"> {/* Reduced mt */}
               Ensure Row Level Security (RLS) is enabled on your tables if exposing this to non-admin users.
             </p>
           </div>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-3"> {/* Reduced padding */}
         {isLoading && (
-          <div className="flex items-center justify-center py-8 text-muted-foreground">
-            <Loader2 className="h-6 w-6 animate-spin mr-2" />
-            <p>Loading tables...</p>
+          <div className="flex items-center justify-center py-4 text-muted-foreground"> {/* Reduced py */}
+            <Loader2 className="h-5 w-5 animate-spin mr-2" /> {/* Smaller icon */}
+            <p className="text-sm">Loading tables...</p>
           </div>
         )}
         {error && !isLoading && (
-          <div className="flex flex-col items-center justify-center py-8 text-destructive bg-destructive/10 p-4 rounded-md">
-            <AlertTriangle className="h-8 w-8 mb-2" />
-            <p className="font-semibold">Error Loading Tables</p>
-            <p className="text-sm text-center">{error}</p>
+          <div className="flex flex-col items-center justify-center py-4 text-destructive bg-destructive/10 p-3 rounded-md"> {/* Reduced py, p */}
+            <AlertTriangle className="h-6 w-6 mb-1" /> {/* Smaller icon/margin */}
+            <p className="font-semibold text-sm">Error Loading Tables</p>
+            <p className="text-xs text-center">{error}</p>
             {error.includes("was not found in your Supabase project") && (
-                 <p className="text-xs mt-2 text-center">
+                 <p className="text-xs mt-1 text-center"> {/* Reduced mt */}
                     Please refer to the README.md for instructions on how to create the `get_public_tables` function.
                  </p>
             )}
           </div>
         )}
         {!isLoading && !error && tables.length === 0 && (
-          <p className="text-muted-foreground text-center py-8">No tables found in the public schema or RPC function returned no data.</p>
+          <p className="text-muted-foreground text-center py-4 text-sm">No tables found in the public schema or RPC function returned no data.</p> {/* Reduced py */}
         )}
         {!isLoading && !error && tables.length > 0 && (
-          <div className="border rounded-md overflow-y-auto"> {/* Removed max-h-80 */}
+          <div className="border rounded-md overflow-y-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Table Name</TableHead>
+                  <TableHead className="py-1.5 px-2 text-xs">Table Name</TableHead> {/* Smaller padding/text */}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {tables.map((table) => (
                   <TableRow key={table.table_name} className="hover:bg-muted/50 cursor-pointer" onClick={() => handleTableSelect(table.table_name)}>
-                    <TableCell className="font-medium">{table.table_name}</TableCell>
+                    <TableCell className="font-medium py-1.5 px-2 text-xs">{table.table_name}</TableCell> {/* Smaller padding/text */}
                   </TableRow>
                 ))}
               </TableBody>

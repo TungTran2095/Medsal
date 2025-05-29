@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { Message } from '@/types';
@@ -16,29 +17,29 @@ export default function ChatMessage({ message }: ChatMessageProps) {
   return (
     <div
       className={cn(
-        'flex items-end gap-2 mb-3 animate-in fade-in slide-in-from-bottom-4 duration-300 ease-out',
+        'flex items-end gap-1.5 mb-2 animate-in fade-in slide-in-from-bottom-4 duration-300 ease-out', // Reduced gap and mb
         isUser ? 'justify-end' : 'justify-start'
       )}
     >
       {!isUser && (
-        <Avatar className="h-8 w-8 self-start shrink-0">
+        <Avatar className="h-7 w-7 self-start shrink-0"> {/* Smaller avatar */}
           <AvatarFallback className="bg-accent text-accent-foreground">
-            <Bot size={18} />
+            <Bot size={16} /> {/* Smaller icon */}
           </AvatarFallback>
         </Avatar>
       )}
       <div
         className={cn(
-          'max-w-[75%] md:max-w-[70%] rounded-xl p-3 shadow-sm break-words',
+          'max-w-[75%] md:max-w-[70%] rounded-lg p-2 shadow-sm break-words', // Smaller padding, rounded-lg
           isUser
             ? 'bg-primary text-primary-foreground rounded-br-sm'
             : 'bg-card text-card-foreground rounded-bl-sm'
         )}
       >
-        <p className="text-sm leading-relaxed">{message.text}</p>
+        <p className="text-sm leading-snug">{message.text}</p> {/* Tighter line height */}
         <p
           className={cn(
-            'text-xs mt-1.5',
+            'text-xs mt-1', // Reduced mt
             isUser ? 'text-primary-foreground/70 text-right' : 'text-muted-foreground text-left'
           )}
         >
@@ -46,9 +47,9 @@ export default function ChatMessage({ message }: ChatMessageProps) {
         </p>
       </div>
       {isUser && (
-        <Avatar className="h-8 w-8 self-start shrink-0">
+        <Avatar className="h-7 w-7 self-start shrink-0"> {/* Smaller avatar */}
           <AvatarFallback className="bg-secondary text-secondary-foreground">
-            <User size={18} />
+            <User size={16} /> {/* Smaller icon */}
           </AvatarFallback>
         </Avatar>
       )}

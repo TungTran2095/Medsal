@@ -86,10 +86,10 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="flex flex-col md:flex-row flex-1 w-full h-full bg-muted/40">
+    <div className="flex flex-col md:flex-row flex-1 w-full h-full bg-muted/40 p-0"> {/* Main page padding can be set to 0 if desired */}
       {/* Left Pane: Workspace */}
       <div className={cn(
-          "w-full pt-2 pb-2 pl-2 pr-1 md:pt-4 md:pb-4 md:pl-4 md:pr-2 overflow-y-auto transition-all duration-300 ease-in-out",
+          "w-full pt-2 pb-2 pl-2 pr-0.5 md:pt-4 md:pb-4 md:pl-4 md:pr-1 overflow-y-auto transition-all duration-300 ease-in-out",
           isChatbotOpen ? 'md:w-2/3' : 'md:flex-1'
         )}
       >
@@ -98,7 +98,7 @@ export default function DashboardPage() {
 
       {/* Right Pane: Chatbot */}
       <div className={cn(
-          "w-full pt-2 pb-2 pr-2 pl-1 md:pt-4 md:pb-4 md:pr-4 md:pl-2 flex flex-col transition-all duration-300 ease-in-out overflow-hidden",
+          "w-full pt-2 pb-2 pr-2 pl-0.5 md:pt-4 md:pb-4 md:pr-4 md:pl-1 flex flex-col transition-all duration-300 ease-in-out overflow-hidden",
            isChatbotOpen ? 'md:w-1/3' : 'md:w-[72px]' 
         )}
       >
@@ -108,15 +108,15 @@ export default function DashboardPage() {
           )}
         >
           <header className={cn(
-              "border-b p-3 md:p-4 shadow-sm bg-card flex items-center justify-end"
+              "border-b p-2 md:p-2 shadow-sm bg-card flex items-center justify-end" // Reduced header padding
             )}
           >
             <div className={cn(
-                "flex items-center mr-auto",
+                "flex items-center mr-auto overflow-hidden", // Added overflow-hidden
                 "transition-all duration-300 ease-in-out",
                 isChatbotOpen 
                   ? "opacity-100 max-w-xs" 
-                  : "opacity-0 max-w-0 overflow-hidden pointer-events-none"
+                  : "opacity-0 max-w-0 pointer-events-none" // Added pointer-events-none
               )}
             >
               <Sparkles className="h-6 w-6 mr-2 text-primary shrink-0" />
@@ -140,8 +140,8 @@ export default function DashboardPage() {
             className={cn(
               "flex flex-col flex-1 overflow-hidden transition-all duration-300 ease-in-out",
               isChatbotOpen
-                ? "opacity-100 max-h-[100vh]" // Large max-height for open state
-                : "opacity-0 max-h-0" // Collapse to zero height and fade out
+                ? "opacity-100 max-h-[100vh]" 
+                : "opacity-0 max-h-0" 
             )}
           >
             <ChatHistory messages={messages} isLoading={isLoading} />

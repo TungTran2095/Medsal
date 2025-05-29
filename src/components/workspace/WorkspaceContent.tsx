@@ -159,16 +159,16 @@ export default function WorkspaceContent() {
 
   return (
     <SidebarProvider defaultOpen={true} >
-      <Sidebar collapsible="icon"> {/* Added collapsible="icon" here */}
+      <Sidebar collapsible="icon"> 
         <SidebarHeader>
-           <div className="flex items-center justify-between p-3">
+           <div className="flex items-center justify-between p-2"> {/* Reduced padding */}
             <span className="text-base font-semibold text-sidebar-primary group-data-[state=collapsed]:hidden">
               Workspace
             </span>
             <SidebarTrigger />
           </div>
         </SidebarHeader>
-        <SidebarContent>
+        <SidebarContent className="p-1"> {/* Reduced padding for content area */}
           <SidebarMenu>
             {navItems.map(item => {
               const IconComponent = item.icon;
@@ -188,18 +188,18 @@ export default function WorkspaceContent() {
           </SidebarMenu>
         </SidebarContent>
       </Sidebar>
-      <SidebarInset className="flex-grow overflow-y-auto p-4 md:p-6">
-        <div className="space-y-6 h-full">
+      <SidebarInset className="flex-grow overflow-y-auto p-2"> {/* Reduced padding */}
+        <div className="space-y-2 h-full"> {/* Reduced space-y */}
           {activeView === 'dbManagement' && (
             <>
               <Card className="w-full flex flex-col shadow-md rounded-lg">
-                <CardHeader className="items-center border-b pb-4">
-                  <FileText className="h-10 w-10 mb-3 text-primary" />
-                  <CardTitle className="text-2xl font-bold">Payroll CSV Import</CardTitle>
+                <CardHeader className="items-center border-b pb-2 pt-3"> {/* Reduced padding */}
+                  <FileText className="h-8 w-8 mb-2 text-primary" /> {/* Slightly smaller icon/margin */}
+                  <CardTitle className="text-xl font-bold">Payroll CSV Import</CardTitle>
                   <CardDescription>Import payroll data from CSV files and upload to Supabase 'Fulltime' table.</CardDescription>
                 </CardHeader>
-                <CardContent className="flex-grow flex flex-col p-4 md:p-6 space-y-6">
-                  <div className="space-y-2">
+                <CardContent className="flex-grow flex flex-col p-3 space-y-3"> {/* Reduced padding and space-y */}
+                  <div className="space-y-1"> {/* Reduced space-y */}
                     <label htmlFor="payroll-csv-input" className="text-sm font-medium">
                       Upload Payroll CSV
                     </label>
@@ -209,42 +209,42 @@ export default function WorkspaceContent() {
                       accept=".csv"
                       onChange={handleFileChange}
                       disabled={isLoadingCsv || isUploading}
-                      className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
+                      className="file:mr-2 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" // Adjusted file button style
                     />
                     {selectedFile && (
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-xs text-muted-foreground"> {/* Smaller text */}
                         Selected: {selectedFile.name}
                       </p>
                     )}
                   </div>
 
                   {parsedData.length > 0 && !isLoadingCsv && (
-                    <div className="space-y-4 flex-grow flex flex-col min-h-[200px]">
-                      <h3 className="text-lg font-semibold">Parsed Data Preview (First 5 Rows)</h3>
+                    <div className="space-y-2 flex-grow flex flex-col min-h-[150px]"> {/* Reduced space-y and min-h */}
+                      <h3 className="text-base font-semibold">Parsed Data Preview (First 5 Rows)</h3> {/* Smaller text */}
                       <div className="border rounded-md overflow-x-auto flex-grow">
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead>Employee ID</TableHead>
-                              <TableHead>Employee Name</TableHead>
-                              <TableHead>Salary</TableHead>
-                              <TableHead>Pay Date</TableHead>
+                              <TableHead className="py-1 px-2 text-xs">Employee ID</TableHead> {/* Smaller padding/text */}
+                              <TableHead className="py-1 px-2 text-xs">Employee Name</TableHead>
+                              <TableHead className="py-1 px-2 text-xs">Salary</TableHead>
+                              <TableHead className="py-1 px-2 text-xs">Pay Date</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {parsedData.slice(0, 5).map((entry, index) => (
                               <TableRow key={index}>
-                                <TableCell>{entry.employee_id}</TableCell>
-                                <TableCell>{entry.employee_name}</TableCell>
-                                <TableCell>{entry.salary.toFixed(2)}</TableCell>
-                                <TableCell>{entry.pay_date}</TableCell>
+                                <TableCell className="py-1 px-2 text-xs">{entry.employee_id}</TableCell> {/* Smaller padding/text */}
+                                <TableCell className="py-1 px-2 text-xs">{entry.employee_name}</TableCell>
+                                <TableCell className="py-1 px-2 text-xs">{entry.salary.toFixed(2)}</TableCell>
+                                <TableCell className="py-1 px-2 text-xs">{entry.pay_date}</TableCell>
                               </TableRow>
                             ))}
                           </TableBody>
                         </Table>
                       </div>
                       {parsedData.length > 5 && (
-                        <p className="text-sm text-muted-foreground text-center">
+                        <p className="text-xs text-muted-foreground text-center"> {/* Smaller text */}
                           Showing first 5 rows of {parsedData.length} total entries.
                         </p>
                       )}
@@ -252,16 +252,16 @@ export default function WorkspaceContent() {
                   )}
                   
                   {(isLoadingCsv && !parsedData.length) && (
-                      <div className="flex flex-col items-center justify-center text-muted-foreground py-8 min-h-[100px]">
-                          <Loader2 className="h-8 w-8 animate-spin mb-2" />
-                          <p>Processing file...</p>
+                      <div className="flex flex-col items-center justify-center text-muted-foreground py-4 min-h-[80px]"> {/* Reduced padding/min-h */}
+                          <Loader2 className="h-6 w-6 animate-spin mb-1" /> {/* Smaller icon/margin */}
+                          <p className="text-sm">Processing file...</p>
                       </div>
                   )}
 
                   <Button
                     onClick={handleUpload}
                     disabled={isUploading || isLoadingCsv || parsedData.length === 0}
-                    className="w-full mt-auto"
+                    className="w-full mt-auto text-sm py-1.5 h-auto" /* Smaller text/padding */
                   >
                     {isUploading ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -273,24 +273,24 @@ export default function WorkspaceContent() {
                 </CardContent>
               </Card>
 
-              <Separator />
+              <Separator className="my-2"/> {/* Reduced margin for separator */}
 
               <SupabaseTableList />
             </>
           )}
           {activeView === 'dashboard' && (
             <Card className="shadow-md rounded-lg">
-              <CardHeader>
-                <div className="flex items-center gap-3">
-                   <LayoutDashboard className="h-6 w-6 text-primary" />
+              <CardHeader className="pt-3 pb-2"> {/* Reduced padding */}
+                <div className="flex items-center gap-2"> {/* Reduced gap */}
+                   <LayoutDashboard className="h-5 w-5 text-primary" /> {/* Smaller icon */}
                   <div>
                       <CardTitle className="text-base font-semibold">Payroll Dashboard</CardTitle>
                       <CardDescription className="text-xs text-muted-foreground">Analytics and overview of payroll data.</CardDescription>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="pt-4">
-                <h3 className="text-sm font-semibold mb-2">Total Fulltime Salary</h3>
+              <CardContent className="pt-2"> {/* Reduced padding */}
+                <h3 className="text-sm font-semibold mb-1">Total Fulltime Salary</h3> {/* Reduced margin */}
                 <TotalSalaryChart />
               </CardContent>
             </Card>
@@ -300,5 +300,3 @@ export default function WorkspaceContent() {
     </SidebarProvider>
   );
 }
-
-    

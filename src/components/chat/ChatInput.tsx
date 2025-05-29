@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Button } from '@/components/ui/button';
@@ -31,7 +32,7 @@ export default function ChatInput({ onSendMessage, isLoading }: ChatInputProps) 
   return (
     <form
       onSubmit={handleSubmit}
-      className="flex items-center gap-3 border-t bg-background p-3 md:p-4 sticky bottom-0"
+      className="flex items-center gap-2 border-t bg-background p-2 sticky bottom-0" // Reduced gap and padding
     >
       <Input
         ref={inputRef}
@@ -40,17 +41,17 @@ export default function ChatInput({ onSendMessage, isLoading }: ChatInputProps) 
         value={inputValue}
         onChange={(e) => setInputValue(e.target.value)}
         disabled={isLoading}
-        className="flex-grow rounded-full px-4 h-11 text-sm focus-visible:ring-1 focus-visible:ring-accent"
+        className="flex-grow rounded-full px-3 h-9 text-sm focus-visible:ring-1 focus-visible:ring-accent" // Reduced px and h
         autoComplete="off"
       />
       <Button
         type="submit"
         size="icon"
         disabled={isLoading || !inputValue.trim()}
-        className="rounded-full bg-accent hover:bg-accent/90 text-accent-foreground w-11 h-11 shrink-0"
+        className="rounded-full bg-accent hover:bg-accent/90 text-accent-foreground w-9 h-9 shrink-0" // Reduced w and h
         aria-label="Send message"
       >
-        <SendHorizontal size={20} />
+        <SendHorizontal size={18} /> {/* Smaller icon */}
       </Button>
     </form>
   );
