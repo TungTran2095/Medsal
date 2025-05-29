@@ -7,13 +7,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, Menu } from "lucide-react";
+import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, Banknote } from "lucide-react";
 import type { PayrollEntry } from '@/types';
 import { supabase } from '@/lib/supabaseClient';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import SupabaseTableList from './SupabaseTableList';
 import { Separator } from '@/components/ui/separator';
-import TotalSalaryChart from '@/components/charts/TotalSalaryChart';
+import TotalSalaryCard from '@/components/dashboard/TotalSalaryCard'; // Updated import
 import EmployeeCountCard from '@/components/dashboard/EmployeeCountCard';
 import MonthlySalaryTrendChart from '@/components/charts/MonthlySalaryTrendChart';
 import {
@@ -57,7 +57,7 @@ export default function WorkspaceContent() {
   const { theme, toggleTheme } = useTheme();
 
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
-  const [selectedYear, setSelectedYear] = useState<number | null>(new Date().getFullYear()); // Default to current year
+  const [selectedYear, setSelectedYear] = useState<number | null>(new Date().getFullYear()); 
   const [availableMonths, setAvailableMonths] = useState<number[]>([]);
   const [isLoadingMonths, setIsLoadingMonths] = useState<boolean>(true);
   
@@ -71,12 +71,12 @@ export default function WorkspaceContent() {
   ];
 
   const fetchDistinctMonths = useCallback(async () => {
-    if (activeView !== 'dashboard') return; // Only fetch if dashboard is active
+    if (activeView !== 'dashboard') return; 
     setIsLoadingMonths(true);
     try {
       const { data, error } = await supabase
         .from('Fulltime')
-        .select('thang'); // Select only the 'thang' column
+        .select('thang'); 
 
       if (error) throw error;
 
@@ -98,11 +98,11 @@ export default function WorkspaceContent() {
     } finally {
       setIsLoadingMonths(false);
     }
-  }, [activeView, toast]); // Added activeView to dependencies
+  }, [activeView, toast]); 
 
   useEffect(() => {
     fetchDistinctMonths();
-  }, [fetchDistinctMonths]); // fetchDistinctMonths is already memoized with useCallback
+  }, [fetchDistinctMonths]); 
 
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -180,16 +180,38 @@ export default function WorkspaceContent() {
 
     setIsUploading(true);
     try {
-      const dataToUpload = parsedData.map(entry => ({
-        employee_id: entry.employee_id,
-        employee_name: entry.employee_name,
-        tong_thu_nhap: entry.salary, 
-        pay_date: entry.pay_date,
-        // Assuming 'thang' and 'nam' should be derived from pay_date
-        // This logic might need to be more robust depending on pay_date format
-        thang: entry.pay_date ? new Date(entry.pay_date).getMonth() + 1 : null,
-        nam: entry.pay_date ? new Date(entry.pay_date).getFullYear() : null,
-      }));
+      const dataToUpload = parsedData.map(entry => {
+        let payDate = null;
+        let thang = null;
+        let nam = null;
+        if (entry.pay_date) {
+          try {
+            payDate = new Date(entry.pay_date);
+            // Check if payDate is valid
+            if (!isNaN(payDate.getTime())) {
+              thang = payDate.getMonth() + 1;
+              nam = payDate.getFullYear();
+            } else {
+              // Handle invalid date string
+              console.warn(`Invalid date format for pay_date: ${entry.pay_date}. Setting thang and nam to null.`);
+              payDate = null; // Reset payDate if invalid
+            }
+          } catch (e) {
+            console.warn(`Error parsing pay_date: ${entry.pay_date}. Setting thang and nam to null. Error:`, e);
+            payDate = null;
+          }
+        }
+
+        return {
+          employee_id: entry.employee_id,
+          employee_name: entry.employee_name,
+          tong_thu_nhap: entry.salary, 
+          pay_date: payDate ? payDate.toISOString().split('T')[0] : null, // Store as YYYY-MM-DD or null
+          thang: thang,
+          nam: nam,
+        };
+      });
+
 
       const { error } = await supabase
         .from('Fulltime')
@@ -207,7 +229,7 @@ export default function WorkspaceContent() {
       setSelectedFile(null);
       const fileInput = document.getElementById('payroll-csv-input') as HTMLInputElement;
       if (fileInput) fileInput.value = '';
-      fetchDistinctMonths(); // Refresh month filter after upload
+      fetchDistinctMonths(); 
 
     } catch (error: any) {
       console.error("Supabase upload error:", error);
@@ -367,7 +389,7 @@ export default function WorkspaceContent() {
                   <div>
                     <CardTitle className="text-base font-semibold">Payroll Dashboard</CardTitle>
                     <CardDescription className="text-xs text-muted-foreground">
-                      Analytics and overview of payroll data.
+                      Analytics and overview of payroll data from 'Fulltime' table.
                     </CardDescription>
                   </div>
                 </div>
@@ -417,10 +439,10 @@ export default function WorkspaceContent() {
               </CardHeader>
               <CardContent className="pt-2 px-2 pb-2 flex-grow overflow-auto">
                 <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
-                    <TotalSalaryChart selectedMonth={selectedMonth} selectedYear={selectedYear} />
+                    <TotalSalaryCard selectedMonth={selectedMonth} selectedYear={selectedYear} />
                     <EmployeeCountCard selectedMonth={selectedMonth} selectedYear={selectedYear} />
-                    <div className="md:col-span-2 lg:col-span-1"> {/* Placeholder for third card or adjust span */}
-                       {/* This card can be wider or you can add another KPI here */}
+                    <div className="md:col-span-2 lg:col-span-1"> 
+                       {/* Placeholder for potential third KPI card or to balance grid */}
                     </div>
                 </div>
                 <div className="mt-2">
