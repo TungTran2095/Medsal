@@ -3,6 +3,7 @@
 'use server';
 /**
  * @fileOverview Implements the echoUserInput flow which takes user input and interacts with a Gemini-powered AI.
+ * The AI can use tools to query the Supabase database.
  *
  * - echoUserInput - A function that handles the AI interaction.
  * - EchoUserInputInput - The input type for the echoUserInput function.
@@ -11,6 +12,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import { querySupabaseTableTool } from '@/ai/tools/supabaseQueryTool';
 
 const EchoUserInputInputSchema = z.object({
   userInput: z.string().describe('The user input to be processed by the AI.'),
@@ -22,7 +24,7 @@ const EchoUserInputInputSchema = z.object({
 export type EchoUserInputInput = z.infer<typeof EchoUserInputInputSchema>;
 
 const EchoUserInputOutputSchema = z.object({
-  echoedResponse: z.string().describe("The AI's response to the user."),
+  echoedResponse: z.string().describe("The AI's response to the user, potentially including data from Supabase."),
 });
 export type EchoUserInputOutput = z.infer<typeof EchoUserInputOutputSchema>;
 
@@ -34,9 +36,29 @@ const prompt = ai.definePrompt({
   name: 'echoUserInputPrompt',
   input: {schema: EchoUserInputInputSchema},
   output: {schema: EchoUserInputOutputSchema},
+  tools: [querySupabaseTableTool],
   prompt: `You are a helpful and friendly AI assistant named Echo.
 Your goal is to assist the user with their questions and tasks.
 Use the previous context to maintain a natural conversation flow.
+
+If the user asks for information that might be in the database (e.g., "show me employees", "what are the latest orders?", "find customer details"), use the 'querySupabaseTableTool' to fetch it.
+When deciding to use the tool, consider if the user's request implies accessing structured data that likely resides in a database table.
+
+To use the 'querySupabaseTableTool':
+- You MUST provide the 'tableName'. Ask clarifying questions if the table name is ambiguous (e.g., "From which table should I fetch the employees? Perhaps the 'Fulltime' table?").
+- You can optionally provide 'selectQuery' (e.g., 'employee_name, salary' or '*' for all columns, defaults to '*').
+- You can optionally provide 'limit' (e.g., 3 to get 3 rows, defaults to 5).
+- You can optionally provide 'filters' as an array of objects. Each filter object needs 'column', 'operator' (e.g., 'eq', 'gt', 'like', 'ilike'), and 'value'. For 'like'/'ilike' operators, use '%' as a wildcard (e.g., {column: 'employee_name', operator: 'ilike', value: '%john%'}). Ensure the 'value' is appropriate for the column's data type (e.g., a number for a salary column, a string for a name).
+- You can optionally provide 'orderBy' with 'column' and 'ascending' (boolean, defaults to true).
+
+Example of using the tool: If the user asks "Show me the first 2 employees from the Fulltime table whose salary is more than 50000", you might call querySupabaseTableTool with:
+tableName: 'Fulltime'
+selectQuery: 'employee_name, salary'
+limit: 2
+filters: [{column: 'salary', operator: 'gt', value: 50000}] // Notice value is a number here
+orderBy: {column: 'employee_name', ascending: true}
+
+After receiving the JSON result from the tool, interpret it and present the information to the user in a natural, readable way. Do not just output the raw JSON. If the tool returns an error, inform the user clearly.
 
 Previous Context:
 {{#if previousContext}}
