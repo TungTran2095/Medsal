@@ -40,7 +40,7 @@ export default function WorkspaceContent() {
   const [isLoadingCsv, setIsLoadingCsv] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const { toast } = useToast();
-  const [activeView, setActiveView] = useState<WorkspaceView>('dbManagement');
+  const [activeView, setActiveView] = useState<WorkspaceView>('dashboard'); // Changed default view
 
   const navItems: NavItem[] = [
     { id: 'dbManagement', label: 'Database Management', icon: Database },
