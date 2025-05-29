@@ -9,7 +9,6 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -82,17 +81,21 @@ export default function TotalSalaryChart({ selectedMonth, selectedYear }: TotalS
 
         if (isFunctionMissingError) {
           throw { 
-            type: 'rpcMissing', 
+            type: 'rpcMissing' as 'rpcMissing', 
             message: `The '${functionName}' RPC function was not found. Please create it in your Supabase SQL Editor. See instructions in README.md if needed.` 
           };
         }
-        throw { type: 'generic', message: rpcError.message || 'An unknown RPC error occurred.'};
+        throw { type: 'generic' as 'generic', message: rpcError.message || 'An unknown RPC error occurred.'};
       }
 
       const rawTotal = data;
-      const numericTotal = typeof rawTotal === 'number' ? rawTotal : 0;
+      // Ensure 'tong_thu_nhap' is treated as a number. If it's a string with commas, remove them.
+      // The RPC function should already handle this, but this is a client-side fallback.
+      const numericTotal = typeof rawTotal === 'string' 
+        ? parseFloat(rawTotal.replace(/,/g, '')) 
+        : (typeof rawTotal === 'number' ? rawTotal : 0);
       
-      setTotalSalary(numericTotal);
+      setTotalSalary(numericTotal || 0);
 
     } catch (err: any) {
       // The 'err' object here is what was thrown from the try block.
@@ -193,9 +196,7 @@ export default function TotalSalaryChart({ selectedMonth, selectedYear }: TotalS
          <div className="text-2xl font-bold text-primary mb-1">
             {formattedTotalSalary}
           </div>
-          <p className="text-xs text-muted-foreground mb-2">
-            Calculated from 'tong_thu_nhap' for {filterDescription} via RPC.
-          </p>
+          {/* Removed descriptive paragraph: <p className="text-xs text-muted-foreground mb-2">Calculated from 'tong_thu_nhap' for {filterDescription} via RPC.</p> */}
         <ChartContainer config={chartConfig} className="mx-auto aspect-auto h-[80px] max-w-full">
           <BarChart
             accessibilityLayer
@@ -238,12 +239,13 @@ export default function TotalSalaryChart({ selectedMonth, selectedYear }: TotalS
           </BarChart>
         </ChartContainer>
       </CardContent>
+       {/* Removed CardFooter 
        <CardFooter className="flex-col items-start gap-1 text-xs p-2">
         <div className="leading-none text-muted-foreground">
           Sum of 'tong_thu_nhap' from 'Fulltime' table (via RPC).
         </div>
-      </CardFooter>
+      </CardFooter> 
+      */}
     </Card>
   );
 }
-

@@ -46,13 +46,13 @@ export default function EmployeeCountCard({ selectedMonth, selectedYear }: Emplo
         rpcArgs.filter_month = selectedMonth;
       }
 
+      const functionName = 'get_employee_count_fulltime';
       const { data, error: rpcError } = await supabase.rpc(
-        'get_employee_count_fulltime',
+        functionName,
         rpcArgs
       );
 
       if (rpcError) {
-        const functionName = 'get_employee_count_fulltime';
         const rpcMessageText = rpcError.message ? String(rpcError.message).toLowerCase() : '';
         
         const isFunctionMissingError =
@@ -61,7 +61,7 @@ export default function EmployeeCountCard({ selectedMonth, selectedYear }: Emplo
           (rpcMessageText.includes(functionName.toLowerCase()) && rpcMessageText.includes('does not exist'));
 
         if (isFunctionMissingError) {
-          throw new Error(`The '${functionName}' RPC function was not found. Please create it in your Supabase SQL Editor. See instructions provided by the assistant.`);
+          throw new Error(`The '${functionName}' RPC function was not found. Please create it in your Supabase SQL Editor. See instructions provided in the README.md.`);
         }
         throw rpcError;
       }
@@ -92,7 +92,7 @@ export default function EmployeeCountCard({ selectedMonth, selectedYear }: Emplo
     return (
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-3">
-          <CardTitle className="text-sm font-medium">Total Employees</CardTitle>
+          <CardTitle className="text-sm font-medium"></CardTitle> {/* Removed "Total Employees" text */}
           <Users className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent className="pt-2">
@@ -115,7 +115,7 @@ export default function EmployeeCountCard({ selectedMonth, selectedYear }: Emplo
           <p className="text-xs text-destructive">{error}</p>
            {error.includes("RPC function was not found") && (
              <p className="text-xs text-muted-foreground mt-1">
-               Please ensure the `get_employee_count_fulltime` RPC function is created in Supabase.
+               Please ensure the `get_employee_count_fulltime` RPC function is created in Supabase as per the README.md.
              </p>
            )}
         </CardContent>
@@ -126,7 +126,7 @@ export default function EmployeeCountCard({ selectedMonth, selectedYear }: Emplo
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-3">
-        <CardTitle className="text-sm font-medium">Total Employees</CardTitle>
+        <CardTitle className="text-sm font-medium"></CardTitle> {/* Removed "Total Employees" text */}
         <Users className="h-4 w-4 text-muted-foreground" />
       </CardHeader>
       <CardContent className="pt-2">
