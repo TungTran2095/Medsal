@@ -18,7 +18,7 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [conversationContext, setConversationContext] = useState<string>('');
   const { toast } = useToast();
-  const [isChatbotOpen, setIsChatbotOpen] = useState(true);
+  const [isChatbotOpen, setIsChatbotOpen] = useState(false); // Default to collapsed
 
   useEffect(() => {
     setMessages([
@@ -108,19 +108,19 @@ export default function DashboardPage() {
           )}
         >
           <header className={cn(
-              "border-b p-2 md:p-2 shadow-sm bg-card flex items-center justify-end" // Reduced header padding
+              "border-b p-2 md:p-2 shadow-sm bg-card flex items-center justify-end" 
             )}
           >
             <div className={cn(
-                "flex items-center mr-auto overflow-hidden", // Added overflow-hidden
+                "flex items-center mr-auto overflow-hidden", 
                 "transition-all duration-300 ease-in-out",
                 isChatbotOpen 
                   ? "opacity-100 max-w-xs" 
-                  : "opacity-0 max-w-0 pointer-events-none" // Added pointer-events-none
+                  : "opacity-0 max-w-0 pointer-events-none" 
               )}
             >
-              <Sparkles className="h-6 w-6 mr-2 text-primary shrink-0" />
-              <h1 className="text-xl font-semibold text-primary truncate">Chatbot</h1>
+              <Sparkles className="h-6 w-6 mr-2 text-primary shrink-0" /> {/* Smaller icon */}
+              <h1 className="text-lg font-semibold text-primary truncate">Chatbot</h1> {/* Smaller title */}
             </div>
             <Button 
               variant="ghost" 
@@ -129,8 +129,9 @@ export default function DashboardPage() {
               aria-expanded={isChatbotOpen}
               aria-controls="chatbot-content-area"
               title={isChatbotOpen ? 'Collapse Chatbot' : 'Expand Chatbot'}
+              className="h-8 w-8" // Smaller button
             >
-              {isChatbotOpen ? <PanelRightClose className="h-5 w-5" /> : <PanelRightOpen className="h-5 w-5" />}
+              {isChatbotOpen ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />} {/* Smaller icons */}
               <span className="sr-only">{isChatbotOpen ? 'Collapse Chatbot' : 'Expand Chatbot'}</span>
             </Button>
           </header>
