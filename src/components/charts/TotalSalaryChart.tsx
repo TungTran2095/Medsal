@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { Loader2 } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, LabelList, XAxis, YAxis } from 'recharts';
@@ -38,54 +38,55 @@ export default function TotalSalaryChart({ selectedMonth, selectedYear }: TotalS
   const [error, setError] = useState<string | null>(null);
   const [filterDescription, setFilterDescription] = useState<string>("all periods");
 
-  useEffect(() => {
-    const fetchTotalSalary = async () => {
-      setIsLoading(true);
-      setError(null);
+  const fetchTotalSalary = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
 
-      let description = "all periods";
-      if (selectedYear && selectedMonth) {
-        description = `Month ${selectedMonth}, ${selectedYear}`;
-      } else if (selectedYear) {
-        description = `Year ${selectedYear}`;
-      } else if (selectedMonth) {
-        description = `Month ${selectedMonth} (all years)`;
+    let description = "all periods";
+    if (selectedYear && selectedMonth) {
+      description = `Month ${selectedMonth}, ${selectedYear}`;
+    } else if (selectedYear) {
+      description = `Year ${selectedYear}`;
+    } else if (selectedMonth) {
+      description = `Month ${selectedMonth} (all years)`;
+    }
+    setFilterDescription(description);
+
+    try {
+      let query = supabase
+        .from('Fulltime')
+        .select('tong_thu_nhap');
+
+      if (selectedYear) {
+        query = query.eq('nam', selectedYear);
       }
-      setFilterDescription(description);
-
-      try {
-        let query = supabase
-          .from('Fulltime')
-          .select('tong_thu_nhap');
-
-        if (selectedYear) {
-          query = query.eq('nam', selectedYear);
-        }
-        if (selectedMonth) {
-          query = query.eq('thang', selectedMonth);
-        }
-        
-        const { data, error: dbError } = await query;
-
-        if (dbError) throw dbError;
-
-        if (data) {
-          const sum = data.reduce((acc, currentRow) => acc + (currentRow.tong_thu_nhap || 0), 0);
-          setTotalSalary(sum);
-        } else {
-          setTotalSalary(0);
-        }
-      } catch (err: any) {
-        const errorMessage = err.message || 'Failed to fetch total salary data.';
-        setError(errorMessage);
-        console.error("Error fetching total salary:", JSON.stringify(err, null, 2));
-        setTotalSalary(null);
-      } finally {
-        setIsLoading(false);
+      if (selectedMonth) {
+        query = query.eq('thang', selectedMonth);
       }
-    };
-    fetchTotalSalary();
+      
+      const { data, error: dbError } = await query;
+
+      if (dbError) throw dbError;
+
+      if (data) {
+        const sum = data.reduce((acc, currentRow) => acc + (currentRow.tong_thu_nhap || 0), 0);
+        setTotalSalary(sum);
+      } else {
+        setTotalSalary(0);
+      }
+    } catch (err: any) {
+      const errorMessage = err.message || 'Failed to fetch total salary data.';
+      setError(errorMessage);
+      console.error("Error fetching total salary:", JSON.stringify(err, null, 2));
+      setTotalSalary(null);
+    } finally {
+      setIsLoading(false);
+    }
   }, [selectedMonth, selectedYear]);
+
+  useEffect(() => {
+    fetchTotalSalary();
+  }, [fetchTotalSalary]);
 
   if (isLoading) {
     return (
@@ -98,13 +99,14 @@ export default function TotalSalaryChart({ selectedMonth, selectedYear }: TotalS
   if (error) {
     return (
       <Card className="border-destructive/50">
-        <CardHeader>
+        <CardHeader className="pt-3 pb-2">
           <CardTitle className="text-destructive text-sm">Error Loading Chart</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-2">
           <p className="text-xs text-destructive">{error}</p>
           <p className="text-xs text-muted-foreground mt-1">
-            Please ensure the 'Fulltime' table exists, contains 'tong_thu_nhap', 'thang', and 'nam' columns with numeric values.
+            Please ensure the 'Fulltime' table exists and contains 'tong_thu_nhap'.
+            For filtering to work, it must also contain numeric 'thang' (month) and 'nam' (year) columns.
           </p>
         </CardContent>
       </Card>
@@ -121,7 +123,7 @@ export default function TotalSalaryChart({ selectedMonth, selectedYear }: TotalS
         <CardContent className="pt-2">
           <p className="text-xs text-muted-foreground">No salary data found for the selected period or total is zero.</p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Data from 'tong_thu_nhap' column in 'Fulltime' table.
+            Data from 'tong_thu_nhap' column in 'Fulltime' table. Check if 'thang' and 'nam' columns match your filter.
           </p>
         </CardContent>
       </Card>
@@ -145,14 +147,14 @@ export default function TotalSalaryChart({ selectedMonth, selectedYear }: TotalS
 
   return (
     <Card>
-      <CardContent className="pt-4 px-2 pb-2"> {/* Reduced padding */}
-         <div className="text-2xl font-bold text-primary mb-1"> {/* Reduced font size and margin */}
+      <CardContent className="pt-4 px-2 pb-2">
+         <div className="text-2xl font-bold text-primary mb-1">
             {formattedTotalSalary}
           </div>
-          <p className="text-xs text-muted-foreground mb-2"> {/* Reduced margin */}
+          <p className="text-xs text-muted-foreground mb-2">
             Calculated from 'tong_thu_nhap' for {filterDescription}.
           </p>
-        <ChartContainer config={chartConfig} className="mx-auto aspect-auto h-[80px] max-w-full"> {/* Reduced height */}
+        <ChartContainer config={chartConfig} className="mx-auto aspect-auto h-[80px] max-w-full">
           <BarChart
             accessibilityLayer
             data={chartData}
@@ -166,7 +168,7 @@ export default function TotalSalaryChart({ selectedMonth, selectedYear }: TotalS
               tickLine={false}
               tickMargin={0} 
               axisLine={false}
-              className="text-xs sr-only" // Hide Y-axis label visually but keep for accessibility
+              className="text-xs sr-only"
               hide 
             />
             <XAxis dataKey="totalSalary" type="number" hide />
@@ -182,7 +184,7 @@ export default function TotalSalaryChart({ selectedMonth, selectedYear }: TotalS
               dataKey="totalSalary"
               fill="var(--color-totalSalary)"
               radius={4}
-              barSize={30} // Reduced bar size
+              barSize={30}
             >
               <LabelList
                 position="right"
@@ -194,7 +196,7 @@ export default function TotalSalaryChart({ selectedMonth, selectedYear }: TotalS
           </BarChart>
         </ChartContainer>
       </CardContent>
-       <CardFooter className="flex-col items-start gap-1 text-xs p-2"> {/* Reduced padding and gap */}
+       <CardFooter className="flex-col items-start gap-1 text-xs p-2">
         <div className="leading-none text-muted-foreground">
           Sum of 'tong_thu_nhap' from 'Fulltime' table.
         </div>
