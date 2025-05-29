@@ -85,12 +85,12 @@ export default function MonthlySalaryTrendChart({ selectedYear }: MonthlySalaryT
         const rpcMessageText = rpcError.message ? String(rpcError.message).toLowerCase() : '';
         
         const isFunctionMissingError =
-          rpcError.code === '42883' || 
-          (rpcError.code === 'PGRST202' && rpcMessageText.includes(functionName.toLowerCase())) ||
+          rpcError.code === '42883' || // PostgreSQL: undefined_function
+          (rpcError.code === 'PGRST202' && rpcMessageText.includes(functionName.toLowerCase())) || // PostgREST: "Could not find the function..."
           (rpcMessageText.includes(functionName.toLowerCase()) && rpcMessageText.includes('does not exist'));
 
         if (isFunctionMissingError) {
-          throw new Error(`The '${functionName}' RPC function was not found. Please create it in your Supabase SQL Editor. See instructions provided by the assistant.`);
+          throw new Error(`The '${functionName}' RPC function was not found in your Supabase database. Please ensure it's created correctly using the SQL provided in the README.md. Check for copy-paste errors.`);
         }
         throw rpcError;
       }
@@ -151,7 +151,7 @@ export default function MonthlySalaryTrendChart({ selectedYear }: MonthlySalaryT
          
           {error.includes("RPC function was not found") && (
             <p className="text-xs text-muted-foreground mt-1">
-              Please ensure the `get_monthly_salary_trend_fulltime` RPC function is created in Supabase.
+              Please ensure the `get_monthly_salary_trend_fulltime` RPC function is created in Supabase as per the README.md instructions. Double-check for copy-paste errors.
             </p>
           )}
         </CardContent>
@@ -207,7 +207,7 @@ export default function MonthlySalaryTrendChart({ selectedYear }: MonthlySalaryT
                         if (name === 'totalSalary' && typeof value === 'number') {
                            return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'VND', minimumFractionDigits: 0, maximumFractionDigits: 0  }).format(value);
                         }
-                        return value;
+                        return String(value);
                     }}
                 />}
               />

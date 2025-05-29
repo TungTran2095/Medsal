@@ -16,7 +16,8 @@ To create these functions:
 1.  Go to your Supabase Project.
 2.  Navigate to the **SQL Editor** (usually found in the left sidebar).
 3.  Click on **New query** (or "+ New query").
-4.  For each function below, paste its SQL code into the editor and click **Run**. Ensure you are copying *only* the SQL function definition block.
+4.  For each function below, **carefully copy the ENTIRE SQL code block provided** (from `CREATE OR REPLACE FUNCTION` down to the final `$$;`) and paste it into the editor. Ensure no extra characters, comments, or lines are included outside of what's provided for each function block.
+5.  Click **Run** for each function.
 
 #### `get_public_tables`
 
@@ -24,13 +25,13 @@ This function is used by the application to retrieve a list of tables from your 
 
 **SQL Code:**
 ```sql
-create or replace function get_public_tables()
-returns table (table_name text)
-language sql
-as $$
-  select tablename::text from pg_catalog.pg_tables
-  where schemaname = 'public'
-  order by tablename;
+CREATE OR REPLACE FUNCTION get_public_tables()
+RETURNS TABLE (table_name text)
+LANGUAGE SQL
+AS $$
+  SELECT tablename::text FROM pg_catalog.pg_tables
+  WHERE schemaname = 'public'
+  ORDER BY tablename;
 $$;
 ```
 
@@ -100,4 +101,4 @@ END;
 $$;
 ```
 
-Once these functions are successfully created, the application should be able to list your public tables and display dashboard analytics correctly.
+Once these functions are successfully created, the application should be able to list your public tables and display dashboard analytics correctly. If you encounter errors like "unterminated dollar-quoted string", double-check your copy-pasting process into the SQL editor, ensuring only the function code is included and no extra lines or comments interfere with the `$$` delimiters.
