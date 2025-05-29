@@ -53,7 +53,6 @@ export default function TotalSalaryChart({ selectedMonth, selectedYear }: TotalS
     setFilterDescription(description);
 
     try {
-      // Prepare arguments for RPC call, ensuring nulls are passed if filters are not set
       const rpcArgs: { filter_year?: number; filter_month?: number } = {};
       if (selectedYear !== null && selectedYear !== undefined) {
         rpcArgs.filter_year = selectedYear;
@@ -68,16 +67,27 @@ export default function TotalSalaryChart({ selectedMonth, selectedYear }: TotalS
       );
 
       if (rpcError) {
-        // Check if the error is because the RPC function doesn't exist
-        if (rpcError.code === '42883' || (rpcError.message && rpcError.message.toLowerCase().includes("function get_total_salary_fulltime") && rpcError.message.toLowerCase().includes("does not exist"))) {
-          throw new Error("The 'get_total_salary_fulltime' RPC function was not found. Please create it in your Supabase SQL Editor. See instructions if needed.");
+        const functionName = 'get_total_salary_fulltime';
+        const rpcMessage = rpcError.message ? rpcError.message.toLowerCase() : '';
+        
+        const isFunctionMissingError =
+          rpcError.code === '42883' || // PostgreSQL: undefined_function
+          (rpcError.code === 'PGRST202' && rpcMessage.includes(functionName.toLowerCase())) || // PostgREST: "Could not find the function..."
+          (rpcMessage.includes(functionName.toLowerCase()) && rpcMessage.includes('does not exist'));
+
+        if (isFunctionMissingError) {
+          throw new Error(`The '${functionName}' RPC function was not found. Please create it in your Supabase SQL Editor. See instructions in README.md if needed.`);
         }
-        throw rpcError;
+        throw rpcError; // Re-throw other RPC errors
       }
 
       // The RPC function directly returns the sum.
       // It might return null if no rows match or if all matching 'tong_thu_nhap' are null.
-      setTotalSalary(data === null ? 0 : Number(data));
+      // Ensure data is treated as a number, defaulting to 0 if null or undefined.
+      const rawTotal = data;
+      const numericTotal = typeof rawTotal === 'number' ? rawTotal : 0;
+      
+      setTotalSalary(numericTotal);
 
     } catch (err: any) {
       const errorMessage = err.message || 'Failed to fetch total salary data via RPC.';
@@ -110,16 +120,15 @@ export default function TotalSalaryChart({ selectedMonth, selectedYear }: TotalS
         <CardContent className="pt-2">
           <p className="text-xs text-destructive">{error}</p>
           <p className="text-xs text-muted-foreground mt-1">
-            Please ensure the 'Fulltime' table exists and contains a 'tong_thu_nhap' column with numeric data.
-            For filtering to work, it must also contain numeric 'thang' (month) and 'nam' (year) columns.
-            If the error mentions 'get_total_salary_fulltime', ensure the RPC function is created in Supabase.
+            If the error mentions '{`get_total_salary_fulltime`}', ensure the RPC function is created in Supabase (see README.md).
+            Otherwise, check 'Fulltime' table structure: 'tong_thu_nhap' (numeric/text with numbers), 'thang' (numeric), and 'nam' (numeric) columns.
           </p>
         </CardContent>
       </Card>
     );
   }
 
-  if (totalSalary === null || totalSalary === 0) { // Handle both null and 0 explicitly for clarity
+  if (totalSalary === null || totalSalary === 0) {
      return (
       <Card>
         <CardHeader className="pt-3 pb-2">
@@ -146,7 +155,7 @@ export default function TotalSalaryChart({ selectedMonth, selectedYear }: TotalS
   
   const formattedTotalSalary = new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: 'VND', // Changed to VND as per large numbers
+    currency: 'VND', 
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(totalSalary);
