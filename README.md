@@ -49,8 +49,8 @@ LANGUAGE SQL
 AS $$
   SELECT SUM(CAST(REPLACE(tong_thu_nhap::text, ',', '') AS DOUBLE PRECISION))
   FROM "Fulltime"
-  WHERE (filter_year IS NULL OR nam = filter_year)
-    AND (filter_month IS NULL OR thang = filter_month);
+  WHERE (filter_year IS NULL OR nam::INTEGER = filter_year)
+    AND (filter_month IS NULL OR thang::INTEGER = filter_month);
 $$;
 ```
 
@@ -69,8 +69,8 @@ LANGUAGE SQL
 AS $$
   SELECT COUNT(DISTINCT employee_id)::INTEGER
   FROM "Fulltime"
-  WHERE (filter_year IS NULL OR nam = filter_year)
-    AND (filter_month IS NULL OR thang = filter_month);
+  WHERE (filter_year IS NULL OR nam::INTEGER = filter_year)
+    AND (filter_month IS NULL OR thang::INTEGER = filter_month);
 $$;
 ```
 
@@ -93,7 +93,7 @@ BEGIN
         f.nam AS year,
         SUM(CAST(REPLACE(f.tong_thu_nhap::text, ',', '') AS DOUBLE PRECISION)) AS total_salary
     FROM "Fulltime" f
-    WHERE (p_filter_year IS NULL OR f.nam = p_filter_year)
+    WHERE (p_filter_year IS NULL OR f.nam::INTEGER = p_filter_year)
     GROUP BY f.nam, f.thang
     ORDER BY f.nam, f.thang;
 END;
@@ -101,4 +101,3 @@ $$;
 ```
 
 Once these functions are successfully created, the application should be able to list your public tables and display dashboard analytics correctly.
-```
