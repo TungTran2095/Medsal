@@ -53,36 +53,36 @@ export default function TotalSalaryChart({ selectedMonth, selectedYear }: TotalS
     setFilterDescription(description);
 
     try {
-      let query = supabase
-        .from('Fulltime')
-        .select('tong_thu_nhap');
-
-      if (selectedYear) {
-        query = query.eq('nam', selectedYear);
+      // Prepare arguments for RPC call, ensuring nulls are passed if filters are not set
+      const rpcArgs: { filter_year?: number; filter_month?: number } = {};
+      if (selectedYear !== null && selectedYear !== undefined) {
+        rpcArgs.filter_year = selectedYear;
       }
-      if (selectedMonth) {
-        query = query.eq('thang', selectedMonth);
+      if (selectedMonth !== null && selectedMonth !== undefined) {
+        rpcArgs.filter_month = selectedMonth;
       }
-      
-      const { data, error: dbError } = await query;
 
-      if (dbError) throw dbError;
+      const { data, error: rpcError } = await supabase.rpc(
+        'get_total_salary_fulltime',
+        rpcArgs
+      );
 
-      if (data) {
-        const sum = data.reduce((acc, currentRow) => {
-          // Remove commas and then parse to float, handle NaN
-          const valueString = String(currentRow.tong_thu_nhap).replace(/,/g, '');
-          const value = parseFloat(valueString);
-          return acc + (isNaN(value) ? 0 : value);
-        }, 0);
-        setTotalSalary(sum);
-      } else {
-        setTotalSalary(0);
+      if (rpcError) {
+        // Check if the error is because the RPC function doesn't exist
+        if (rpcError.code === '42883' || (rpcError.message && rpcError.message.toLowerCase().includes("function get_total_salary_fulltime") && rpcError.message.toLowerCase().includes("does not exist"))) {
+          throw new Error("The 'get_total_salary_fulltime' RPC function was not found. Please create it in your Supabase SQL Editor. See instructions if needed.");
+        }
+        throw rpcError;
       }
+
+      // The RPC function directly returns the sum.
+      // It might return null if no rows match or if all matching 'tong_thu_nhap' are null.
+      setTotalSalary(data === null ? 0 : Number(data));
+
     } catch (err: any) {
-      const errorMessage = err.message || 'Failed to fetch total salary data.';
+      const errorMessage = err.message || 'Failed to fetch total salary data via RPC.';
       setError(errorMessage);
-      console.error("Error fetching total salary:", JSON.stringify(err, null, 2));
+      console.error("Error fetching total salary via RPC:", JSON.stringify(err, null, 2));
       setTotalSalary(null);
     } finally {
       setIsLoading(false);
@@ -105,20 +105,21 @@ export default function TotalSalaryChart({ selectedMonth, selectedYear }: TotalS
     return (
       <Card className="border-destructive/50">
         <CardHeader className="pt-3 pb-2">
-          <CardTitle className="text-destructive text-sm">Error Loading Chart</CardTitle>
+          <CardTitle className="text-destructive text-sm">Error Loading Chart Data</CardTitle>
         </CardHeader>
         <CardContent className="pt-2">
           <p className="text-xs text-destructive">{error}</p>
           <p className="text-xs text-muted-foreground mt-1">
-            Please ensure the 'Fulltime' table exists and contains 'tong_thu_nhap'.
+            Please ensure the 'Fulltime' table exists and contains a 'tong_thu_nhap' column with numeric data.
             For filtering to work, it must also contain numeric 'thang' (month) and 'nam' (year) columns.
+            If the error mentions 'get_total_salary_fulltime', ensure the RPC function is created in Supabase.
           </p>
         </CardContent>
       </Card>
     );
   }
 
-  if (totalSalary === null || totalSalary === 0) {
+  if (totalSalary === null || totalSalary === 0) { // Handle both null and 0 explicitly for clarity
      return (
       <Card>
         <CardHeader className="pt-3 pb-2">
@@ -126,9 +127,10 @@ export default function TotalSalaryChart({ selectedMonth, selectedYear }: TotalS
            <CardDescription className="text-xs">For: {filterDescription}</CardDescription>
         </CardHeader>
         <CardContent className="pt-2">
-          <p className="text-xs text-muted-foreground">No salary data found for the selected period or total is zero.</p>
+          <p className="text-xs text-muted-foreground">No salary data found for the selected period, or the total is zero.</p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Data from 'tong_thu_nhap' column in 'Fulltime' table. Check if 'thang' and 'nam' columns match your filter.
+            Data summed from 'tong_thu_nhap' column in 'Fulltime' table using RPC.
+            Check if 'thang' and 'nam' columns match your filter and if 'tong_thu_nhap' has values for the period.
           </p>
         </CardContent>
       </Card>
@@ -144,7 +146,7 @@ export default function TotalSalaryChart({ selectedMonth, selectedYear }: TotalS
   
   const formattedTotalSalary = new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: 'USD', // Change as needed
+    currency: 'VND', // Changed to VND as per large numbers
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(totalSalary);
@@ -157,7 +159,7 @@ export default function TotalSalaryChart({ selectedMonth, selectedYear }: TotalS
             {formattedTotalSalary}
           </div>
           <p className="text-xs text-muted-foreground mb-2">
-            Calculated from 'tong_thu_nhap' for {filterDescription}.
+            Calculated from 'tong_thu_nhap' for {filterDescription} via RPC.
           </p>
         <ChartContainer config={chartConfig} className="mx-auto aspect-auto h-[80px] max-w-full">
           <BarChart
@@ -182,7 +184,7 @@ export default function TotalSalaryChart({ selectedMonth, selectedYear }: TotalS
               content={<ChartTooltipContent 
                 indicator="line" 
                 hideLabel 
-                formatter={(value) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value as number)}
+                formatter={(value) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'VND' }).format(value as number)}
               />}
             />
             <Bar
@@ -195,7 +197,7 @@ export default function TotalSalaryChart({ selectedMonth, selectedYear }: TotalS
                 position="right"
                 offset={8}
                 className="fill-foreground text-xs"
-                formatter={(value: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', notation: 'compact' }).format(value)}
+                formatter={(value: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'VND', notation: 'compact' }).format(value)}
               />
             </Bar>
           </BarChart>
@@ -203,7 +205,7 @@ export default function TotalSalaryChart({ selectedMonth, selectedYear }: TotalS
       </CardContent>
        <CardFooter className="flex-col items-start gap-1 text-xs p-2">
         <div className="leading-none text-muted-foreground">
-          Sum of 'tong_thu_nhap' from 'Fulltime' table.
+          Sum of 'tong_thu_nhap' from 'Fulltime' table (via RPC).
         </div>
       </CardFooter>
     </Card>
