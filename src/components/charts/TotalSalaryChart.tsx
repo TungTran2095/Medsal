@@ -22,7 +22,7 @@ import {
 
 const chartConfig = {
   totalSalary: {
-    label: 'Total Salary',
+    label: 'Total Salary', // Label can remain generic or be updated if needed
     color: 'hsl(var(--chart-1))',
   },
 } satisfies ChartConfig;
@@ -37,18 +37,18 @@ export default function TotalSalaryChart() {
       setIsLoading(true);
       setError(null);
       try {
-        // NOTE: This fetches all 'salary' entries and sums them on the client.
+        // NOTE: This fetches all 'tong_thu_nhap' entries and sums them on the client.
         // For very large tables, consider using a Supabase RPC function for aggregation.
-        // It uses the 'salary' column as populated by the CSV import.
-        // If you have a 'tong_thu_nhap' column, change 'salary' to 'tong_thu_nhap' below.
+        // It uses the 'tong_thu_nhap' column.
         const { data, error: dbError } = await supabase
           .from('Fulltime')
-          .select('salary'); 
+          .select('tong_thu_nhap'); // Changed 'salary' to 'tong_thu_nhap'
 
         if (dbError) throw dbError;
 
         if (data) {
-          const sum = data.reduce((acc, currentRow) => acc + (currentRow.salary || 0), 0);
+          // Changed currentRow.salary to currentRow.tong_thu_nhap
+          const sum = data.reduce((acc, currentRow) => acc + (currentRow.tong_thu_nhap || 0), 0);
           setTotalSalary(sum);
         } else {
           setTotalSalary(0);
@@ -82,7 +82,8 @@ export default function TotalSalaryChart() {
         <CardContent>
           <p className="text-xs text-destructive">{error}</p>
           <p className="text-xs text-muted-foreground mt-1">
-            Please ensure the 'Fulltime' table exists and contains a 'salary' column.
+            {/* Updated error guidance */}
+            Please ensure the 'Fulltime' table exists and contains a 'tong_thu_nhap' column with numeric values.
           </p>
         </CardContent>
       </Card>
@@ -96,7 +97,8 @@ export default function TotalSalaryChart() {
            <CardTitle className="text-sm">Total Fulltime Salary</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-xs text-muted-foreground">No salary data found in the 'Fulltime' table or total is zero.</p>
+          {/* Updated guidance message */}
+          <p className="text-xs text-muted-foreground">No salary data found in the 'tong_thu_nhap' column of the 'Fulltime' table or total is zero.</p>
         </CardContent>
       </Card>
     );
@@ -104,7 +106,7 @@ export default function TotalSalaryChart() {
 
   const chartData = [
     {
-      category: 'Total Fulltime Salary',
+      category: 'Total Fulltime Salary', // Category label for the chart
       totalSalary: totalSalary,
     },
   ];
@@ -124,7 +126,8 @@ export default function TotalSalaryChart() {
             {formattedTotalSalary}
           </div>
           <p className="text-xs text-muted-foreground mb-4">
-            Calculated from the 'salary' column in the 'Fulltime' table.
+            {/* Updated description */}
+            Calculated from the 'tong_thu_nhap' column in the 'Fulltime' table.
           </p>
         <ChartContainer config={chartConfig} className="mx-auto aspect-square h-[100px] max-w-xs">
           <BarChart
@@ -170,7 +173,8 @@ export default function TotalSalaryChart() {
       </CardContent>
        <CardFooter className="flex-col items-start gap-2 text-xs">
         <div className="leading-none text-muted-foreground">
-          Displaying the sum of all salaries from the Fulltime table.
+          {/* Updated description */}
+          Displaying the sum of all salaries from the 'tong_thu_nhap' column in the Fulltime table.
         </div>
       </CardFooter>
     </Card>
