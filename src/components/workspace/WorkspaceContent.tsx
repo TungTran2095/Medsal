@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, ChevronDown } from "lucide-react";
+import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, ChevronDown, Filter } from "lucide-react";
 import type { PayrollEntry } from '@/types';
 import { supabase } from '@/lib/supabaseClient';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -23,7 +23,8 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator as DMSR,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   SidebarProvider,
   Sidebar,
@@ -39,7 +40,6 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useTheme } from "@/contexts/ThemeContext";
 
-
 type WorkspaceView = 'dbManagement' | 'dashboard';
 
 interface NavItem {
@@ -53,6 +53,11 @@ interface MonthOption {
   label: string;
 }
 
+interface YearMonthOption {
+  year: number;
+  months: MonthOption[];
+}
+
 export default function WorkspaceContent() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<PayrollEntry[]>([]);
@@ -62,13 +67,14 @@ export default function WorkspaceContent() {
   const [activeView, setActiveView] = useState<WorkspaceView>('dashboard');
   const { theme, toggleTheme } = useTheme();
 
-  const [selectedMonths, setSelectedMonths] = useState<number[]>([]);
-  const [selectedYears, setSelectedYears] = useState<number[]>([new Date().getFullYear()]);
-  const [availableMonths, setAvailableMonths] = useState<MonthOption[]>([]);
-  const [isLoadingMonths, setIsLoadingMonths] = useState<boolean>(true);
+  // State for hierarchical filter
+  const [yearMonthOptions, setYearMonthOptions] = useState<YearMonthOption[]>([]);
+  const [isLoadingFilterOptions, setIsLoadingFilterOptions] = useState<boolean>(true);
+  const [detailedSelections, setDetailedSelections] = useState<Record<number, number[]>>({});
 
-  const currentYear = new Date().getFullYear();
-  const yearOptions = Array.from({ length: 10 }, (_, i) => currentYear - i);
+  // Derived states passed to cards (compatible with existing RPC logic)
+  const [selectedYears, setSelectedYears] = useState<number[]>([]);
+  const [selectedMonths, setSelectedMonths] = useState<number[]>([]);
 
 
   const navItems: NavItem[] = [
@@ -76,58 +82,90 @@ export default function WorkspaceContent() {
     { id: 'dbManagement', label: 'Quản Lý Cơ Sở Dữ Liệu', icon: Database },
   ];
 
-  const fetchDistinctMonths = useCallback(async () => {
+  const fetchHierarchicalFilterOptions = useCallback(async () => {
     if (activeView !== 'dashboard') return;
-    setIsLoadingMonths(true);
+    setIsLoadingFilterOptions(true);
     try {
-      const { data, error } = await supabase
+      const { data: yearData, error: yearError } = await supabase
         .from('Fulltime')
-        .select('thang');
+        .select('nam')
+        .order('nam', { ascending: false });
 
-      if (error) throw error;
+      if (yearError) throw yearError;
 
-      if (data) {
-        const distinctMonthNumbers = Array.from(
-          new Set(
-            data
-              .map(item => {
-                if (item.thang === null || item.thang === undefined) return null;
-                const monthStr = String(item.thang).trim();
-                const numericPart = monthStr.replace(/\D/g, ''); // Remove non-digits
-                if (numericPart) {
-                  return parseInt(numericPart, 10);
-                }
-                return null;
-              })
-              .filter(month => month !== null && !isNaN(month) && month >= 1 && month <= 12) as number[]
-          )
-        ).sort((a, b) => a - b);
+      const distinctYears: number[] = yearData
+        ? Array.from(new Set(yearData.map(item => item.nam as number))).filter(year => year != null).sort((a, b) => b - a)
+        : [];
+
+      const options: YearMonthOption[] = [];
+      for (const year of distinctYears) {
+        const { data: monthData, error: monthError } = await supabase
+          .from('Fulltime')
+          .select('thang')
+          .eq('nam', year);
+
+        if (monthError) throw monthError;
+
+        const distinctMonthNumbers: number[] = monthData
+          ? Array.from(
+              new Set(
+                monthData
+                  .map(item => {
+                    if (item.thang === null || item.thang === undefined) return null;
+                    const monthStr = String(item.thang).trim();
+                    const numericPart = monthStr.replace(/\D/g, '');
+                    return numericPart ? parseInt(numericPart, 10) : null;
+                  })
+                  .filter(month => month !== null && !isNaN(month) && month >= 1 && month <= 12) as number[]
+              )
+            ).sort((a, b) => a - b)
+          : [];
         
-        const monthOptions = distinctMonthNumbers.map(monthNum => ({
-          value: monthNum,
-          label: `Tháng ${String(monthNum).padStart(2, '0')}`
-        }));
-        setAvailableMonths(monthOptions);
-
-      } else {
-        setAvailableMonths([]);
+        options.push({
+          year: year,
+          months: distinctMonthNumbers.map(monthNum => ({
+            value: monthNum,
+            label: `Tháng ${String(monthNum).padStart(2, '0')}`
+          }))
+        });
       }
+      setYearMonthOptions(options);
+      // Set initial selection: latest year, all its months
+      if (options.length > 0 && options[0].months.length > 0) {
+        const latestYear = options[0].year;
+        setDetailedSelections({ [latestYear]: options[0].months.map(m => m.value) });
+      }
+
     } catch (error: any) {
-      console.error("Error fetching distinct months:", error);
+      console.error("Error fetching hierarchical filter options:", error);
       toast({
-        title: "Lỗi Tải Tháng",
-        description: "Không thể tải các tùy chọn bộ lọc tháng từ cơ sở dữ liệu.",
+        title: "Lỗi Tải Dữ Liệu Lọc",
+        description: "Không thể tải các tùy chọn bộ lọc từ cơ sở dữ liệu.",
         variant: "destructive",
       });
-      setAvailableMonths([]);
+      setYearMonthOptions([]);
     } finally {
-      setIsLoadingMonths(false);
+      setIsLoadingFilterOptions(false);
     }
   }, [activeView, toast]);
 
   useEffect(() => {
-    fetchDistinctMonths();
-  }, [fetchDistinctMonths]);
+    fetchHierarchicalFilterOptions();
+  }, [fetchHierarchicalFilterOptions]);
+
+  useEffect(() => {
+    const newSelectedYears = Object.entries(detailedSelections)
+      .filter(([, months]) => months.length > 0)
+      .map(([year]) => parseInt(year));
+
+    const newSelectedMonths = Array.from(
+      new Set(Object.values(detailedSelections).flat())
+    );
+    
+    setSelectedYears(newSelectedYears.length > 0 ? newSelectedYears : []); // Pass empty array if no years are effectively selected
+    setSelectedMonths(newSelectedMonths.length > 0 ? newSelectedMonths : []); // Pass empty array if no months are effectively selected
+
+  }, [detailedSelections]);
 
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -222,7 +260,6 @@ export default function WorkspaceContent() {
           } else if (datePartsMDY) { 
             payDateObj = new Date(parseInt(datePartsMDY[3]), parseInt(datePartsMDY[1]) - 1, parseInt(datePartsMDY[2]));
           } else {
-             // Attempt to parse other common formats or rely on Date constructor's flexibility
              payDateObj = new Date(entry.pay_date);
           }
 
@@ -232,9 +269,9 @@ export default function WorkspaceContent() {
             nam = payDateObj.getFullYear();
           } else {
             console.warn(`Invalid date format for pay_date: ${entry.pay_date}. Setting thang and nam to null.`);
-            payDateObj = null; // Ensure payDateObj is null if date is invalid
-            thang = null; // Explicitly set thang to null
-            nam = null;   // Explicitly set nam to null
+            payDateObj = null; 
+            thang = null; 
+            nam = null;   
           }
         }
 
@@ -265,7 +302,7 @@ export default function WorkspaceContent() {
       setSelectedFile(null);
       const fileInput = document.getElementById('payroll-csv-input') as HTMLInputElement;
       if (fileInput) fileInput.value = '';
-      fetchDistinctMonths(); 
+      fetchHierarchicalFilterOptions(); 
 
     } catch (error: any) {
       console.error("Supabase upload error:", error);
@@ -279,52 +316,58 @@ export default function WorkspaceContent() {
     }
   };
 
-  const handleMonthSelection = (monthValue: number, checked: boolean) => {
-    setSelectedMonths(prevSelected => {
-      const newSelected = new Set(prevSelected);
-      if (checked) {
-        newSelected.add(monthValue);
-      } else {
-        newSelected.delete(monthValue);
+  const handleHierarchicalSelection = (year: number, monthValue: number | 'all_months_for_year', checked: boolean) => {
+    setDetailedSelections(prev => {
+      const newSelections = { ...prev };
+      if (!newSelections[year]) {
+        newSelections[year] = [];
       }
-      return Array.from(newSelected).sort((a,b) => a-b);
+
+      const yearOption = yearMonthOptions.find(yo => yo.year === year);
+      const allMonthsForYear = yearOption ? yearOption.months.map(m => m.value) : [];
+
+      if (monthValue === 'all_months_for_year') {
+        if (checked) {
+          newSelections[year] = [...allMonthsForYear];
+        } else {
+          newSelections[year] = [];
+        }
+      } else {
+        const monthIdx = newSelections[year].indexOf(monthValue);
+        if (checked && monthIdx === -1) {
+          newSelections[year].push(monthValue);
+          newSelections[year].sort((a,b) => a-b);
+        } else if (!checked && monthIdx !== -1) {
+          newSelections[year].splice(monthIdx, 1);
+        }
+      }
+      // Remove year if no months are selected for it
+      if (newSelections[year].length === 0) {
+        delete newSelections[year];
+      }
+      return newSelections;
     });
   };
   
-  const getSelectedMonthsText = () => {
-    if (selectedMonths.length === 0 || selectedMonths.length === availableMonths.length && availableMonths.length > 0) {
-      return "Tất Cả Tháng";
-    }
-    if (selectedMonths.length === 1) {
-      const month = availableMonths.find(am => am.value === selectedMonths[0]);
-      return month ? month.label : "1 tháng được chọn";
-    }
-    if (selectedMonths.length > 1) {
-      return `${selectedMonths.length} tháng được chọn`;
-    }
-    return "Chọn Tháng";
-  };
-
-  const handleYearSelection = (yearValue: number, checked: boolean) => {
-    setSelectedYears(prevSelected => {
-      const newSelected = new Set(prevSelected);
-      if (checked) {
-        newSelected.add(yearValue);
-      } else {
-        newSelected.delete(yearValue);
+  const getFilterSummaryText = () => {
+    const selectedYearCount = Object.keys(detailedSelections).length;
+    if (selectedYearCount === 0) return "Lọc theo Kỳ";
+    
+    let summaryParts: string[] = [];
+    Object.entries(detailedSelections).forEach(([year, months]) => {
+      if (months.length > 0) {
+        const yearOption = yearMonthOptions.find(yo => yo.year === parseInt(year));
+        const allMonthsForThisYear = yearOption ? yearOption.months.length : 0;
+        if (months.length === allMonthsForThisYear && allMonthsForThisYear > 0) {
+          summaryParts.push(`${year} (Tất cả tháng)`);
+        } else {
+           summaryParts.push(`${year} (${months.length} tháng)`);
+        }
       }
-      return Array.from(newSelected).sort((a,b) => a-b);
     });
-  };
-
-  const getSelectedYearsText = () => {
-    if (selectedYears.length === 0 || selectedYears.length === yearOptions.length) {
-      return "Tất Cả Năm";
-    }
-    if (selectedYears.length <= 3) { // Show individual years if 3 or less selected
-      return selectedYears.join(', ');
-    }
-    return `${selectedYears.length} năm được chọn`;
+    if (summaryParts.length === 0) return "Lọc theo Kỳ";
+    if (summaryParts.length > 2) return `${summaryParts.slice(0,2).join(', ')}...`;
+    return summaryParts.join(', ');
   };
 
 
@@ -471,7 +514,7 @@ export default function WorkspaceContent() {
           {activeView === 'dashboard' && (
              <Card className="shadow-md rounded-lg h-full flex flex-col">
               <CardHeader className="pb-3 pt-4 px-3 md:px-4">
-                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <div className="flex-1">
                     <CardTitle className="text-lg font-semibold text-primary flex items-center gap-1.5">
                       <LayoutDashboard className="h-5 w-5" />
@@ -481,61 +524,62 @@ export default function WorkspaceContent() {
                       Phân tích và tổng quan dữ liệu lương từ bảng 'Fulltime'.
                     </CardDescription>
                   </div>
-                  <div className="flex items-end gap-2 mt-2 sm:mt-0">
-                    <div>
-                      <Label htmlFor="month-filter" className="text-xs font-medium">Tháng</Label>
-                       <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="outline" className="h-9 text-sm w-full sm:w-[150px] mt-1 justify-between">
-                            <span>{getSelectedMonthsText()}</span>
-                            <ChevronDown className="ml-2 h-4 w-4 opacity-50" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent className="w-[150px]">
-                          <DropdownMenuLabel>Chọn Tháng</DropdownMenuLabel>
-                          <DMSR />
-                          {isLoadingMonths ? (
-                            <div className="px-2 py-1.5 text-xs text-muted-foreground">Đang tải tháng...</div>
-                          ) : availableMonths.length === 0 ? (
-                            <div className="px-2 py-1.5 text-xs text-muted-foreground">Không tìm thấy tháng</div>
-                          ) : (
-                            availableMonths.map(month => (
-                              <DropdownMenuCheckboxItem
-                                key={month.value}
-                                checked={selectedMonths.includes(month.value)}
-                                onCheckedChange={(checked) => handleMonthSelection(month.value, checked as boolean)}
-                              >
-                                {month.label}
-                              </DropdownMenuCheckboxItem>
-                            ))
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                    <div>
-                      <Label htmlFor="year-filter" className="text-xs font-medium">Năm</Label>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="outline" className="h-9 text-sm w-full sm:w-[140px] mt-1 justify-between">
-                            <span>{getSelectedYearsText()}</span>
-                            <ChevronDown className="ml-2 h-4 w-4 opacity-50" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent className="w-[140px]">
-                          <DropdownMenuLabel>Chọn Năm</DropdownMenuLabel>
-                          <DMSR />
-                          {yearOptions.map(year => (
-                            <DropdownMenuCheckboxItem
-                              key={year}
-                              checked={selectedYears.includes(year)}
-                              onCheckedChange={(checked) => handleYearSelection(year, checked as boolean)}
-                            >
-                              {year}
-                            </DropdownMenuCheckboxItem>
-                          ))}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
+                  <div className="flex items-center gap-2 mt-2 sm:mt-0">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" className="h-9 text-sm min-w-[150px] justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <Filter className="h-3.5 w-3.5 opacity-80" />
+                            <span>{getFilterSummaryText()}</span>
+                          </div>
+                          <ChevronDown className="ml-2 h-4 w-4 opacity-50" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent className="w-[280px]" align="end">
+                        <DropdownMenuLabel>Lọc theo Kỳ</DropdownMenuLabel>
+                        <DMSR />
+                        {isLoadingFilterOptions ? (
+                          <div className="px-2 py-1.5 text-xs text-muted-foreground">Đang tải dữ liệu lọc...</div>
+                        ) : yearMonthOptions.length === 0 ? (
+                          <div className="px-2 py-1.5 text-xs text-muted-foreground">Không có dữ liệu để lọc.</div>
+                        ) : (
+                          <ScrollArea className="max-h-[300px]">
+                            <div className="p-1">
+                            {yearMonthOptions.map(yearOption => (
+                              <React.Fragment key={yearOption.year}>
+                                <DropdownMenuLabel className="px-2 pt-2 pb-1 text-xs font-semibold text-primary">{`Năm ${yearOption.year}`}</DropdownMenuLabel>
+                                {yearOption.months.length > 0 && (
+                                    <DropdownMenuCheckboxItem
+                                    key={`${yearOption.year}-all`}
+                                    checked={
+                                        detailedSelections[yearOption.year]?.length === yearOption.months.length &&
+                                        yearOption.months.every(m => detailedSelections[yearOption.year]?.includes(m.value))
+                                    }
+                                    onCheckedChange={(checked) => handleHierarchicalSelection(yearOption.year, 'all_months_for_year', checked as boolean)}
+                                    className="text-xs"
+                                    >
+                                    Tất cả tháng ({yearOption.months.length})
+                                    </DropdownMenuCheckboxItem>
+                                )}
+                                <DMSR className="my-1" />
+                                {yearOption.months.map(month => (
+                                  <DropdownMenuCheckboxItem
+                                    key={`${yearOption.year}-${month.value}`}
+                                    checked={detailedSelections[yearOption.year]?.includes(month.value) ?? false}
+                                    onCheckedChange={(checked) => handleHierarchicalSelection(yearOption.year, month.value, checked as boolean)}
+                                    className="text-xs ml-2"
+                                  >
+                                    {month.label}
+                                  </DropdownMenuCheckboxItem>
+                                ))}
+                                {yearMonthOptions.indexOf(yearOption) < yearMonthOptions.length - 1 && <DMSR className="my-2" />}
+                              </React.Fragment>
+                            ))}
+                            </div>
+                          </ScrollArea>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </div>
               </CardHeader>
@@ -543,11 +587,8 @@ export default function WorkspaceContent() {
                 <div className="grid gap-3 md:grid-cols-4">
                     <TotalSalaryCard selectedMonths={selectedMonths} selectedYears={selectedYears} />
                     <EmployeeCountCard selectedMonths={selectedMonths} selectedYears={selectedYears} />
-                    {/* Placeholder for 2 more cards */}
-                    {/* <Card className="h-full"><CardContent className="pt-6">Card 3</CardContent></Card> */}
-                    {/* <Card className="h-full"><CardContent className="pt-6">Card 4</CardContent></Card> */}
                 </div>
-                <div className="mt-0">
+                <div className="mt-0"> {/* Ensure chart is below cards */}
                     <MonthlySalaryTrendChart selectedYears={selectedYears} />
                 </div>
               </CardContent>
@@ -558,3 +599,6 @@ export default function WorkspaceContent() {
     </SidebarProvider>
   );
 }
+
+
+    
