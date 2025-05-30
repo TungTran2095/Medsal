@@ -5,25 +5,31 @@
 
 @layer base {
   :root {
-    --background: 0 0% 96.1%; /* #F5F5F5 Light Gray */
+    --background: 0 0% 96.1%; /* #F5F5F5 Light Gray - Opaque */
     --foreground: 0 0% 3.9%; /* Default Dark for text */
-    --card: 0 0% 100%; /* White */
+    
+    /* Glassmorphism: Card and Popover with transparency */
+    --card: 0 0% 100% / 0.65; /* White with 65% opacity */
     --card-foreground: 0 0% 3.9%;
-    --popover: 0 0% 100%;
+    --popover: 0 0% 100% / 0.75; /* White with 75% opacity */
     --popover-foreground: 0 0% 3.9%;
+
     --primary: 216 100% 33%; /* #003EA8 Dark Blue */
     --primary-foreground: 0 0% 98%; /* White/Light text for Primary */
     --secondary: 49 61% 64%; /* #DCC86A Gold/Yellow */
     --secondary-foreground: 0 0% 15%; /* Dark text for contrast on Gold/Yellow */
-    --muted: 0 0% 90%; 
+    --muted: 0 0% 90% / 0.5; /* Muted with 50% opacity for subtle glass */
     --muted-foreground: 0 0% 45.1%;
     --accent: 357 79% 49%; /* #E21A22 Red */
     --accent-foreground: 0 0% 98%; /* White/Light text for Accent */
-    --destructive: 0 84.2% 60.2%; 
+    --destructive: 0 84.2% 60.2% / 0.7; /* Destructive with 70% opacity */
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
+    
+    /* Glassmorphism: Borders with transparency */
+    --border: 0 0% 80% / 0.3; /* Lighter, more transparent border */
+    --input: 0 0% 89.8% / 0.3; /* Input border with some transparency */
     --ring: 216 100% 33%; /* Use Primary color for ring */
+    
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
@@ -31,62 +37,64 @@
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
 
-    /* Light theme sidebar (already defined, slight review for consistency if needed) */
-    --sidebar-background: 0 0% 98%; /* Slightly off-white */
+    /* Glassmorphism: Light theme sidebar with transparency */
+    --sidebar-background: 0 0% 98% / 0.7; /* Slightly off-white with 70% opacity */
     --sidebar-foreground: 240 5.3% 26.1%; /* Dark gray text */
     --sidebar-primary: 216 100% 33%; /* Main primary for active items */
     --sidebar-primary-foreground: 0 0% 98%; /* Light text on primary */
-    --sidebar-accent: 0 0% 94%; /* Lighter gray for hover/focus */
+    --sidebar-accent: 0 0% 94% / 0.5; /* Lighter gray for hover/focus with 50% opacity */
     --sidebar-accent-foreground: 240 5.9% 10%; /* Dark text for accent */
-    --sidebar-border: 0 0% 90%; /* Slightly darker border */
+    --sidebar-border: 0 0% 90% / 0.3; /* More transparent border */
     --sidebar-ring: 216 100% 33%; /* Primary for focus rings */
   }
 
   .dark {
-    /* Firebase Studio inspired Dark Theme */
-    --background: 220 13% 10%; /* #1A1B1E - Very dark, slightly cool gray */
+    /* Firebase Studio inspired Dark Theme - Opaque Background */
+    --background: 220 13% 10%; /* #1A1B1E - Very dark, slightly cool gray - Opaque */
     --foreground: 220 10% 85%; /* #D0D1D5 - Light gray for text */
 
-    --card: 220 13% 13%;         /* #1E1F22 - Slightly lighter than background for cards */
-    --card-foreground: 220 10% 85%; /* #D0D1D5 */
+    /* Glassmorphism: Dark theme Card and Popover with transparency */
+    --card: 220 13% 13% / 0.65;  /* Dark card with 65% opacity */
+    --card-foreground: 220 10% 85%; 
 
-    --popover: 220 13% 10%;      /* #1A1B1E - Same as background */
-    --popover-foreground: 220 10% 85%; /* #D0D1D5 */
+    --popover: 220 13% 10% / 0.75; /* Dark popover with 75% opacity */
+    --popover-foreground: 220 10% 85%; 
 
     --primary: 210 80% 60%;     /* #60A5FA - A medium-light blue, good for interactivity */
     --primary-foreground: 220 15% 10%; /* #17181C - Dark text for the blue primary button */
 
-    --secondary: 220 10% 20%;   /* #2D2E33 - A muted gray for secondary elements */
-    --secondary-foreground: 220 10% 80%; /* #C4C6CC - Light gray text for secondary */
+    --secondary: 220 10% 20% / 0.7;   /* Muted gray with 70% opacity */
+    --secondary-foreground: 220 10% 80%; 
 
-    --muted: 220 10% 20%; /* #2D2E33 */
-    --muted-foreground: 220 10% 55%; /* #80828A - Dimmer text */
+    --muted: 220 10% 20% / 0.5; /* Muted with 50% opacity */
+    --muted-foreground: 220 10% 55%; 
 
     --accent: 200 85% 55%;      /* #43B0EE - A brighter, slightly more cyan blue for accents */
     --accent-foreground: 220 15% 10%; /* #17181C - Dark text for accent */
     
-    --destructive: 0 60% 50%;     /* #CC3333 - A standard red for destructive actions */
-    --destructive-foreground: 0 0% 100%; /* White text */
+    --destructive: 0 60% 50% / 0.7; /* Destructive with 70% opacity */
+    --destructive-foreground: 0 0% 100%; 
 
-    --border: 220 10% 25%;       /* #383A3F - Borders */
-    --input: 220 10% 25%;        /* #383A3F - Input background */
+    /* Glassmorphism: Dark theme Borders with transparency */
+    --border: 220 10% 30% / 0.3;       /* More transparent border */
+    --input: 220 10% 25% / 0.3;        /* Input border with some transparency */
     --ring: 210 80% 60%;         /* Primary blue for focus rings */
 
-    --chart-1: 210 80% 60%; /* primary */
-    --chart-2: 200 85% 55%; /* accent */
-    --chart-3: 170 70% 45%; /* a teal/greenish blue */
-    --chart-4: 250 60% 65%; /* a violet */
-    --chart-5: 30 70% 60%; /* an orange */
+    --chart-1: 210 80% 60%; 
+    --chart-2: 200 85% 55%; 
+    --chart-3: 170 70% 45%; 
+    --chart-4: 250 60% 65%; 
+    --chart-5: 30 70% 60%; 
 
-    /* Sidebar specific dark theme vars */
-    --sidebar-background: 220 13% 12%;        /* #1C1D20 - Dark sidebar bg */
-    --sidebar-foreground: 220 10% 80%;        /* #C4C6CC - Light text */
-    --sidebar-primary: 210 80% 60%;          /* #60A5FA - Active item bg (main primary) */
-    --sidebar-primary-foreground: 220 15% 10%; /* #17181C - Text on active item bg */
-    --sidebar-accent: 220 10% 22%;           /* #313339 - Hover/focus item bg */
-    --sidebar-accent-foreground: 210 80% 70%;/* #87BFFB - Text on hover/focus */
-    --sidebar-border: 220 10% 18%;           /* #26282B - Border for sidebar elements */
-    --sidebar-ring: 210 80% 60%;             /* #60A5FA - Focus ring */
+    /* Glassmorphism: Dark theme Sidebar with transparency */
+    --sidebar-background: 220 13% 12% / 0.7; /* Dark sidebar bg with 70% opacity */
+    --sidebar-foreground: 220 10% 80%;        
+    --sidebar-primary: 210 80% 60%;          
+    --sidebar-primary-foreground: 220 15% 10%; 
+    --sidebar-accent: 220 10% 22% / 0.5; /* Hover/focus with 50% opacity */
+    --sidebar-accent-foreground: 210 80% 70%;
+    --sidebar-border: 220 10% 18% / 0.3; /* More transparent border */
+    --sidebar-ring: 210 80% 60%;             
   }
 }
 
