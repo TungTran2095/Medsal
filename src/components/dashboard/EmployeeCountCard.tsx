@@ -12,11 +12,11 @@ import {
 } from "@/components/ui/card";
 
 interface EmployeeCountCardProps {
-  selectedMonths?: number[]; 
-  selectedYears?: number[];
+  selectedMonths?: number[];
+  selectedYear?: number | null;
 }
 
-export default function EmployeeCountCard({ selectedMonths, selectedYears }: EmployeeCountCardProps) {
+export default function EmployeeCountCard({ selectedMonths, selectedYear }: EmployeeCountCardProps) {
   const [employeeCount, setEmployeeCount] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,32 +26,32 @@ export default function EmployeeCountCard({ selectedMonths, selectedYears }: Emp
     setIsLoading(true);
     setError(null);
 
-    let yearDesc = (selectedYears && selectedYears.length > 0) 
-      ? `Năm ${selectedYears.join(', ')}` 
-      : "Tất cả các năm";
+    let yearDesc = selectedYear ? `Năm ${selectedYear}` : "Tất cả các năm";
+    let monthDesc = (selectedMonths && selectedMonths.length > 0)
+      ? `Tháng ${selectedMonths.join(', ')}`
+      : "Tất cả các tháng";
     
-    let monthDesc = "";
-    if (selectedMonths && selectedMonths.length > 0) {
-      monthDesc = `Tháng ${selectedMonths.join(', ')}`;
-    } else {
-      monthDesc = "Tất cả các tháng";
-    }
-
     let description = "tất cả các kỳ";
-    if ((selectedYears && selectedYears.length > 0) && (selectedMonths && selectedMonths.length > 0)) {
+    if (selectedYear && selectedMonths && selectedMonths.length > 0) {
       description = `${monthDesc}, ${yearDesc}`;
-    } else if (selectedYears && selectedYears.length > 0) {
+    } else if (selectedYear) {
       description = yearDesc;
     } else if (selectedMonths && selectedMonths.length > 0) {
-      description = `${monthDesc} (tất cả các năm)`;
+      description = `${monthDesc} (mọi năm)`;
     }
     setFilterDescription(description);
 
 
     try {
-      const rpcArgs: { filter_years?: number[]; filter_months?: number[] } = {};
-      rpcArgs.filter_years = selectedYears && selectedYears.length > 0 ? selectedYears : undefined;
-      rpcArgs.filter_months = selectedMonths && selectedMonths.length > 0 ? selectedMonths : undefined;
+      const rpcArgs: { filter_year?: number; filter_months?: number[] } = {};
+       if (selectedYear !== null) {
+        rpcArgs.filter_year = selectedYear;
+      }
+      if (selectedMonths && selectedMonths.length > 0) {
+        rpcArgs.filter_months = selectedMonths;
+      } else {
+        rpcArgs.filter_months = undefined; 
+      }
 
 
       const functionName = 'get_employee_count_fulltime';
@@ -62,10 +62,10 @@ export default function EmployeeCountCard({ selectedMonths, selectedYears }: Emp
 
       if (rpcError) {
         const rpcMessageText = rpcError.message ? String(rpcError.message).toLowerCase() : '';
-        
+
         const isFunctionMissingError =
-          rpcError.code === '42883' || 
-          (rpcError.code === 'PGRST202' && rpcMessageText.includes(functionName.toLowerCase())) || 
+          rpcError.code === '42883' ||
+          (rpcError.code === 'PGRST202' && rpcMessageText.includes(functionName.toLowerCase())) ||
           (rpcMessageText.includes(functionName.toLowerCase()) && rpcMessageText.includes('does not exist'));
 
         if (isFunctionMissingError) {
@@ -73,7 +73,7 @@ export default function EmployeeCountCard({ selectedMonths, selectedYears }: Emp
         }
         throw rpcError;
       }
-      
+
       setEmployeeCount(data as number ?? 0);
 
     } catch (err: any) {
@@ -90,7 +90,7 @@ export default function EmployeeCountCard({ selectedMonths, selectedYears }: Emp
     } finally {
       setIsLoading(false);
     }
-  }, [selectedMonths, selectedYears]);
+  }, [selectedMonths, selectedYear]);
 
   useEffect(() => {
     fetchEmployeeCount();
@@ -121,7 +121,7 @@ export default function EmployeeCountCard({ selectedMonths, selectedYears }: Emp
         </CardHeader>
         <CardContent className="pt-2">
           <p className="text-xs text-destructive">{error}</p>
-           {error.includes("RPC function was not found") && ( // Simplified check
+           {error.includes("Hàm RPC") && error.includes("không tìm thấy") && (
              <p className="text-xs text-muted-foreground mt-1">
                Vui lòng đảm bảo hàm RPC `get_employee_count_fulltime` đã được tạo trong Supabase theo README.md.
              </p>

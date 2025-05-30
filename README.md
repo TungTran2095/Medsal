@@ -40,72 +40,62 @@ $$;
 
 #### `get_total_salary_fulltime`
 
-This function is used by the Payroll Dashboard to calculate the total sum of `tong_thu_nhap` from the `Fulltime` table, with optional filters for selected year(s) and month(s). It now correctly parses text-based month columns (e.g., "Tháng 01") into integers and supports an array of months and years for multi-selection.
+This function is used by the Payroll Dashboard to calculate the total sum of `tong_thu_nhap` from the `Fulltime` table, with optional filters for a selected year and an array of months. It correctly parses text-based month columns (e.g., "Tháng 01") into integers.
 
 **SQL Code:**
 ```sql
 CREATE OR REPLACE FUNCTION get_total_salary_fulltime(
-    filter_years INTEGER[] DEFAULT NULL, -- Array of integers for years
-    filter_months INTEGER[] DEFAULT NULL -- Array of integers for months
+    filter_year INTEGER DEFAULT NULL,
+    filter_months INTEGER[] DEFAULT NULL
 )
 RETURNS DOUBLE PRECISION
 LANGUAGE SQL
 AS $$
   SELECT SUM(CAST(REPLACE(tong_thu_nhap::text, ',', '') AS DOUBLE PRECISION))
   FROM "Fulltime"
-  WHERE (
-      filter_years IS NULL OR
-      array_length(filter_years, 1) IS NULL OR
-      array_length(filter_years, 1) = 0 OR
-      nam::INTEGER = ANY(filter_years)
-    )
+  WHERE (filter_year IS NULL OR nam::INTEGER = filter_year)
     AND (
-      filter_months IS NULL OR
-      array_length(filter_months, 1) IS NULL OR
-      array_length(filter_months, 1) = 0 OR
-      regexp_replace(thang, '\D', '', 'g')::INTEGER = ANY(filter_months)
+        filter_months IS NULL OR
+        array_length(filter_months, 1) IS NULL OR
+        array_length(filter_months, 1) = 0 OR
+        regexp_replace(thang, '\D', '', 'g')::INTEGER = ANY(filter_months)
     );
 $$;
 ```
 
 #### `get_employee_count_fulltime`
 
-This function is used by the Payroll Dashboard to count the number of unique employees from the `Fulltime` table, with optional filters for selected year(s) and month(s). It now correctly parses text-based month columns (e.g., "Tháng 01") into integers and supports an array of months and years for multi-selection.
+This function is used by the Payroll Dashboard to count the number of unique employees from the `Fulltime` table, with optional filters for a selected year and an array of months. It correctly parses text-based month columns (e.g., "Tháng 01") into integers.
 
 **SQL Code:**
 ```sql
 CREATE OR REPLACE FUNCTION get_employee_count_fulltime(
-    filter_years INTEGER[] DEFAULT NULL, -- Array of integers for years
-    filter_months INTEGER[] DEFAULT NULL -- Array of integers for months
+    filter_year INTEGER DEFAULT NULL,
+    filter_months INTEGER[] DEFAULT NULL
 )
 RETURNS INTEGER
 LANGUAGE SQL
 AS $$
   SELECT COUNT(DISTINCT employee_id)::INTEGER
   FROM "Fulltime"
-  WHERE (
-      filter_years IS NULL OR
-      array_length(filter_years, 1) IS NULL OR
-      array_length(filter_years, 1) = 0 OR
-      nam::INTEGER = ANY(filter_years)
-    )
+  WHERE (filter_year IS NULL OR nam::INTEGER = filter_year)
     AND (
-      filter_months IS NULL OR
-      array_length(filter_months, 1) IS NULL OR
-      array_length(filter_months, 1) = 0 OR
-      regexp_replace(thang, '\D', '', 'g')::INTEGER = ANY(filter_months)
+        filter_months IS NULL OR
+        array_length(filter_months, 1) IS NULL OR
+        array_length(filter_months, 1) = 0 OR
+        regexp_replace(thang, '\D', '', 'g')::INTEGER = ANY(filter_months)
     );
 $$;
 ```
 
 #### `get_monthly_salary_trend_fulltime`
 
-This function is used by the Payroll Dashboard to fetch the total salary (`tong_thu_nhap`) aggregated per month and year, for given year(s). This is used to display the monthly salary trend. It now correctly parses text-based month columns (e.g., "Tháng 01") into integers and supports an array of years.
+This function is used by the Payroll Dashboard to fetch the total salary (`tong_thu_nhap`) aggregated per month and year, for a given year. This is used to display the monthly salary trend. It now correctly parses text-based month columns (e.g., "Tháng 01") into integers.
 
 **SQL Code:**
 ```sql
 CREATE OR REPLACE FUNCTION get_monthly_salary_trend_fulltime(
-    p_filter_years INTEGER[] DEFAULT NULL -- Array of integers for years
+    p_filter_year INTEGER DEFAULT NULL
 )
 RETURNS TABLE(month INTEGER, year INTEGER, total_salary DOUBLE PRECISION)
 LANGUAGE plpgsql
@@ -118,10 +108,8 @@ BEGIN
         SUM(CAST(REPLACE(f.tong_thu_nhap::text, ',', '') AS DOUBLE PRECISION)) AS total_salary
     FROM "Fulltime" f
     WHERE (
-        p_filter_years IS NULL OR
-        array_length(p_filter_years, 1) IS NULL OR
-        array_length(p_filter_years, 1) = 0 OR
-        f.nam::INTEGER = ANY(p_filter_years)
+        p_filter_year IS NULL OR
+        f.nam::INTEGER = p_filter_year
       )
     GROUP BY f.nam, regexp_replace(f.thang, '\D', '', 'g') -- Group by the extracted numeric month
     ORDER BY f.nam, month; -- Order by the extracted numeric month
@@ -130,4 +118,3 @@ $$;
 ```
 
 Once these functions are successfully created (or updated) in your Supabase SQL Editor, the application should be able to correctly filter and aggregate data. If you continue to encounter "unterminated dollar-quoted string" errors, please double-check for any invisible characters or ensure the entire function block is being processed correctly by the SQL editor, especially ensuring no comments are between `END;` and the final `$$;`.
-

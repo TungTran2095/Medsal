@@ -29,7 +29,7 @@ import {
 
 const chartConfig = {
   totalSalary: {
-    label: 'Tổng Lương', // Translated
+    label: 'Tổng Lương',
     color: 'hsl(var(--chart-1))',
   },
 } satisfies ChartConfig;
@@ -38,16 +38,16 @@ interface MonthlyData {
   month: number;
   year: number;
   total_salary: number;
-  name: string; 
+  name: string;
 }
 
 interface MonthlySalaryTrendChartProps {
-  selectedYears?: number[];
+  selectedYear?: number | null;
 }
 
 const CRITICAL_SETUP_ERROR_PREFIX = "LỖI CÀI ĐẶT QUAN TRỌNG:";
 
-export default function MonthlySalaryTrendChart({ selectedYears }: MonthlySalaryTrendChartProps) {
+export default function MonthlySalaryTrendChart({ selectedYear }: MonthlySalaryTrendChartProps) {
   const [chartData, setChartData] = useState<MonthlyData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -57,14 +57,14 @@ export default function MonthlySalaryTrendChart({ selectedYears }: MonthlySalary
     setIsLoading(true);
     setError(null);
 
-    let description = (selectedYears && selectedYears.length > 0) 
-      ? `Năm ${selectedYears.join(', ')}` 
-      : "tất cả các năm có sẵn";
+    let description = selectedYear ? `Năm ${selectedYear}` : "tất cả các năm có sẵn";
     setFilterDescription(description);
-    
+
     try {
-      const rpcArgs: { p_filter_years?: number[] } = {};
-      rpcArgs.p_filter_years = selectedYears && selectedYears.length > 0 ? selectedYears : undefined;
+      const rpcArgs: { p_filter_year?: number } = {};
+      if (selectedYear !== null) {
+        rpcArgs.p_filter_year = selectedYear;
+      }
 
 
       const functionName = 'get_monthly_salary_trend_fulltime';
@@ -75,22 +75,22 @@ export default function MonthlySalaryTrendChart({ selectedYears }: MonthlySalary
 
       if (rpcError) {
         const rpcMessageText = rpcError.message ? String(rpcError.message).toLowerCase() : '';
-        
+
         const isFunctionMissingError =
-          rpcError.code === '42883' || 
-          (rpcError.code === 'PGRST202' && rpcMessageText.includes(functionName.toLowerCase())) || 
+          rpcError.code === '42883' ||
+          (rpcError.code === 'PGRST202' && rpcMessageText.includes(functionName.toLowerCase())) ||
           (rpcMessageText.includes(functionName.toLowerCase()) && rpcMessageText.includes('does not exist'));
 
         if (isFunctionMissingError) {
           throw new Error(`${CRITICAL_SETUP_ERROR_PREFIX} Hàm RPC Supabase '${functionName}' bị thiếu. Biểu đồ này không thể hiển thị dữ liệu nếu không có nó. Vui lòng tạo hàm này trong SQL Editor của Supabase bằng script trong phần 'Required SQL Functions' của README.md.`);
         }
-        throw rpcError; 
+        throw rpcError;
       }
 
       if (data) {
         const formattedData = data.map((item: any) => ({
           ...item,
-          name: `${String(item.month).padStart(2, '0')}/${item.year}`, // Format as MM/YYYY
+          name: `${String(item.month).padStart(2, '0')}/${item.year}`, 
           total_salary: Number(item.total_salary) || 0,
         }));
         setChartData(formattedData);
@@ -112,7 +112,7 @@ export default function MonthlySalaryTrendChart({ selectedYears }: MonthlySalary
     } finally {
       setIsLoading(false);
     }
-  }, [selectedYears]);
+  }, [selectedYear]);
 
   useEffect(() => {
     fetchMonthlyTrend();
@@ -122,10 +122,10 @@ export default function MonthlySalaryTrendChart({ selectedYears }: MonthlySalary
     return (
       <Card className="h-full">
         <CardHeader className="pb-2 pt-3">
-          <CardTitle className="text-base font-semibold">Xu Hướng Lương Theo Tháng</CardTitle> 
+          <CardTitle className="text-base font-semibold">Xu Hướng Lương Theo Tháng</CardTitle>
           <CardDescription className="text-xs">Đang tải dữ liệu xu hướng...</CardDescription>
         </CardHeader>
-        <CardContent className="flex items-center justify-center h-[250px] pt-2"> 
+        <CardContent className="flex items-center justify-center h-[250px] pt-2">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </CardContent>
       </Card>
@@ -136,7 +136,7 @@ export default function MonthlySalaryTrendChart({ selectedYears }: MonthlySalary
     return (
       <Card className="border-destructive/50 h-full">
         <CardHeader className="pb-2 pt-3">
-          <CardTitle className="text-base font-semibold text-destructive flex items-center gap-1"> 
+          <CardTitle className="text-base font-semibold text-destructive flex items-center gap-1">
             <AlertTriangle className="h-4 w-4" />
             Lỗi Xu Hướng Hàng Tháng
           </CardTitle>
@@ -152,16 +152,16 @@ export default function MonthlySalaryTrendChart({ selectedYears }: MonthlySalary
       </Card>
     );
   }
-  
+
   if (chartData.length === 0) {
     return (
      <Card  className="h-full">
        <CardHeader className="pb-2 pt-3">
-          <CardTitle className="text-base font-semibold text-muted-foreground">Xu Hướng Lương Theo Tháng</CardTitle> 
+          <CardTitle className="text-base font-semibold text-muted-foreground">Xu Hướng Lương Theo Tháng</CardTitle>
           <CardDescription className="text-xs">Cho: {filterDescription}</CardDescription>
        </CardHeader>
-       <CardContent className="pt-2 flex items-center justify-center h-[250px]"> 
-         <p className="text-sm text-muted-foreground">Không tìm thấy dữ liệu lương cho kỳ đã chọn.</p> 
+       <CardContent className="pt-2 flex items-center justify-center h-[250px]">
+         <p className="text-sm text-muted-foreground">Không tìm thấy dữ liệu lương cho kỳ đã chọn.</p>
        </CardContent>
      </Card>
    );
@@ -170,7 +170,7 @@ export default function MonthlySalaryTrendChart({ selectedYears }: MonthlySalary
   return (
     <Card  className="h-full">
       <CardHeader className="pb-2 pt-3">
-        <CardTitle className="text-base font-semibold">Xu Hướng Lương Theo Tháng</CardTitle> 
+        <CardTitle className="text-base font-semibold">Xu Hướng Lương Theo Tháng</CardTitle>
         <CardDescription className="text-xs">
           Tổng lương ('tong_thu_nhap') mỗi tháng cho {filterDescription}.
         </CardDescription>
@@ -180,14 +180,14 @@ export default function MonthlySalaryTrendChart({ selectedYears }: MonthlySalary
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData} margin={{ top: 5, right: 20, left: -25, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis 
-                dataKey="name" 
+              <XAxis
+                dataKey="name"
                 tickLine={false}
                 axisLine={false}
                 tickMargin={8}
                 className="text-xs"
               />
-              <YAxis 
+              <YAxis
                 tickLine={false}
                 axisLine={false}
                 tickMargin={8}
@@ -195,7 +195,7 @@ export default function MonthlySalaryTrendChart({ selectedYears }: MonthlySalary
                 tickFormatter={(value) => new Intl.NumberFormat('vi-VN', { notation: 'compact', compactDisplay: 'short' }).format(value)}
               />
               <Tooltip
-                content={<ChartTooltipContent 
+                content={<ChartTooltipContent
                     indicator="line"
                     formatter={(value) => {
                         if (typeof value === 'number') {
@@ -205,14 +205,14 @@ export default function MonthlySalaryTrendChart({ selectedYears }: MonthlySalary
                     }}
                 />}
               />
-              <Legend wrapperStyle={{ fontSize: '0.75rem' }} /> 
+              <Legend wrapperStyle={{ fontSize: '0.75rem' }} />
               <Line
                 type="monotone"
                 dataKey="total_salary"
                 stroke="var(--color-totalSalary)"
                 strokeWidth={2}
                 dot={false}
-                name={chartConfig.totalSalary.label} // Use translated label
+                name={chartConfig.totalSalary.label}
               />
             </LineChart>
           </ResponsiveContainer>

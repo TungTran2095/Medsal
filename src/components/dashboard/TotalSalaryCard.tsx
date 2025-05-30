@@ -12,8 +12,8 @@ import {
 } from "@/components/ui/card";
 
 interface TotalSalaryCardProps {
-  selectedMonths?: number[]; 
-  selectedYears?: number[]; 
+  selectedMonths?: number[];
+  selectedYear?: number | null;
 }
 
 interface ChartError {
@@ -21,7 +21,7 @@ interface ChartError {
   message: string;
 }
 
-export default function TotalSalaryCard({ selectedMonths, selectedYears }: TotalSalaryCardProps) {
+export default function TotalSalaryCard({ selectedMonths, selectedYear }: TotalSalaryCardProps) {
   const [totalSalary, setTotalSalary] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<ChartError | null>(null);
@@ -31,33 +31,33 @@ export default function TotalSalaryCard({ selectedMonths, selectedYears }: Total
     setIsLoading(true);
     setError(null);
 
-    let yearDesc = (selectedYears && selectedYears.length > 0) 
-      ? `Năm ${selectedYears.join(', ')}` 
-      : "Tất cả các năm";
-    
-    let monthDesc = "";
-    if (selectedMonths && selectedMonths.length > 0) {
-      // Assuming availableMonths logic is in parent and provides labels if needed, or just use numbers
-      monthDesc = `Tháng ${selectedMonths.join(', ')}`;
-    } else {
-      monthDesc = "Tất cả các tháng";
-    }
+    let yearDesc = selectedYear ? `Năm ${selectedYear}` : "Tất cả các năm";
+    let monthDesc = (selectedMonths && selectedMonths.length > 0)
+      ? `Tháng ${selectedMonths.join(', ')}`
+      : "Tất cả các tháng";
 
-    let description = "tất cả các kỳ";
-    if ((selectedYears && selectedYears.length > 0) && (selectedMonths && selectedMonths.length > 0)) {
+    if (selectedYear && selectedMonths && selectedMonths.length > 0) {
       description = `${monthDesc}, ${yearDesc}`;
-    } else if (selectedYears && selectedYears.length > 0) {
+    } else if (selectedYear) {
       description = yearDesc;
     } else if (selectedMonths && selectedMonths.length > 0) {
-      description = `${monthDesc} (tất cả các năm)`;
+      description = `${monthDesc} (mọi năm)`;
+    } else {
+      description = "tất cả các kỳ";
     }
     setFilterDescription(description);
-    
+
 
     try {
-      const rpcArgs: { filter_years?: number[]; filter_months?: number[] } = {};
-      rpcArgs.filter_years = selectedYears && selectedYears.length > 0 ? selectedYears : undefined;
-      rpcArgs.filter_months = selectedMonths && selectedMonths.length > 0 ? selectedMonths : undefined;
+      const rpcArgs: { filter_year?: number; filter_months?: number[] } = {};
+      if (selectedYear !== null) {
+        rpcArgs.filter_year = selectedYear;
+      }
+      if (selectedMonths && selectedMonths.length > 0) {
+        rpcArgs.filter_months = selectedMonths;
+      } else {
+        rpcArgs.filter_months = undefined; // Explicitly pass undefined for "all months"
+      }
 
 
       const functionName = 'get_total_salary_fulltime';
@@ -68,26 +68,26 @@ export default function TotalSalaryCard({ selectedMonths, selectedYears }: Total
 
       if (rpcError) {
         const rpcMessageText = rpcError.message ? String(rpcError.message).toLowerCase() : '';
-        
+
         const isFunctionMissingError =
-          rpcError.code === '42883' || 
-          (rpcError.code === 'PGRST202' && rpcMessageText.includes(functionName.toLowerCase())) || 
+          rpcError.code === '42883' ||
+          (rpcError.code === 'PGRST202' && rpcMessageText.includes(functionName.toLowerCase())) ||
           (rpcMessageText.includes(functionName.toLowerCase()) && rpcMessageText.includes('does not exist'));
 
         if (isFunctionMissingError) {
-          throw { 
-            type: 'rpcMissing' as 'rpcMissing', 
-            message: `Hàm RPC '${functionName}' không tìm thấy. Vui lòng tạo nó trong SQL Editor của Supabase. Xem hướng dẫn trong README.md.` 
+          throw {
+            type: 'rpcMissing' as 'rpcMissing',
+            message: `Hàm RPC '${functionName}' không tìm thấy. Vui lòng tạo nó trong SQL Editor của Supabase. Xem hướng dẫn trong README.md.`
           };
         }
         throw { type: 'generic' as 'generic', message: rpcError.message || 'Đã xảy ra lỗi RPC không xác định.'};
       }
 
       const rawTotal = data;
-      const numericTotal = typeof rawTotal === 'string' 
-        ? parseFloat(rawTotal.replace(/,/g, '')) 
+      const numericTotal = typeof rawTotal === 'string'
+        ? parseFloat(rawTotal.replace(/,/g, ''))
         : (typeof rawTotal === 'number' ? rawTotal : 0);
-      
+
       setTotalSalary(numericTotal || 0);
 
     } catch (err: any) {
@@ -96,20 +96,20 @@ export default function TotalSalaryCard({ selectedMonths, selectedYears }: Total
       } else {
         setError({ type: 'generic', message: err.message || 'Không thể tải dữ liệu tổng lương qua RPC.' });
       }
-      
+
       console.error("Error fetching total salary via RPC. Details:", {
           type: err.type,
           message: err.message,
           name: err.name,
-          code: err.code, 
-          stack: err.stack, 
-          originalErrorObject: err 
+          code: err.code,
+          stack: err.stack,
+          originalErrorObject: err
       });
       setTotalSalary(null);
     } finally {
       setIsLoading(false);
     }
-  }, [selectedMonths, selectedYears, supabase]);
+  }, [selectedMonths, selectedYear, supabase]);
 
   useEffect(() => {
     fetchTotalSalary();
@@ -145,7 +145,7 @@ export default function TotalSalaryCard({ selectedMonths, selectedYears }: Total
           <p className="text-xs text-destructive">{error.message}</p>
           {error.type === 'rpcMissing' && (
             <p className="text-xs text-muted-foreground mt-1">
-              Vui lòng tạo hàm `get_total_salary_fulltime` trong SQL Editor của Supabase. Tham khảo README.md để biết script SQL. Đảm bảo các cột `thang` và `nam` trong bảng `Fulltime` là số hoặc có thể chuyển đổi được.
+              Vui lòng tạo hàm `get_total_salary_fulltime` trong SQL Editor của Supabase. Tham khảo README.md để biết script SQL. Đảm bảo các cột `thang` (văn bản dạng 'Tháng XX') và `nam` (số) trong bảng `Fulltime` là đúng.
             </p>
           )}
           {error.type === 'generic' && (
@@ -176,10 +176,10 @@ export default function TotalSalaryCard({ selectedMonths, selectedYears }: Total
       </Card>
     );
   }
-  
+
   const formattedTotalSalary = new Intl.NumberFormat('vi-VN', {
     style: 'currency',
-    currency: 'VND', 
+    currency: 'VND',
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(totalSalary);
