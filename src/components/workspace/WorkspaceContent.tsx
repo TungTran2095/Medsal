@@ -92,15 +92,12 @@ export default function WorkspaceContent() {
             data
               .map(item => {
                 if (item.thang === null || item.thang === undefined) return null;
-                if (typeof item.thang === 'string') {
-                  const trimmedThang = item.thang.trim();
-                  const numericPart = trimmedThang.replace(/\D/g, '');
-                  if (numericPart) {
-                    return parseInt(numericPart, 10);
-                  }
-                  return null;
+                const monthStr = String(item.thang).trim();
+                const numericPart = monthStr.replace(/\D/g, ''); // Remove non-digits
+                if (numericPart) {
+                  return parseInt(numericPart, 10);
                 }
-                return Number(item.thang);
+                return null;
               })
               .filter(month => month !== null && !isNaN(month) && month >= 1 && month <= 12) as number[]
           )
@@ -108,7 +105,7 @@ export default function WorkspaceContent() {
         
         const monthOptions = distinctMonthNumbers.map(monthNum => ({
           value: monthNum,
-          label: `Tháng ${monthNum}` // Use "Tháng X" format directly
+          label: `Tháng ${String(monthNum).padStart(2, '0')}`
         }));
         setAvailableMonths(monthOptions);
 
@@ -225,6 +222,7 @@ export default function WorkspaceContent() {
           } else if (datePartsMDY) { 
             payDateObj = new Date(parseInt(datePartsMDY[3]), parseInt(datePartsMDY[1]) - 1, parseInt(datePartsMDY[2]));
           } else {
+             // Attempt to parse other common formats or rely on Date constructor's flexibility
              payDateObj = new Date(entry.pay_date);
           }
 
@@ -234,9 +232,9 @@ export default function WorkspaceContent() {
             nam = payDateObj.getFullYear();
           } else {
             console.warn(`Invalid date format for pay_date: ${entry.pay_date}. Setting thang and nam to null.`);
-            payDateObj = null; 
-            thang = null; 
-            nam = null;   
+            payDateObj = null; // Ensure payDateObj is null if date is invalid
+            thang = null; // Explicitly set thang to null
+            nam = null;   // Explicitly set nam to null
           }
         }
 
@@ -304,7 +302,7 @@ export default function WorkspaceContent() {
     if (selectedMonths.length > 1) {
       return `${selectedMonths.length} tháng được chọn`;
     }
-    return "Chọn Tháng"; // Fallback / placeholder when no months available or none selected
+    return "Chọn Tháng";
   };
 
   const handleYearSelection = (yearValue: number, checked: boolean) => {
@@ -323,7 +321,7 @@ export default function WorkspaceContent() {
     if (selectedYears.length === 0 || selectedYears.length === yearOptions.length) {
       return "Tất Cả Năm";
     }
-    if (selectedYears.length <= 2) {
+    if (selectedYears.length <= 3) { // Show individual years if 3 or less selected
       return selectedYears.join(', ');
     }
     return `${selectedYears.length} năm được chọn`;
@@ -518,12 +516,12 @@ export default function WorkspaceContent() {
                       <Label htmlFor="year-filter" className="text-xs font-medium">Năm</Label>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="outline" className="h-9 text-sm w-full sm:w-[120px] mt-1 justify-between">
+                          <Button variant="outline" className="h-9 text-sm w-full sm:w-[140px] mt-1 justify-between">
                             <span>{getSelectedYearsText()}</span>
                             <ChevronDown className="ml-2 h-4 w-4 opacity-50" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent className="w-[120px]">
+                        <DropdownMenuContent className="w-[140px]">
                           <DropdownMenuLabel>Chọn Năm</DropdownMenuLabel>
                           <DMSR />
                           {yearOptions.map(year => (
@@ -542,11 +540,14 @@ export default function WorkspaceContent() {
                 </div>
               </CardHeader>
               <CardContent className="pt-3 px-3 md:px-4 pb-3 flex-grow overflow-y-auto space-y-3">
-                <div className="grid gap-3 md:grid-cols-2">
+                <div className="grid gap-3 md:grid-cols-4">
                     <TotalSalaryCard selectedMonths={selectedMonths} selectedYears={selectedYears} />
                     <EmployeeCountCard selectedMonths={selectedMonths} selectedYears={selectedYears} />
+                    {/* Placeholder for 2 more cards */}
+                    {/* <Card className="h-full"><CardContent className="pt-6">Card 3</CardContent></Card> */}
+                    {/* <Card className="h-full"><CardContent className="pt-6">Card 4</CardContent></Card> */}
                 </div>
-                <div className="mt-0"> {/* Removed mt-3 to make it closer to cards above */}
+                <div className="mt-0">
                     <MonthlySalaryTrendChart selectedYears={selectedYears} />
                 </div>
               </CardContent>
