@@ -18,7 +18,7 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [conversationContext, setConversationContext] = useState<string>('');
   const { toast } = useToast();
-  const [isChatbotOpen, setIsChatbotOpen] = useState(false); // Default to collapsed
+  const [isChatbotOpen, setIsChatbotOpen] = useState(false); 
 
   useEffect(() => {
     setMessages([
@@ -32,7 +32,7 @@ export default function DashboardPage() {
   }, []);
 
   const handleSendMessage = async (text: string) => {
-    if (!isChatbotOpen) setIsChatbotOpen(true); // Open chatbot on send message
+    if (!isChatbotOpen) setIsChatbotOpen(true); 
 
     const newUserMessage: Message = {
       id: `user-${Date.now()}`,
@@ -87,7 +87,6 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col md:flex-row flex-1 w-full h-full bg-muted/40 p-0"> 
-      {/* Left Pane: Workspace */}
       <div className={cn(
           "w-full pt-2 pb-2 pl-2 pr-0.5 md:pt-4 md:pb-4 md:pl-4 md:pr-1 overflow-y-auto transition-all duration-300 ease-in-out",
           isChatbotOpen ? 'md:w-2/3' : 'md:flex-1'
@@ -96,19 +95,18 @@ export default function DashboardPage() {
         <WorkspaceContent />
       </div>
 
-      {/* Right Pane: Chatbot */}
       <div className={cn(
           "w-full pt-2 pb-2 pr-2 pl-0.5 md:pt-4 md:pb-4 md:pr-4 md:pl-1 flex flex-col transition-all duration-300 ease-in-out overflow-hidden",
            isChatbotOpen ? 'md:w-1/3' : 'md:w-[72px]' 
         )}
       >
         <div className={cn(
-            "flex flex-col flex-1 bg-card text-foreground border rounded-lg shadow-sm overflow-hidden h-full backdrop-blur-md", // Added backdrop-blur-md
+            "flex flex-col flex-1 bg-card text-foreground border rounded-lg shadow-soft-md overflow-hidden h-full", 
             isChatbotOpen ? 'min-h-[300px] md:min-h-0' : ''
           )}
         >
           <header className={cn(
-              "border-b p-2 md:p-2 shadow-sm bg-transparent flex items-center justify-end" // bg-card changed to bg-transparent for glass effect
+              "border-b p-2 md:p-2 shadow-sm flex items-center justify-end" 
             )}
           >
             <div className={cn(

@@ -10,8 +10,7 @@ export default {
   theme: {
   	extend: {
       fontFamily: {
-        sans: ["var(--font-montserrat)", "system-ui", "sans-serif"], // Changed from Geist
-        // mono: ["var(--font-geist-mono)", "monospace"], // Geist Mono removed, can be replaced if a specific mono font is needed
+        sans: ["var(--font-montserrat)", "system-ui", "sans-serif"],
       },
   		colors: {
   			background: 'hsl(var(--background))',
@@ -66,9 +65,9 @@ export default {
   			}
   		},
   		borderRadius: {
-  			lg: 'var(--radius)',
-  			md: 'calc(var(--radius) - 2px)',
-  			sm: 'calc(var(--radius) - 4px)'
+  			lg: 'var(--radius)', /* 0.75rem from globals.css */
+  			md: 'calc(var(--radius) - 0.25rem)', /* Effectively 0.5rem */
+  			sm: 'calc(var(--radius) - 0.5rem)' /* Effectively 0.25rem */
   		},
   		keyframes: {
   			'accordion-down': {
@@ -102,7 +101,13 @@ export default {
   			'accordion-down': 'accordion-down 0.2s ease-out',
   			'accordion-up': 'accordion-up 0.2s ease-out',
         'bounce': 'bounce 1s infinite'
-  		}
+  		},
+      boxShadow: {
+        'soft-sm': '0 2px 4px 0px hsl(var(--foreground) / 0.05)',
+        'soft-md': '0 4px 8px 0px hsl(var(--foreground) / 0.07)',
+        'soft-lg': '0 8px 16px 0px hsl(var(--foreground) / 0.07)',
+        'soft-xl': '0 12px 24px 0px hsl(var(--foreground) / 0.07)',
+      }
   	}
   },
   plugins: [require("tailwindcss-animate")],
