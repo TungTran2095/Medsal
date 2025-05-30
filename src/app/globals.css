@@ -5,50 +5,45 @@
 
 @layer base {
   :root {
-    --background-start-rgb: 100, 116, 139; /* slate-500 */
-    --background-end-rgb: 30, 41, 59; /* slate-800 */
-    --background-angle: 145deg;
+    /* Light Theme - Based on the "Clean Dashboard" style */
+    --background: 240 5% 98%; /* Very light gray, almost white */
+    --foreground: 220 10% 25%; /* Dark charcoal for text */
 
-    --background: transparent; /* Page background will be set on body */
-    --foreground: 240 10% 15%; /* Dark text for readability */
+    --card: 0 0% 100%; /* Opaque white */
+    --card-foreground: 220 10% 25%;
 
-    /* Glassy elements */
-    --card: 255 255 255 / 0.1; /* Light, very transparent */
-    --card-foreground: 240 10% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 10% 25%;
 
-    --popover: 255 255 255 / 0.1;
-    --popover-foreground: 240 10% 15%;
-
-    /* Primary colors for buttons, etc. should be opaque */
     --primary: 250 75% 60%; /* Vibrant purple-blue */
     --primary-foreground: 0 0% 100%; /* White */
 
-    --secondary: 240 5% 85% / 0.15; /* Lighter gray, very transparent for secondary elements */
-    --secondary-foreground: 240 10% 15%;
+    --secondary: 240 5% 95%; /* Lighter gray for secondary elements */
+    --secondary-foreground: 220 10% 25%;
 
-    --muted: 240 5% 90% / 0.1;
-    --muted-foreground: 240 5% 40%;
+    --muted: 240 5% 90%; /* Light muted gray */
+    --muted-foreground: 220 5% 45%; /* Softer gray for muted text */
 
-    --accent: 250 60% 75% / 0.7; /* Lighter purple for accents, semi-opaque */
-    --accent-foreground: 240 10% 15%;
+    --accent: 250 60% 94%; /* Light lavender for accents, e.g., active sidebar */
+    --accent-foreground: 250 50% 55%; /* Darker lavender text for active sidebar */
 
     --destructive: 0 70% 55%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 255 255 255 / 0.15; /* Light, very transparent border */
-    --input: 255 255 255 / 0.05; /* Input fields also very glassy */
-    --ring: 250 75% 65%;
+    --border: 240 5% 85%; /* Subtle light gray border */
+    --input: 0 0% 100%; /* White input background */
+    --ring: 250 75% 65%; /* Ring color based on primary */
 
     --radius: 0.75rem;
 
-    /* Sidebar specific vars - Light theme glass */
-    --sidebar-background: 255 255 255 / 0.08; /* Glassy sidebar, slightly more transparent */
-    --sidebar-foreground: 240 10% 20%;
-    --sidebar-primary: 250 60% 94% / 0.2; /* Active item background, semi-transparent */
+    /* Sidebar specific vars - Light theme */
+    --sidebar-background: 40 50% 97%; /* Light, slightly off-white/cream */
+    --sidebar-foreground: 220 10% 25%;
+    --sidebar-primary: 250 60% 94%; /* Active item background - opaque light lavender */
     --sidebar-primary-foreground: 250 50% 55%;
-    --sidebar-accent: 255 255 255 / 0.1;   /* Hover for sidebar items */
-    --sidebar-accent-foreground: 240 10% 20%;
-    --sidebar-border: 255 255 255 / 0.1;
+    --sidebar-accent: 240 5% 90%;   /* Hover for sidebar items - opaque light gray */
+    --sidebar-accent-foreground: 220 10% 25%;
+    --sidebar-border: 240 5% 85%;
     --sidebar-ring: 250 75% 65%;
 
     /* Chart Colors (keep opaque for visibility) */
@@ -60,47 +55,43 @@
   }
 
   .dark {
-    /* Dark Theme Glass */
-    --background-start-rgb: 48, 25, 52; /* Darker purple */
-    --background-end-rgb: 20, 29, 50;   /* Dark blue/indigo */
-    --background-angle: 145deg;
+    /* Dark Theme */
+    --background: 220 15% 15%; /* Dark slate/charcoal */
+    --foreground: 0 0% 95%;  /* Light text */
 
-    --background: transparent;
-    --foreground: 240 5% 90%;  /* Light text */
+    --card: 220 15% 20%; /* Slightly lighter dark gray for cards */
+    --card-foreground: 0 0% 95%;
 
-    --card: 20 20% 20% / 0.1; /* Dark, very transparent */
-    --card-foreground: 240 5% 90%;
+    --popover: 220 15% 18%; /* Darker popover */
+    --popover-foreground: 0 0% 95%;
 
-    --popover: 20 20% 15% / 0.1;
-    --popover-foreground: 240 5% 90%;
+    --primary: 250 70% 65%; /* Keep primary vibrant */
+    --primary-foreground: 0 0% 100%;
 
-    --primary: 250 70% 65%;
-    --primary-foreground: 240 5% 95%;
+    --secondary: 220 15% 25%; /* Dark secondary */
+    --secondary-foreground: 0 0% 90%;
 
-    --secondary: 240 10% 30% / 0.15;
-    --secondary-foreground: 240 5% 80%;
+    --muted: 220 15% 25%;
+    --muted-foreground: 0 0% 60%;
 
-    --muted: 240 10% 25% / 0.1;
-    --muted-foreground: 240 5% 60%;
-
-    --accent: 250 60% 60% / 0.7;
-    --accent-foreground: 240 5% 95%;
+    --accent: 250 60% 35%; /* Darker accent for active sidebar */
+    --accent-foreground: 250 60% 85%; /* Lighter text on accent */
 
     --destructive: 0 65% 60%;
-    --destructive-foreground: 0 0% 95%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 255 255 255 / 0.1; /* Light border for dark glass */
-    --input: 20 20% 25% / 0.05;
+    --border: 220 15% 30%; /* Dark border */
+    --input: 220 15% 22%; /* Dark input background */
     --ring: 250 70% 70%;
 
-    /* Sidebar specific vars - Dark theme glass */
-    --sidebar-background: 20 20% 15% / 0.08;
-    --sidebar-foreground: 240 5% 85%;
-    --sidebar-primary: 250 60% 35% / 0.2;
+    /* Sidebar specific vars - Dark theme */
+    --sidebar-background: 220 15% 12%; /* Very dark sidebar */
+    --sidebar-foreground: 0 0% 90%;
+    --sidebar-primary: 250 60% 35%; /* Active item background */
     --sidebar-primary-foreground: 250 60% 85%;
-    --sidebar-accent: 240 10% 25% / 0.1;
-    --sidebar-accent-foreground: 240 5% 85%;
-    --sidebar-border: 255 255 255 / 0.08;
+    --sidebar-accent: 220 15% 25%;   /* Hover for sidebar items */
+    --sidebar-accent-foreground: 0 0% 90%;
+    --sidebar-border: 220 15% 30%;
     --sidebar-ring: 250 70% 70%;
 
     /* Chart Colors for Dark Mode (keep opaque) */
@@ -117,9 +108,7 @@
     @apply border-border;
   }
   body {
-    @apply text-foreground;
-    background-image: linear-gradient(var(--background-angle, to bottom right), rgb(var(--background-start-rgb)), rgb(var(--background-end-rgb)));
-    min-height: 100vh; /* Ensure gradient covers full height */
-    background-attachment: fixed; /* Keep gradient fixed during scroll */
+    @apply bg-background text-foreground; /* Apply solid background */
+    min-height: 100vh;
   }
 }

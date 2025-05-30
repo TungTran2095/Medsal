@@ -24,7 +24,7 @@ export default function DashboardPage() {
     setMessages([
       {
         id: 'welcome-' + Date.now(),
-        text: "Hello! I'm your AI Echo. Type something and I'll echo it back with a twist!",
+        text: "Hello! I'm your AI Echo. Ask me anything or request data from your database!",
         sender: 'ai',
         timestamp: Date.now(),
       },
@@ -101,7 +101,7 @@ export default function DashboardPage() {
         )}
       >
         <div className={cn(
-            "flex flex-col flex-1 bg-card text-foreground border rounded-lg shadow-soft-md overflow-hidden h-full backdrop-blur-lg", // Added backdrop-blur-lg
+            "flex flex-col flex-1 bg-card text-foreground border rounded-lg shadow-soft-md overflow-hidden h-full", // Removed backdrop-blur-lg
             isChatbotOpen ? 'min-h-[200px] md:min-h-0' : ''
           )}
         >
