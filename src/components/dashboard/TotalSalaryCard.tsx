@@ -31,6 +31,7 @@ export default function TotalSalaryCard({ selectedMonths, selectedYear }: TotalS
     setIsLoading(true);
     setError(null);
 
+    let description; // Declare description variable
     let yearDesc = selectedYear ? `Năm ${selectedYear}` : "Tất cả các năm";
     let monthDesc = (selectedMonths && selectedMonths.length > 0)
       ? `Tháng ${selectedMonths.join(', ')}`
@@ -49,14 +50,14 @@ export default function TotalSalaryCard({ selectedMonths, selectedYear }: TotalS
 
 
     try {
-      const rpcArgs: { filter_year?: number; filter_months?: number[] } = {};
+      const rpcArgs: { filter_year?: number; filter_months?: number[] | null } = {};
       if (selectedYear !== null) {
         rpcArgs.filter_year = selectedYear;
       }
       if (selectedMonths && selectedMonths.length > 0) {
         rpcArgs.filter_months = selectedMonths;
       } else {
-        rpcArgs.filter_months = undefined; // Explicitly pass undefined for "all months"
+        rpcArgs.filter_months = null; 
       }
 
 
@@ -77,7 +78,7 @@ export default function TotalSalaryCard({ selectedMonths, selectedYear }: TotalS
         if (isFunctionMissingError) {
           throw {
             type: 'rpcMissing' as 'rpcMissing',
-            message: `Hàm RPC '${functionName}' không tìm thấy. Vui lòng tạo nó trong SQL Editor của Supabase. Xem hướng dẫn trong README.md.`
+            message: `Hàm RPC '${functionName}' bị thiếu. Vui lòng tạo nó trong SQL Editor của Supabase bằng script trong phần 'Required SQL Functions' của README.md.`
           };
         }
         throw { type: 'generic' as 'generic', message: rpcError.message || 'Đã xảy ra lỗi RPC không xác định.'};
@@ -201,3 +202,4 @@ export default function TotalSalaryCard({ selectedMonths, selectedYear }: TotalS
     </Card>
   );
 }
+
