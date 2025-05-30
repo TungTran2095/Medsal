@@ -13,7 +13,7 @@ import {
 
 interface TotalSalaryCardProps {
   selectedMonths?: number[]; 
-  selectedYears?: number[]; // Updated to array
+  selectedYears?: number[]; 
 }
 
 interface ChartError {
@@ -25,26 +25,31 @@ export default function TotalSalaryCard({ selectedMonths, selectedYears }: Total
   const [totalSalary, setTotalSalary] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<ChartError | null>(null);
-  const [filterDescription, setFilterDescription] = useState<string>("all periods");
+  const [filterDescription, setFilterDescription] = useState<string>("tất cả các kỳ");
 
   const fetchTotalSalary = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
-    let description = "all periods";
-    const yearDesc = selectedYears && selectedYears.length > 0 
-      ? `Year(s) ${selectedYears.join(', ')}` 
-      : "All Years";
-    const monthDesc = selectedMonths && selectedMonths.length > 0 
-      ? `Month(s) ${selectedMonths.join(', ')}` 
-      : "All Months";
+    let yearDesc = (selectedYears && selectedYears.length > 0) 
+      ? `Năm ${selectedYears.join(', ')}` 
+      : "Tất cả các năm";
+    
+    let monthDesc = "";
+    if (selectedMonths && selectedMonths.length > 0) {
+      // Assuming availableMonths logic is in parent and provides labels if needed, or just use numbers
+      monthDesc = `Tháng ${selectedMonths.join(', ')}`;
+    } else {
+      monthDesc = "Tất cả các tháng";
+    }
 
+    let description = "tất cả các kỳ";
     if ((selectedYears && selectedYears.length > 0) && (selectedMonths && selectedMonths.length > 0)) {
       description = `${monthDesc}, ${yearDesc}`;
     } else if (selectedYears && selectedYears.length > 0) {
       description = yearDesc;
     } else if (selectedMonths && selectedMonths.length > 0) {
-      description = `${monthDesc} (all years)`;
+      description = `${monthDesc} (tất cả các năm)`;
     }
     setFilterDescription(description);
     
@@ -72,10 +77,10 @@ export default function TotalSalaryCard({ selectedMonths, selectedYears }: Total
         if (isFunctionMissingError) {
           throw { 
             type: 'rpcMissing' as 'rpcMissing', 
-            message: `The '${functionName}' RPC function was not found. Please create it in your Supabase SQL Editor. See instructions in README.md if needed.` 
+            message: `Hàm RPC '${functionName}' không tìm thấy. Vui lòng tạo nó trong SQL Editor của Supabase. Xem hướng dẫn trong README.md.` 
           };
         }
-        throw { type: 'generic' as 'generic', message: rpcError.message || 'An unknown RPC error occurred.'};
+        throw { type: 'generic' as 'generic', message: rpcError.message || 'Đã xảy ra lỗi RPC không xác định.'};
       }
 
       const rawTotal = data;
@@ -89,7 +94,7 @@ export default function TotalSalaryCard({ selectedMonths, selectedYears }: Total
       if (err.type === 'rpcMissing') {
         setError(err);
       } else {
-        setError({ type: 'generic', message: err.message || 'Failed to fetch total salary data via RPC.' });
+        setError({ type: 'generic', message: err.message || 'Không thể tải dữ liệu tổng lương qua RPC.' });
       }
       
       console.error("Error fetching total salary via RPC. Details:", {
@@ -114,7 +119,7 @@ export default function TotalSalaryCard({ selectedMonths, selectedYears }: Total
     return (
       <Card className="h-full">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-3">
-          <CardTitle className="text-sm font-medium text-muted-foreground">Total Fulltime Salary</CardTitle>
+          <CardTitle className="text-sm font-semibold text-muted-foreground">Tổng Lương Fulltime</CardTitle>
           <Banknote className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent className="pt-2">
@@ -130,9 +135,9 @@ export default function TotalSalaryCard({ selectedMonths, selectedYears }: Total
     return (
       <Card className="border-destructive/50 h-full">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-3">
-          <CardTitle className="text-destructive text-sm font-medium flex items-center gap-1">
+          <CardTitle className="text-destructive text-sm font-semibold flex items-center gap-1">
             <AlertTriangle className="h-4 w-4" />
-            Salary Data Error
+            Lỗi Dữ Liệu Lương
           </CardTitle>
            <Banknote className="h-4 w-4 text-destructive" />
         </CardHeader>
@@ -140,12 +145,12 @@ export default function TotalSalaryCard({ selectedMonths, selectedYears }: Total
           <p className="text-xs text-destructive">{error.message}</p>
           {error.type === 'rpcMissing' && (
             <p className="text-xs text-muted-foreground mt-1">
-              Please create the `get_total_salary_fulltime` function in your Supabase SQL Editor. Refer to the README.md for the SQL script. Ensure `thang` and `nam` columns in `Fulltime` table are numeric or castable.
+              Vui lòng tạo hàm `get_total_salary_fulltime` trong SQL Editor của Supabase. Tham khảo README.md để biết script SQL. Đảm bảo các cột `thang` và `nam` trong bảng `Fulltime` là số hoặc có thể chuyển đổi được.
             </p>
           )}
           {error.type === 'generic' && (
             <p className="text-xs text-muted-foreground mt-1">
-              Check 'Fulltime' table structure: 'tong_thu_nhap' (numeric or text convertible to double precision), 'thang' (text like 'Tháng 01', will be parsed to number), and 'nam' (numeric) columns. Ensure RPC function is updated for text 'thang' parsing and correct year handling.
+              Kiểm tra cấu trúc bảng 'Fulltime': cột 'tong_thu_nhap' (số hoặc văn bản có thể chuyển thành double precision), 'thang' (văn bản như 'Tháng 01', sẽ được phân tích thành số), và 'nam' (số). Đảm bảo hàm RPC được cập nhật để phân tích 'thang' dạng văn bản và xử lý năm chính xác.
             </p>
           )}
         </CardContent>
@@ -157,7 +162,7 @@ export default function TotalSalaryCard({ selectedMonths, selectedYears }: Total
      return (
       <Card className="h-full">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-3">
-           <CardTitle className="text-sm font-medium text-muted-foreground">Total Fulltime Salary</CardTitle>
+           <CardTitle className="text-sm font-semibold text-muted-foreground">Tổng Lương Fulltime</CardTitle>
            <Banknote className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent className="pt-2">
@@ -165,14 +170,14 @@ export default function TotalSalaryCard({ selectedMonths, selectedYears }: Total
             0 VND
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">
-            No salary data for: {filterDescription}.
+            Không có dữ liệu lương cho: {filterDescription}.
           </p>
         </CardContent>
       </Card>
     );
   }
   
-  const formattedTotalSalary = new Intl.NumberFormat('en-US', {
+  const formattedTotalSalary = new Intl.NumberFormat('vi-VN', {
     style: 'currency',
     currency: 'VND', 
     minimumFractionDigits: 0,
@@ -182,7 +187,7 @@ export default function TotalSalaryCard({ selectedMonths, selectedYears }: Total
   return (
     <Card className="h-full">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-3">
-        <CardTitle className="text-sm font-medium text-muted-foreground">Total Fulltime Salary</CardTitle>
+        <CardTitle className="text-sm font-semibold text-muted-foreground">Tổng Lương Fulltime</CardTitle>
         <Banknote className="h-4 w-4 text-muted-foreground" />
       </CardHeader>
       <CardContent className="pt-2">
@@ -190,7 +195,7 @@ export default function TotalSalaryCard({ selectedMonths, selectedYears }: Total
             {formattedTotalSalary}
           </div>
           <p className="text-xs text-muted-foreground">
-            For: {filterDescription}
+            Cho: {filterDescription}
           </p>
       </CardContent>
     </Card>

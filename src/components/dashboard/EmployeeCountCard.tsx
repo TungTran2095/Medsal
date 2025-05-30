@@ -13,33 +13,37 @@ import {
 
 interface EmployeeCountCardProps {
   selectedMonths?: number[]; 
-  selectedYears?: number[]; // Updated to array
+  selectedYears?: number[];
 }
 
 export default function EmployeeCountCard({ selectedMonths, selectedYears }: EmployeeCountCardProps) {
   const [employeeCount, setEmployeeCount] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filterDescription, setFilterDescription] = useState<string>("all periods");
+  const [filterDescription, setFilterDescription] = useState<string>("tất cả các kỳ");
 
   const fetchEmployeeCount = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
-    let description = "all periods";
-    const yearDesc = selectedYears && selectedYears.length > 0 
-      ? `Year(s) ${selectedYears.join(', ')}` 
-      : "All Years";
-    const monthDesc = selectedMonths && selectedMonths.length > 0 
-      ? `Month(s) ${selectedMonths.join(', ')}` 
-      : "All Months";
+    let yearDesc = (selectedYears && selectedYears.length > 0) 
+      ? `Năm ${selectedYears.join(', ')}` 
+      : "Tất cả các năm";
+    
+    let monthDesc = "";
+    if (selectedMonths && selectedMonths.length > 0) {
+      monthDesc = `Tháng ${selectedMonths.join(', ')}`;
+    } else {
+      monthDesc = "Tất cả các tháng";
+    }
 
+    let description = "tất cả các kỳ";
     if ((selectedYears && selectedYears.length > 0) && (selectedMonths && selectedMonths.length > 0)) {
       description = `${monthDesc}, ${yearDesc}`;
     } else if (selectedYears && selectedYears.length > 0) {
       description = yearDesc;
     } else if (selectedMonths && selectedMonths.length > 0) {
-      description = `${monthDesc} (all years)`;
+      description = `${monthDesc} (tất cả các năm)`;
     }
     setFilterDescription(description);
 
@@ -65,7 +69,7 @@ export default function EmployeeCountCard({ selectedMonths, selectedYears }: Emp
           (rpcMessageText.includes(functionName.toLowerCase()) && rpcMessageText.includes('does not exist'));
 
         if (isFunctionMissingError) {
-          throw new Error(`The '${functionName}' RPC function was not found. Please create it in your Supabase SQL Editor. See instructions provided in the README.md.`);
+          throw new Error(`Hàm RPC '${functionName}' không tìm thấy. Vui lòng tạo nó trong SQL Editor của Supabase. Xem hướng dẫn trong README.md.`);
         }
         throw rpcError;
       }
@@ -73,7 +77,7 @@ export default function EmployeeCountCard({ selectedMonths, selectedYears }: Emp
       setEmployeeCount(data as number ?? 0);
 
     } catch (err: any) {
-      let uiErrorMessage = err.message || 'Failed to fetch employee count via RPC.';
+      let uiErrorMessage = err.message || 'Không thể tải số lượng nhân viên qua RPC.';
       setError(uiErrorMessage);
       console.error("Error fetching employee count via RPC. Details:", {
           message: err.message,
@@ -96,7 +100,7 @@ export default function EmployeeCountCard({ selectedMonths, selectedYears }: Emp
     return (
       <Card className="h-full">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-3">
-          <CardTitle className="text-sm font-medium text-muted-foreground">Total Employees</CardTitle>
+          <CardTitle className="text-sm font-semibold text-muted-foreground">Tổng Số Nhân Viên</CardTitle>
           <Users className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent className="pt-2">
@@ -112,14 +116,14 @@ export default function EmployeeCountCard({ selectedMonths, selectedYears }: Emp
     return (
       <Card className="border-destructive/50 h-full">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-3">
-          <CardTitle className="text-sm font-medium text-destructive">Employee Count Error</CardTitle>
+          <CardTitle className="text-sm font-semibold text-destructive">Lỗi Số Lượng Nhân Viên</CardTitle>
           <AlertTriangle className="h-4 w-4 text-destructive" />
         </CardHeader>
         <CardContent className="pt-2">
           <p className="text-xs text-destructive">{error}</p>
-           {error.includes("RPC function was not found") && (
+           {error.includes("RPC function was not found") && ( // Simplified check
              <p className="text-xs text-muted-foreground mt-1">
-               Please ensure the `get_employee_count_fulltime` RPC function is created in Supabase as per the README.md.
+               Vui lòng đảm bảo hàm RPC `get_employee_count_fulltime` đã được tạo trong Supabase theo README.md.
              </p>
            )}
         </CardContent>
@@ -130,15 +134,15 @@ export default function EmployeeCountCard({ selectedMonths, selectedYears }: Emp
   return (
     <Card className="h-full">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-3">
-        <CardTitle className="text-sm font-medium text-muted-foreground">Total Employees</CardTitle>
+        <CardTitle className="text-sm font-semibold text-muted-foreground">Tổng Số Nhân Viên</CardTitle>
         <Users className="h-4 w-4 text-muted-foreground" />
       </CardHeader>
       <CardContent className="pt-2">
         <div className="text-2xl font-bold text-primary">
-          {employeeCount !== null ? employeeCount.toLocaleString() : 'N/A'}
+          {employeeCount !== null ? employeeCount.toLocaleString('vi-VN') : 'N/A'}
         </div>
         <p className="text-xs text-muted-foreground">
-          For: {filterDescription}
+          Cho: {filterDescription}
         </p>
       </CardContent>
     </Card>

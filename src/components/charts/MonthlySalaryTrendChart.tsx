@@ -29,7 +29,7 @@ import {
 
 const chartConfig = {
   totalSalary: {
-    label: 'Total Salary',
+    label: 'Tổng Lương', // Translated
     color: 'hsl(var(--chart-1))',
   },
 } satisfies ChartConfig;
@@ -42,29 +42,28 @@ interface MonthlyData {
 }
 
 interface MonthlySalaryTrendChartProps {
-  selectedYears?: number[]; // Updated to array
+  selectedYears?: number[];
 }
 
-const CRITICAL_SETUP_ERROR_PREFIX = "CRITICAL SETUP REQUIRED:";
+const CRITICAL_SETUP_ERROR_PREFIX = "LỖI CÀI ĐẶT QUAN TRỌNG:";
 
 export default function MonthlySalaryTrendChart({ selectedYears }: MonthlySalaryTrendChartProps) {
   const [chartData, setChartData] = useState<MonthlyData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filterDescription, setFilterDescription] = useState<string>("all years");
+  const [filterDescription, setFilterDescription] = useState<string>("tất cả các năm");
 
   const fetchMonthlyTrend = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
     let description = (selectedYears && selectedYears.length > 0) 
-      ? `Year(s) ${selectedYears.join(', ')}` 
-      : "all available years";
+      ? `Năm ${selectedYears.join(', ')}` 
+      : "tất cả các năm có sẵn";
     setFilterDescription(description);
     
     try {
       const rpcArgs: { p_filter_years?: number[] } = {};
-      // Pass the array of years; if empty, RPC should treat as no filter or pass null/undefined
       rpcArgs.p_filter_years = selectedYears && selectedYears.length > 0 ? selectedYears : undefined;
 
 
@@ -83,7 +82,7 @@ export default function MonthlySalaryTrendChart({ selectedYears }: MonthlySalary
           (rpcMessageText.includes(functionName.toLowerCase()) && rpcMessageText.includes('does not exist'));
 
         if (isFunctionMissingError) {
-          throw new Error(`${CRITICAL_SETUP_ERROR_PREFIX} The Supabase RPC function '${functionName}' is missing. This chart cannot display data without it. Please create this function in your Supabase SQL Editor using the script found in the 'Required SQL Functions' section of README.md.`);
+          throw new Error(`${CRITICAL_SETUP_ERROR_PREFIX} Hàm RPC Supabase '${functionName}' bị thiếu. Biểu đồ này không thể hiển thị dữ liệu nếu không có nó. Vui lòng tạo hàm này trong SQL Editor của Supabase bằng script trong phần 'Required SQL Functions' của README.md.`);
         }
         throw rpcError; 
       }
@@ -91,7 +90,7 @@ export default function MonthlySalaryTrendChart({ selectedYears }: MonthlySalary
       if (data) {
         const formattedData = data.map((item: any) => ({
           ...item,
-          name: `${String(item.month).padStart(2, '0')}/${item.year}`,
+          name: `${String(item.month).padStart(2, '0')}/${item.year}`, // Format as MM/YYYY
           total_salary: Number(item.total_salary) || 0,
         }));
         setChartData(formattedData);
@@ -100,7 +99,7 @@ export default function MonthlySalaryTrendChart({ selectedYears }: MonthlySalary
       }
 
     } catch (err: any) {
-      let uiErrorMessage = err.message || 'Failed to fetch monthly salary trend via RPC.';
+      let uiErrorMessage = err.message || 'Không thể tải xu hướng lương hàng tháng qua RPC.';
       setError(uiErrorMessage);
       console.error("Error fetching monthly salary trend via RPC. Details:", {
           message: err.message,
@@ -123,8 +122,8 @@ export default function MonthlySalaryTrendChart({ selectedYears }: MonthlySalary
     return (
       <Card className="h-full">
         <CardHeader className="pb-2 pt-3">
-          <CardTitle className="text-base font-medium">Monthly Salary Trend</CardTitle> 
-          <CardDescription className="text-xs">Loading trend data...</CardDescription>
+          <CardTitle className="text-base font-semibold">Xu Hướng Lương Theo Tháng</CardTitle> 
+          <CardDescription className="text-xs">Đang tải dữ liệu xu hướng...</CardDescription>
         </CardHeader>
         <CardContent className="flex items-center justify-center h-[250px] pt-2"> 
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -137,16 +136,16 @@ export default function MonthlySalaryTrendChart({ selectedYears }: MonthlySalary
     return (
       <Card className="border-destructive/50 h-full">
         <CardHeader className="pb-2 pt-3">
-          <CardTitle className="text-base font-medium text-destructive flex items-center gap-1"> 
+          <CardTitle className="text-base font-semibold text-destructive flex items-center gap-1"> 
             <AlertTriangle className="h-4 w-4" />
-            Monthly Trend Error
+            Lỗi Xu Hướng Hàng Tháng
           </CardTitle>
            <CardDescription className="text-xs text-destructive">{error}</CardDescription>
         </CardHeader>
         <CardContent className="pt-2">
           {error.startsWith(CRITICAL_SETUP_ERROR_PREFIX) && (
             <p className="text-xs text-muted-foreground mt-1">
-              Please refer to the `README.md` file, specifically the "Required SQL Functions" section, for instructions on how to create the missing Supabase function. Double-check for copy-paste errors when running the SQL.
+              Vui lòng tham khảo tệp `README.md`, cụ thể là phần "Required SQL Functions", để biết hướng dẫn cách tạo hàm Supabase bị thiếu. Kiểm tra kỹ lỗi sao chép khi chạy SQL.
             </p>
           )}
         </CardContent>
@@ -158,11 +157,11 @@ export default function MonthlySalaryTrendChart({ selectedYears }: MonthlySalary
     return (
      <Card  className="h-full">
        <CardHeader className="pb-2 pt-3">
-          <CardTitle className="text-base font-medium text-muted-foreground">Monthly Salary Trend</CardTitle> 
-          <CardDescription className="text-xs">For: {filterDescription}</CardDescription>
+          <CardTitle className="text-base font-semibold text-muted-foreground">Xu Hướng Lương Theo Tháng</CardTitle> 
+          <CardDescription className="text-xs">Cho: {filterDescription}</CardDescription>
        </CardHeader>
        <CardContent className="pt-2 flex items-center justify-center h-[250px]"> 
-         <p className="text-sm text-muted-foreground">No salary data found for the selected period.</p> 
+         <p className="text-sm text-muted-foreground">Không tìm thấy dữ liệu lương cho kỳ đã chọn.</p> 
        </CardContent>
      </Card>
    );
@@ -171,9 +170,9 @@ export default function MonthlySalaryTrendChart({ selectedYears }: MonthlySalary
   return (
     <Card  className="h-full">
       <CardHeader className="pb-2 pt-3">
-        <CardTitle className="text-base font-medium">Monthly Salary Trend</CardTitle> 
+        <CardTitle className="text-base font-semibold">Xu Hướng Lương Theo Tháng</CardTitle> 
         <CardDescription className="text-xs">
-          Total salary ('tong_thu_nhap') per month for {filterDescription}.
+          Tổng lương ('tong_thu_nhap') mỗi tháng cho {filterDescription}.
         </CardDescription>
       </CardHeader>
       <CardContent className="pt-2">
@@ -193,14 +192,14 @@ export default function MonthlySalaryTrendChart({ selectedYears }: MonthlySalary
                 axisLine={false}
                 tickMargin={8}
                 className="text-xs"
-                tickFormatter={(value) => new Intl.NumberFormat('en-US', { notation: 'compact', compactDisplay: 'short' }).format(value)}
+                tickFormatter={(value) => new Intl.NumberFormat('vi-VN', { notation: 'compact', compactDisplay: 'short' }).format(value)}
               />
               <Tooltip
                 content={<ChartTooltipContent 
                     indicator="line"
                     formatter={(value) => {
                         if (typeof value === 'number') {
-                           return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'VND', minimumFractionDigits: 0, maximumFractionDigits: 0  }).format(value);
+                           return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', minimumFractionDigits: 0, maximumFractionDigits: 0  }).format(value);
                         }
                         return String(value);
                     }}
@@ -213,7 +212,7 @@ export default function MonthlySalaryTrendChart({ selectedYears }: MonthlySalary
                 stroke="var(--color-totalSalary)"
                 strokeWidth={2}
                 dot={false}
-                name="Total Salary"
+                name={chartConfig.totalSalary.label} // Use translated label
               />
             </LineChart>
           </ResponsiveContainer>

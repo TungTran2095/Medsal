@@ -23,7 +23,6 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator as DMSR,
   DropdownMenuTrigger,
-  DropdownMenuItem,
 } from "@/components/ui/dropdown-menu"
 import {
   SidebarProvider,
@@ -64,7 +63,7 @@ export default function WorkspaceContent() {
   const { theme, toggleTheme } = useTheme();
 
   const [selectedMonths, setSelectedMonths] = useState<number[]>([]);
-  const [selectedYears, setSelectedYears] = useState<number[]>([new Date().getFullYear()]); // Default to current year selected
+  const [selectedYears, setSelectedYears] = useState<number[]>([new Date().getFullYear()]);
   const [availableMonths, setAvailableMonths] = useState<MonthOption[]>([]);
   const [isLoadingMonths, setIsLoadingMonths] = useState<boolean>(true);
 
@@ -73,8 +72,8 @@ export default function WorkspaceContent() {
 
 
   const navItems: NavItem[] = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'dbManagement', label: 'Database Management', icon: Database },
+    { id: 'dashboard', label: 'Bảng Điều Khiển', icon: LayoutDashboard },
+    { id: 'dbManagement', label: 'Quản Lý Cơ Sở Dữ Liệu', icon: Database },
   ];
 
   const fetchDistinctMonths = useCallback(async () => {
@@ -109,7 +108,7 @@ export default function WorkspaceContent() {
         
         const monthOptions = distinctMonthNumbers.map(monthNum => ({
           value: monthNum,
-          label: new Date(0, monthNum - 1).toLocaleString('default', { month: 'long' })
+          label: `Tháng ${monthNum}` // Use "Tháng X" format directly
         }));
         setAvailableMonths(monthOptions);
 
@@ -119,8 +118,8 @@ export default function WorkspaceContent() {
     } catch (error: any) {
       console.error("Error fetching distinct months:", error);
       toast({
-        title: "Error Fetching Months",
-        description: "Could not load month filter options from database.",
+        title: "Lỗi Tải Tháng",
+        description: "Không thể tải các tùy chọn bộ lọc tháng từ cơ sở dữ liệu.",
         variant: "destructive",
       });
       setAvailableMonths([]);
@@ -139,8 +138,8 @@ export default function WorkspaceContent() {
       const file = event.target.files[0];
       if (file.type !== 'text/csv') {
         toast({
-          title: "Invalid File Type",
-          description: "Please upload a CSV file.",
+          title: "Loại Tệp Không Hợp Lệ",
+          description: "Vui lòng tải lên tệp CSV.",
           variant: "destructive",
         });
         setSelectedFile(null);
@@ -172,14 +171,14 @@ export default function WorkspaceContent() {
 
         if (payrollEntries.length === 0 && data.length > 0) {
           toast({
-            title: "CSV Parsing Issue",
-            description: "Could not parse valid entries. Check CSV headers: 'Employee ID', 'Employee Name', 'Salary' (or 'tong_thu_nhap'), 'Pay Date'.",
+            title: "Lỗi Xử Lý CSV",
+            description: "Không thể xử lý các mục hợp lệ. Kiểm tra tiêu đề CSV: 'Employee ID', 'Employee Name', 'Salary' (hoặc 'tong_thu_nhap'), 'Pay Date'.",
             variant: "destructive",
           });
         } else if (payrollEntries.length > 0) {
           toast({
-            title: "CSV Parsed",
-            description: `${payrollEntries.length} entries found. Review and upload.`,
+            title: "Đã Xử Lý CSV",
+            description: `${payrollEntries.length} mục được tìm thấy. Xem lại và tải lên.`,
           });
         }
         setParsedData(payrollEntries);
@@ -187,7 +186,7 @@ export default function WorkspaceContent() {
       },
       error: (error) => {
         toast({
-          title: "CSV Parsing Error",
+          title: "Lỗi Xử Lý CSV",
           description: error.message,
           variant: "destructive",
         });
@@ -200,8 +199,8 @@ export default function WorkspaceContent() {
   const handleUpload = async () => {
     if (parsedData.length === 0) {
       toast({
-        title: "No Data",
-        description: "No data to upload. Please select and parse a CSV file first.",
+        title: "Không Có Dữ Liệu",
+        description: "Không có dữ liệu để tải lên. Vui lòng chọn và xử lý tệp CSV trước.",
         variant: "destructive",
       });
       return;
@@ -261,8 +260,8 @@ export default function WorkspaceContent() {
       }
 
       toast({
-        title: "Upload Successful",
-        description: `${parsedData.length} payroll entries uploaded to Supabase table 'Fulltime'.`,
+        title: "Tải Lên Thành Công",
+        description: `${parsedData.length} mục lương đã được tải lên bảng 'Fulltime' của Supabase.`,
       });
       setParsedData([]);
       setSelectedFile(null);
@@ -273,8 +272,8 @@ export default function WorkspaceContent() {
     } catch (error: any) {
       console.error("Supabase upload error:", error);
       toast({
-        title: "Upload Failed",
-        description: error.message || "An unexpected error occurred during upload.",
+        title: "Tải Lên Thất Bại",
+        description: error.message || "Đã xảy ra lỗi không mong muốn trong quá trình tải lên.",
         variant: "destructive",
       });
     } finally {
@@ -295,13 +294,17 @@ export default function WorkspaceContent() {
   };
   
   const getSelectedMonthsText = () => {
-    if (selectedMonths.length === 0 || selectedMonths.length === availableMonths.length) {
-      return "All Months";
+    if (selectedMonths.length === 0 || selectedMonths.length === availableMonths.length && availableMonths.length > 0) {
+      return "Tất Cả Tháng";
     }
-    if (selectedMonths.length <= 2) {
-      return selectedMonths.map(mValue => availableMonths.find(am => am.value === mValue)?.label).filter(Boolean).join(', ');
+    if (selectedMonths.length === 1) {
+      const month = availableMonths.find(am => am.value === selectedMonths[0]);
+      return month ? month.label : "1 tháng được chọn";
     }
-    return `${selectedMonths.length} months selected`;
+    if (selectedMonths.length > 1) {
+      return `${selectedMonths.length} tháng được chọn`;
+    }
+    return "Chọn Tháng"; // Fallback / placeholder when no months available or none selected
   };
 
   const handleYearSelection = (yearValue: number, checked: boolean) => {
@@ -318,12 +321,12 @@ export default function WorkspaceContent() {
 
   const getSelectedYearsText = () => {
     if (selectedYears.length === 0 || selectedYears.length === yearOptions.length) {
-      return "All Years";
+      return "Tất Cả Năm";
     }
     if (selectedYears.length <= 2) {
       return selectedYears.join(', ');
     }
-    return `${selectedYears.length} years selected`;
+    return `${selectedYears.length} năm được chọn`;
   };
 
 
@@ -333,7 +336,7 @@ export default function WorkspaceContent() {
         <SidebarHeader>
            <div className="flex items-center justify-between p-2">
             <span className="text-base font-semibold text-sidebar-primary group-data-[state=collapsed]:hidden">
-              Workspace
+              Không Gian Làm Việc
             </span>
             <SidebarTrigger className="h-7 w-7" />
           </div>
@@ -360,7 +363,7 @@ export default function WorkspaceContent() {
           <div className="mt-auto p-2 group-data-[state=expanded]:border-t group-data-[state=expanded]:border-sidebar-border">
             <div className="flex items-center justify-between group-data-[state=collapsed]:justify-center">
               <Label htmlFor="theme-toggle" className="text-xs text-sidebar-foreground group-data-[state=collapsed]:hidden">
-                Theme
+                Giao Diện
               </Label>
               <div className="flex items-center gap-2">
                 <Sun className="h-4 w-4 text-sidebar-foreground" />
@@ -377,20 +380,20 @@ export default function WorkspaceContent() {
           </div>
         </SidebarContent>
       </Sidebar>
-      <SidebarInset className="flex-grow overflow-y-auto p-2 md:p-3">
-        <div className="space-y-2 h-full">
+      <SidebarInset className="flex-grow overflow-y-auto p-0.5 md:p-1">
+        <div className="space-y-1 h-full">
           {activeView === 'dbManagement' && (
             <>
               <Card className="w-full flex flex-col shadow-md rounded-lg">
                 <CardHeader className="items-center border-b pb-2 pt-3">
                   <FileText className="h-5 w-5 mb-0.5 text-primary" />
-                  <CardTitle className="text-base font-bold">Payroll CSV Import</CardTitle>
-                  <CardDescription className="text-xs">Import payroll data from CSV files and upload to Supabase 'Fulltime' table.</CardDescription>
+                  <CardTitle className="text-base font-semibold">Nhập Bảng Lương CSV</CardTitle>
+                  <CardDescription className="text-xs">Nhập dữ liệu lương từ tệp CSV và tải lên bảng 'Fulltime' của Supabase.</CardDescription>
                 </CardHeader>
                 <CardContent className="flex-grow flex flex-col p-2 space-y-1">
                   <div className="space-y-0.5">
                     <label htmlFor="payroll-csv-input" className="text-xs font-medium">
-                      Upload Payroll CSV
+                      Tải Lên Bảng Lương CSV
                     </label>
                     <Input
                       id="payroll-csv-input"
@@ -402,22 +405,22 @@ export default function WorkspaceContent() {
                     />
                     {selectedFile && (
                       <p className="text-xs text-muted-foreground">
-                        Selected: {selectedFile.name}
+                        Đã chọn: {selectedFile.name}
                       </p>
                     )}
                   </div>
 
                   {parsedData.length > 0 && !isLoadingCsv && (
                     <div className="space-y-1 flex-grow flex flex-col min-h-[80px]">
-                      <h3 className="text-sm font-semibold">Parsed Data Preview (First 5 Rows)</h3>
+                      <h3 className="text-sm font-semibold">Xem Trước Dữ Liệu (5 Hàng Đầu)</h3>
                       <div className="border rounded-md overflow-x-auto flex-grow">
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead className="py-1 px-1.5 text-xs">Emp. ID</TableHead>
-                              <TableHead className="py-1 px-1.5 text-xs">Emp. Name</TableHead>
-                              <TableHead className="py-1 px-1.5 text-xs">Salary</TableHead>
-                              <TableHead className="py-1 px-1.5 text-xs">Pay Date</TableHead>
+                              <TableHead className="py-1 px-1.5 text-xs">Mã NV</TableHead>
+                              <TableHead className="py-1 px-1.5 text-xs">Tên NV</TableHead>
+                              <TableHead className="py-1 px-1.5 text-xs">Lương</TableHead>
+                              <TableHead className="py-1 px-1.5 text-xs">Ngày Trả</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -425,7 +428,7 @@ export default function WorkspaceContent() {
                               <TableRow key={index}>
                                 <TableCell className="py-1 px-1.5 text-xs">{entry.employee_id}</TableCell>
                                 <TableCell className="py-1 px-1.5 text-xs">{entry.employee_name}</TableCell>
-                                <TableCell className="py-1 px-1.5 text-xs">{entry.salary.toFixed(2)}</TableCell>
+                                <TableCell className="py-1 px-1.5 text-xs">{entry.salary.toFixed(0)}</TableCell>
                                 <TableCell className="py-1 px-1.5 text-xs">{entry.pay_date}</TableCell>
                               </TableRow>
                             ))}
@@ -434,7 +437,7 @@ export default function WorkspaceContent() {
                       </div>
                       {parsedData.length > 5 && (
                         <p className="text-xs text-muted-foreground text-center">
-                          Showing first 5 rows of {parsedData.length} total entries.
+                          Hiển thị 5 hàng đầu của {parsedData.length} tổng số mục.
                         </p>
                       )}
                     </div>
@@ -443,7 +446,7 @@ export default function WorkspaceContent() {
                   {(isLoadingCsv && !parsedData.length) && (
                       <div className="flex flex-col items-center justify-center text-muted-foreground py-2 min-h-[50px]">
                           <Loader2 className="h-4 w-4 animate-spin mb-0.5" />
-                          <p className="text-xs">Processing file...</p>
+                          <p className="text-xs">Đang xử lý tệp...</p>
                       </div>
                   )}
 
@@ -457,12 +460,12 @@ export default function WorkspaceContent() {
                     ) : (
                       <UploadCloud className="mr-1.5 h-3.5 w-3.5" />
                     )}
-                    Upload to Supabase Fulltime Table
+                    Tải Lên Bảng Fulltime Supabase
                   </Button>
                 </CardContent>
               </Card>
 
-              <Separator className="my-2"/>
+              <Separator className="my-1"/>
 
               <SupabaseTableList />
             </>
@@ -474,15 +477,15 @@ export default function WorkspaceContent() {
                   <div className="flex-1">
                     <CardTitle className="text-lg font-semibold text-primary flex items-center gap-1.5">
                       <LayoutDashboard className="h-5 w-5" />
-                      Payroll Dashboard
+                      Bảng Điều Khiển Lương
                     </CardTitle>
                     <CardDescription className="text-xs text-muted-foreground mt-0.5">
-                      Analytics and overview of payroll data from 'Fulltime' table.
+                      Phân tích và tổng quan dữ liệu lương từ bảng 'Fulltime'.
                     </CardDescription>
                   </div>
                   <div className="flex items-end gap-2 mt-2 sm:mt-0">
                     <div>
-                      <Label htmlFor="month-filter" className="text-xs font-medium">Month(s)</Label>
+                      <Label htmlFor="month-filter" className="text-xs font-medium">Tháng</Label>
                        <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="outline" className="h-9 text-sm w-full sm:w-[150px] mt-1 justify-between">
@@ -491,12 +494,12 @@ export default function WorkspaceContent() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent className="w-[150px]">
-                          <DropdownMenuLabel>Select Months</DropdownMenuLabel>
+                          <DropdownMenuLabel>Chọn Tháng</DropdownMenuLabel>
                           <DMSR />
                           {isLoadingMonths ? (
-                             <DropdownMenuItem disabled>Loading months...</DropdownMenuItem>
+                            <div className="px-2 py-1.5 text-xs text-muted-foreground">Đang tải tháng...</div>
                           ) : availableMonths.length === 0 ? (
-                            <DropdownMenuItem disabled>No months found</DropdownMenuItem>
+                            <div className="px-2 py-1.5 text-xs text-muted-foreground">Không tìm thấy tháng</div>
                           ) : (
                             availableMonths.map(month => (
                               <DropdownMenuCheckboxItem
@@ -512,7 +515,7 @@ export default function WorkspaceContent() {
                       </DropdownMenu>
                     </div>
                     <div>
-                      <Label htmlFor="year-filter" className="text-xs font-medium">Year(s)</Label>
+                      <Label htmlFor="year-filter" className="text-xs font-medium">Năm</Label>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="outline" className="h-9 text-sm w-full sm:w-[120px] mt-1 justify-between">
@@ -521,7 +524,7 @@ export default function WorkspaceContent() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent className="w-[120px]">
-                          <DropdownMenuLabel>Select Years</DropdownMenuLabel>
+                          <DropdownMenuLabel>Chọn Năm</DropdownMenuLabel>
                           <DMSR />
                           {yearOptions.map(year => (
                             <DropdownMenuCheckboxItem
@@ -543,7 +546,7 @@ export default function WorkspaceContent() {
                     <TotalSalaryCard selectedMonths={selectedMonths} selectedYears={selectedYears} />
                     <EmployeeCountCard selectedMonths={selectedMonths} selectedYears={selectedYears} />
                 </div>
-                <div className="mt-0">
+                <div className="mt-0"> {/* Removed mt-3 to make it closer to cards above */}
                     <MonthlySalaryTrendChart selectedYears={selectedYears} />
                 </div>
               </CardContent>
