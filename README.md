@@ -21,6 +21,7 @@ To create these functions:
         *   Ensure your selection is exact.
         *   **Before clicking RUN, visually inspect the pasted code in the Supabase SQL Editor. If the editor has automatically added any comments (lines starting with `--`, like `-- source: dashboard...`) at the very end of the function block (especially after the `END;` line but before the final `$$;`), you MUST manually delete those comments from the editor before running the SQL. Otherwise, you will get an "unterminated dollar-quoted string" error.**
 5.  Click **Run** for each function.
+    *   **For `get_monthly_salary_trend_fulltime`**: If you encounter an error like "cannot change return type of existing function", you MUST first run `DROP FUNCTION get_monthly_salary_trend_fulltime(integer);` and then run the `CREATE OR REPLACE FUNCTION` script for it.
 
 #### `get_public_tables`
 
@@ -209,3 +210,4 @@ $$;
 
 Once these functions are successfully created (or updated) in your Supabase SQL Editor, the application should be able to correctly filter and aggregate data. If you continue to encounter "unterminated dollar-quoted string" errors, please double-check for any invisible characters or ensure the entire function block is being processed correctly by the SQL editor, especially ensuring no comments are between `END;` and the final `$$;`.
 Additionally, for the `get_monthly_salary_trend_fulltime` and `get_monthly_revenue_trend` functions, ensure you have a `time` table with appropriate columns (`year_numeric`, `month_numeric`, `Thang_x`) as described in the function's comments.
+
