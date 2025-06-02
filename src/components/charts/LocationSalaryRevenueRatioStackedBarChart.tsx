@@ -53,6 +53,7 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 const CRITICAL_SETUP_ERROR_PREFIX = "LỖI CÀI ĐẶT QUAN TRỌNG:";
+const MIN_CATEGORY_WIDTH = 80; // Minimum width per category on X-axis for readability
 
 export default function LocationSalaryRevenueRatioStackedBarChart({ selectedMonths, selectedYear }: LocationRatioStackedBarChartProps) {
   const [chartData, setChartData] = useState<ChartDataEntry[]>([]);
@@ -130,7 +131,7 @@ export default function LocationSalaryRevenueRatioStackedBarChart({ selectedMont
           ft_salary_ratio_component: Number(item.ft_salary_ratio_component) || 0,
           pt_salary_ratio_component: Number(item.pt_salary_ratio_component) || 0,
           total_ratio: (Number(item.ft_salary_ratio_component) || 0) + (Number(item.pt_salary_ratio_component) || 0),
-        })).filter(item => item.total_ratio > 0); // Only include locations with some ratio
+        })).filter(item => item.total_ratio > 0); 
         setChartData(processedData);
       }
 
@@ -147,11 +148,12 @@ export default function LocationSalaryRevenueRatioStackedBarChart({ selectedMont
   }, [fetchData]);
 
   const percentageFormatter = (value: number) => {
-    if (value === null || value === undefined || Number.isNaN(value)) return '';
+    if (value === null || value === undefined || Number.isNaN(value) || value === 0) return ''; // Don't show label for 0
     return `${(value * 100).toFixed(0)}%`;
   };
   
   const yAxisTickFormatter = (value: number) => `${(value * 100).toFixed(0)}%`;
+  const chartWidth = Math.max(300, chartData.length * MIN_CATEGORY_WIDTH);
 
 
   if (isLoading) {
@@ -212,21 +214,30 @@ export default function LocationSalaryRevenueRatioStackedBarChart({ selectedMont
         </CardDescription>
       </CardHeader>
       <CardContent className="pt-2 flex-grow overflow-hidden">
-        <ScrollArea className="h-full pb-4">
-          <ChartContainer config={chartConfig} className="aspect-auto h-[260px] w-full pr-2">
+        <ScrollArea className="h-full w-full pb-4">
+          <ChartContainer config={chartConfig} className="h-[260px]" style={{ width: `${chartWidth}px` }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} layout="vertical" margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
-                <XAxis type="number" tickFormatter={yAxisTickFormatter} domain={[0, 'auto']} className="text-xs" />
-                <YAxis dataKey="location_name" type="category" hide={chartData.length > 10} className="text-xs" width={80} interval={0} />
-                <YAxis dataKey="location_name" yAxisId="right" orientation="right" type="category" hide={chartData.length <=10} className="text-xs" width={80} interval={0}/>
-
+              <BarChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis 
+                  dataKey="location_name" 
+                  type="category" 
+                  className="text-xs" 
+                  interval={0} 
+                  angle={chartData.length > 5 ? -30 : 0}
+                  textAnchor={chartData.length > 5 ? "end" : "middle"}
+                  height={chartData.length > 5 ? 50 : 30} // Adjust height for angled labels
+                  dy={chartData.length > 5 ? 5 : 0}
+                />
+                <YAxis type="number" tickFormatter={yAxisTickFormatter} domain={[0, 'auto']} className="text-xs" />
+                
                 <Tooltip
                   content={<ChartTooltipContent
                     formatter={(value, name, props) => {
                         const key = name as keyof typeof chartConfig;
                         const itemConfig = chartConfig[key];
                         const formattedValue = percentageFormatter(value as number);
+                        if (!itemConfig || !formattedValue) return null;
                         return (
                             <div className="flex items-center gap-1.5">
                                 <span className="w-2.5 h-2.5 shrink-0 rounded-[2px]" style={{backgroundColor: itemConfig?.color}}/>
@@ -248,7 +259,7 @@ export default function LocationSalaryRevenueRatioStackedBarChart({ selectedMont
                         return label;
                     }}
                     cursor={{fill: 'hsl(var(--muted))', opacity: 0.5}}
-                    itemSorter={(itemA, itemB) => { // Ensure FT is shown before PT in tooltip
+                    itemSorter={(itemA, itemB) => { 
                         if (itemA.dataKey === 'ft_salary_ratio_component') return -1;
                         if (itemB.dataKey === 'ft_salary_ratio_component') return 1;
                         return 0;
@@ -263,7 +274,7 @@ export default function LocationSalaryRevenueRatioStackedBarChart({ selectedMont
                         <div className="flex items-center justify-center gap-2 mb-1 flex-wrap">
                         {payload?.map((entry: any) => {
                             const configKey = entry.dataKey as keyof typeof chartConfig;
-                            const Icon = chartConfig[configKey]?.icon; // Icon not defined in this config
+                            if(!chartConfig[configKey]) return null;
                             return (
                             <div key={`item-${entry.dataKey}`} className="flex items-center gap-0.5 cursor-pointer text-xs">
                                 <span className="w-2 h-2 rounded-sm" style={{backgroundColor: entry.color}} />
@@ -274,22 +285,20 @@ export default function LocationSalaryRevenueRatioStackedBarChart({ selectedMont
                         </div>
                     )}
                 />
-                <Bar dataKey="ft_salary_ratio_component" stackId="a" fill="var(--color-ft_salary_ratio_component)" name={chartConfig.ft_salary_ratio_component.label} radius={[0, 4, 4, 0]}>
+                <Bar dataKey="ft_salary_ratio_component" stackId="a" fill="var(--color-ft_salary_ratio_component)" name={chartConfig.ft_salary_ratio_component.label} radius={[0, 0, 4, 4]}>
                   <LabelList
                     dataKey="ft_salary_ratio_component"
-                    position="insideRight"
+                    position="center"
                     formatter={percentageFormatter}
                     className="text-xs fill-primary-foreground"
-                    offset={5}
                   />
                 </Bar>
-                <Bar dataKey="pt_salary_ratio_component" stackId="a" fill="var(--color-pt_salary_ratio_component)" name={chartConfig.pt_salary_ratio_component.label} radius={[0, 4, 4, 0]}>
+                <Bar dataKey="pt_salary_ratio_component" stackId="a" fill="var(--color-pt_salary_ratio_component)" name={chartConfig.pt_salary_ratio_component.label} radius={[4, 4, 0, 0]}>
                   <LabelList
                     dataKey="pt_salary_ratio_component"
-                    position="insideRight"
+                    position="center"
                     formatter={percentageFormatter}
-                    className="text-xs fill-primary-foreground" // Or choose a contrasting fill
-                    offset={5}
+                    className="text-xs fill-primary-foreground"
                   />
                 </Bar>
               </BarChart>
@@ -300,3 +309,4 @@ export default function LocationSalaryRevenueRatioStackedBarChart({ selectedMont
     </Card>
   );
 }
+
