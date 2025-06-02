@@ -97,10 +97,10 @@ export default function CombinedMonthlyTrendChart({ selectedYear }: CombinedMont
 
       const processResponse = (
         res: PromiseSettledResult<any>,
-        dataType: string, // e.g., "lương full-time"
-        functionName: string, // e.g., 'get_monthly_salary_trend_fulltime'
-        mainDataTableName: string, // e.g., 'Fulltime', 'Parttime', 'Doanh_thu'
-        salaryColumnName: string = 'tong_thu_nhap' // Default salary column, overridden for part-time
+        dataType: string, 
+        functionName: string, 
+        mainDataTableName: 'Fulltime' | 'Parttime' | 'Doanh_thu',
+        salaryColumnName: string = 'tong_thu_nhap' 
       ): { data: MonthlyTrendDataEntry[], error?: string } => {
         if (res.status === 'fulfilled' && !res.value.error) {
           return { data: (res.value.data || []) as MonthlyTrendDataEntry[] };
@@ -109,40 +109,49 @@ export default function CombinedMonthlyTrendChart({ selectedYear }: CombinedMont
           const rpcMessageText = rpcError?.message ? String(rpcError.message).toLowerCase() : '';
           
           let isCriticalSetupError =
-            rpcError?.code === '42883' || // undefined_function
-            (rpcError?.code === 'PGRST202' && rpcMessageText.includes(functionName.toLowerCase())) || // Could not find the function
+            rpcError?.code === '42883' || 
+            (rpcError?.code === 'PGRST202' && rpcMessageText.includes(functionName.toLowerCase())) || 
             (rpcMessageText.includes(functionName.toLowerCase()) && rpcMessageText.includes('does not exist'));
 
           let setupErrorDetails = "";
+          let expectedNamColumn = 'nam';
+          let expectedThangColumn = 'thang';
+          let expectedThangColumnExample = "'Tháng 01'";
 
-          // Check for "Time" table issues
+          if (mainDataTableName === 'Parttime') {
+            expectedNamColumn = '"Nam"';
+            expectedThangColumn = '"Thoi gian"';
+          } else if (mainDataTableName === 'Doanh_thu') {
+            expectedNamColumn = '"Năm"';
+            expectedThangColumn = '"Tháng"';
+          }
+
+
           if (rpcMessageText.includes('relation "time" does not exist')) {
             setupErrorDetails += " Bảng 'Time' (viết hoa T) không tồn tại.";
             isCriticalSetupError = true;
           }
           
-          // Check for main data table issues (e.g., Fulltime, Parttime, Doanh_thu)
           const mainTableLc = mainDataTableName.toLowerCase();
           if (rpcMessageText.includes(`relation "${mainTableLc}" does not exist`)) {
               setupErrorDetails += ` Bảng '${mainDataTableName}' không tồn tại.`;
               isCriticalSetupError = true;
           }
-
-          // Check for 'nam' column issues in the main data table
-          const namColumnMissingPattern = new RegExp(`column "?(${mainTableLc}|f|pt|dr)"?\\."?nam"? does not exist|column "?nam"? of relation "${mainTableLc}" does not exist|column "?nam"? does not exist`, 'i');
+          
+          const namColLcForPattern = expectedNamColumn.replace(/"/g, '').toLowerCase();
+          const namColumnMissingPattern = new RegExp(`column "?(${mainTableLc}|f|pt|dr)"?\\."?${namColLcForPattern}"? does not exist|column "?${expectedNamColumn.replace(/"/g, '')}"? of relation "${mainTableLc}" does not exist|column "?${expectedNamColumn}"? does not exist`, 'i');
           if (namColumnMissingPattern.test(rpcMessageText) && (rpcMessageText.includes(mainTableLc) || rpcMessageText.includes(' f.') || rpcMessageText.includes(' pt.') || rpcMessageText.includes(' dr.'))) {
-             setupErrorDetails += ` Cột 'nam' (kiểu số nguyên, dùng cho năm) dường như bị thiếu trong bảng '${mainDataTableName}'.`;
+             setupErrorDetails += ` Cột ${expectedNamColumn} (kiểu số nguyên, dùng cho năm) dường như bị thiếu trong bảng '${mainDataTableName}'.`;
              isCriticalSetupError = true;
           }
           
-          // Check for 'thang' column issues in the main data table
-          const thangColumnMissingPattern = new RegExp(`column "?(${mainTableLc}|f|pt|dr)"?\\."?thang"? does not exist|column "?thang"? of relation "${mainTableLc}" does not exist|column "?thang"? does not exist`, 'i');
+          const thangColLcForPattern = expectedThangColumn.replace(/"/g, '').toLowerCase();
+          const thangColumnMissingPattern = new RegExp(`column "?(${mainTableLc}|f|pt|dr)"?\\."?${thangColLcForPattern}"? does not exist|column "?${expectedThangColumn.replace(/"/g, '')}"? of relation "${mainTableLc}" does not exist|column "?${expectedThangColumn}"? does not exist`, 'i');
           if (thangColumnMissingPattern.test(rpcMessageText) && (rpcMessageText.includes(mainTableLc) || rpcMessageText.includes(' f.') || rpcMessageText.includes(' pt.') || rpcMessageText.includes(' dr.'))) {
-             setupErrorDetails += ` Cột 'thang' (TEXT, ví dụ 'Tháng 01', dùng để nối với Time."Thang_x") dường như bị thiếu trong bảng '${mainDataTableName}'.`;
+             setupErrorDetails += ` Cột ${expectedThangColumn} (TEXT, ví dụ ${expectedThangColumnExample}, dùng để nối với Time."Thang_x") dường như bị thiếu trong bảng '${mainDataTableName}'.`;
              isCriticalSetupError = true;
           }
           
-          // Check for specific data column issues (tong_thu_nhap, "Tong tien", "Kỳ báo cáo")
           const dataColLc = salaryColumnName.toLowerCase();
           const dataColPattern = new RegExp(`column "?(${mainTableLc}|f|pt|dr)"?\\."?${dataColLc.replace(' ', '\\s')}"? does not exist|column "?${dataColLc.replace(' ', '\\s')}"? of relation "${mainTableLc}" does not exist|column "?${dataColLc.replace(' ', '\\s')}"? does not exist`, 'i');
           if (dataColPattern.test(rpcMessageText) && (rpcMessageText.includes(mainTableLc) || rpcMessageText.includes(' f.') || rpcMessageText.includes(' pt.') || rpcMessageText.includes(' dr.'))) {
@@ -155,30 +164,34 @@ export default function CombinedMonthlyTrendChart({ selectedYear }: CombinedMont
             let detailedGuidance = `${CRITICAL_SETUP_ERROR_PREFIX} Lỗi với hàm RPC '${functionName}' hoặc các bảng phụ thuộc. Chi tiết:${setupErrorDetails.trim()}`;
             detailedGuidance += `\n\nVui lòng kiểm tra và đảm bảo các mục sau theo README.md:`;
             detailedGuidance += `\n1. Hàm RPC '${functionName}' được tạo đúng trong Supabase.`;
-            detailedGuidance += `\n2. Bảng 'Time' (viết hoa T) tồn tại với các cột: "Năm" (kiểu số nguyên), "thangpro" (TEXT, ví dụ: '01', '12', dùng để sắp xếp tháng), và "Thang_x" (TEXT, ví dụ: 'Tháng 01', dùng cho trục X và nối với cột 'thang' của các bảng dữ liệu).`;
-            detailedGuidance += `\n3. Bảng '${mainDataTableName}' tồn tại với cột 'nam' (kiểu số nguyên) cho năm và cột 'thang' (TEXT, ví dụ 'Tháng 01') cho tháng.`;
+            detailedGuidance += `\n2. Bảng 'Time' (viết hoa T) tồn tại với các cột: "Năm" (kiểu số nguyên/int8), "thangpro" (TEXT, ví dụ: '01', '12', dùng để sắp xếp tháng), và "Thang_x" (TEXT, ví dụ: 'Tháng 01', dùng cho trục X và nối với cột tháng của các bảng dữ liệu).`;
             
-            if (mainDataTableName === 'Doanh_thu') {
-                detailedGuidance += `\n4. Bảng 'Doanh_thu' cũng cần cột "Kỳ báo cáo" (số liệu) và "Tên đơn vị" (TEXT).`;
-            } else { // Fulltime or Parttime
-                detailedGuidance += `\n4. Bảng '${mainDataTableName}' cũng cần cột '${salaryColumnName}' (số liệu).`;
+            if (mainDataTableName === 'Fulltime') {
+                detailedGuidance += `\n3. Bảng 'Fulltime' tồn tại với cột 'nam' (kiểu số nguyên) cho năm và cột 'thang' (TEXT, ví dụ 'Tháng 01') cho tháng.`;
+                detailedGuidance += `\n4. Bảng 'Fulltime' cũng cần cột 'tong_thu_nhap' (số liệu).`;
+            } else if (mainDataTableName === 'Parttime') {
+                detailedGuidance += `\n3. Bảng 'Parttime' tồn tại với cột '"Nam"' (kiểu số nguyên) cho năm và cột '"Thoi gian"' (TEXT, ví dụ 'Tháng 01') cho tháng.`;
+                detailedGuidance += `\n4. Bảng 'Parttime' cũng cần cột '${salaryColumnName}' (số liệu, thường là "Tong tien").`;
+            } else if (mainDataTableName === 'Doanh_thu') {
+                detailedGuidance += `\n3. Bảng 'Doanh_thu' tồn tại với cột '"Năm"' (kiểu số nguyên) cho năm và cột '"Tháng"' (TEXT, ví dụ 'Tháng 01') cho tháng.`;
+                detailedGuidance += `\n4. Bảng 'Doanh_thu' cũng cần cột '${salaryColumnName}' (số liệu, thường là "Kỳ báo cáo") và "Tên đơn vị" (TEXT).`;
             }
             return { data: [], error: detailedGuidance };
           }
           
           const baseMessage = `Lỗi tải dữ liệu ${dataType}`;
           const messageDetail = rpcError?.message ? `: ${rpcError.message}` : (res.status === 'rejected' ? `: ${String(res.reason)}` : ". (Không có thông báo lỗi cụ thể từ RPC)");
-          return { data: [], error: `${baseMessage}${messageDetail}${messageDetail.endsWith('.') ? ' Kiểm tra cấu hình RPC hoặc bảng trong Supabase.' : ''}` };
+          return { data: [], error: `${baseMessage}${messageDetail}${!messageDetail.endsWith('.') ? '. Kiểm tra cấu hình RPC hoặc bảng trong Supabase.' : ''}` };
         }
       };
       
       const ftSalaryResult = processResponse(ftSalaryRes, "lương full-time", 'get_monthly_salary_trend_fulltime', 'Fulltime', 'tong_thu_nhap');
       if (ftSalaryResult.error) errorsOccurred.push(ftSalaryResult.error);
 
-      const ptSalaryResult = processResponse(ptSalaryRes, "lương part-time", 'get_monthly_salary_trend_parttime', 'Parttime', '"Tong tien"'); // Note: "Tong tien"
+      const ptSalaryResult = processResponse(ptSalaryRes, "lương part-time", 'get_monthly_salary_trend_parttime', 'Parttime', '"Tong tien"');
       if (ptSalaryResult.error) errorsOccurred.push(ptSalaryResult.error);
       
-      const revenueResult = processResponse(revenueRes, "doanh thu", 'get_monthly_revenue_trend', 'Doanh_thu', '"Kỳ báo cáo"'); // Note: "Kỳ báo cáo"
+      const revenueResult = processResponse(revenueRes, "doanh thu", 'get_monthly_revenue_trend', 'Doanh_thu', '"Kỳ báo cáo"');
       if (revenueResult.error) errorsOccurred.push(revenueResult.error);
 
       if (errorsOccurred.length > 0) {
@@ -191,11 +204,11 @@ export default function CombinedMonthlyTrendChart({ selectedYear }: CombinedMont
 
       const addToMap = (data: MonthlyTrendDataEntry[], type: 'ft_salary' | 'pt_salary' | 'revenue') => {
         data.forEach(item => {
-          const key = `${item.year_val}-${item.month_label}`; // month_label is Time."Thang_x"
+          const key = `${item.year_val}-${item.month_label}`; 
           const existing = mergedDataMap.get(key) || {
             month_label: item.month_label,
             year_val: item.year_val,
-            name: item.month_label, // For XAxis dataKey
+            name: item.month_label, 
             totalRevenue: 0,
             totalCombinedSalary: 0,
           };
@@ -218,16 +231,13 @@ export default function CombinedMonthlyTrendChart({ selectedYear }: CombinedMont
           ...item,
           salaryRevenueRatio: (item.totalRevenue && item.totalRevenue !== 0) ? (item.totalCombinedSalary || 0) / item.totalRevenue : undefined,
         }))
-        .sort((a, b) => { // Sorting logic relies on Time.thangpro being parsable to number after cleaning
+        .sort((a, b) => { 
           if (a.year_val !== b.year_val) return a.year_val - b.year_val;
-          // The month_label is Time."Thang_x". For sorting, we conceptually rely on how the SQL sorted it (using Time.thangpro).
-          // If month_label itself (e.g., "Tháng 01") is consistent and can be parsed for sorting:
           const monthANum = parseInt(String(a.month_label).replace(/\D/g, ''), 10);
           const monthBNum = parseInt(String(b.month_label).replace(/\D/g, ''), 10);
           if (!isNaN(monthANum) && !isNaN(monthBNum)) {
             return monthANum - monthBNum;
           }
-          // Fallback to string sort if parsing fails, though SQL order should dominate
           return String(a.month_label).localeCompare(String(b.month_label));
         });
 
@@ -279,7 +289,7 @@ export default function CombinedMonthlyTrendChart({ selectedYear }: CombinedMont
                 <p className="text-xs text-muted-foreground mt-1 whitespace-pre-line">
                   Đây là một lỗi cấu hình quan trọng. Vui lòng kiểm tra kỹ các mục đã liệt kê ở trên trong cơ sở dữ liệu Supabase và tệp README.md.
                   Đảm bảo rằng tất cả các bảng và hàm RPC được đặt tên chính xác (có phân biệt chữ hoa chữ thường cho tên bảng như 'Time', 'Fulltime', 'Parttime', 'Doanh_thu') và có đúng các cột được yêu cầu.
-                  Đặc biệt, kiểm tra cột 'nam' (năm) và 'thang' (tháng) trong các bảng dữ liệu, và cấu trúc bảng 'Time' ('Năm', 'thangpro', 'Thang_x').
+                  Đặc biệt, kiểm tra cột năm ('nam' hoặc '"Nam"' hoặc '"Năm"') và cột tháng ('thang' hoặc '"Thoi gian"' hoặc '"Tháng"') trong các bảng dữ liệu, và cấu trúc bảng 'Time' ('"Năm"', 'thangpro', '"Thang_x"').
                 </p>
               )}
             </div>

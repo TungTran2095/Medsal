@@ -66,7 +66,7 @@ $$;
 
 #### `get_total_salary_parttime`
 
-This function is used by the Payroll Dashboard to calculate the total sum of `"Tong tien"` from the `Parttime` table, with optional filters for a selected year and an array of months. It correctly parses text-based month columns (e.g., "Tháng 01") into integers.
+This function is used by the Payroll Dashboard to calculate the total sum of `"Tong tien"` from the `Parttime` table, with optional filters for a selected year and an array of months. It correctly parses text-based month columns (e.g., "Tháng 01") into integers. It assumes the `Parttime` table has `"Nam"` (INTEGER for year) and `"Thoi gian"` (TEXT for month description, e.g., "Tháng 01") columns.
 
 **SQL Code:**
 ```sql
@@ -78,20 +78,20 @@ RETURNS DOUBLE PRECISION
 LANGUAGE SQL
 AS $$
   SELECT SUM(CAST(REPLACE("Tong tien"::text, ',', '') AS DOUBLE PRECISION))
-  FROM "Parttime"
-  WHERE (filter_year IS NULL OR nam::INTEGER = filter_year)
+  FROM "Parttime" pt
+  WHERE (filter_year IS NULL OR pt."Nam"::INTEGER = filter_year)
     AND (
         filter_months IS NULL OR
         array_length(filter_months, 1) IS NULL OR
         array_length(filter_months, 1) = 0 OR
-        regexp_replace(thang, '\D', '', 'g')::INTEGER = ANY(filter_months)
+        regexp_replace(pt."Thoi gian", '\D', '', 'g')::INTEGER = ANY(filter_months)
     );
 $$;
 ```
 
 #### `get_total_revenue`
 
-This function is used by the Payroll Dashboard to calculate the total sum of "Kỳ báo cáo" from the "Doanh_thu" table, with optional filters for a selected year and an array of months. It assumes "Doanh_thu" table has `nam` (integer), `thang` (text, e.g., "Tháng 01"), and "Tên đơn vị" (text) columns for filtering. Rows where "Tên đơn vị" is "Medcom", "Medon", "Medicons", "Meddom", or "Med Group" are excluded.
+This function is used by the Payroll Dashboard to calculate the total sum of "Kỳ báo cáo" from the "Doanh_thu" table, with optional filters for a selected year and an array of months. It assumes "Doanh_thu" table has `"Năm"` (integer for year), `"Tháng"` (text for month, e.g., "Tháng 01"), and "Tên đơn vị" (text) columns for filtering. Rows where "Tên đơn vị" is "Medcom", "Medon", "Medicons", "Meddom", or "Med Group" are excluded.
 
 **SQL Code:**
 ```sql
@@ -103,15 +103,15 @@ RETURNS DOUBLE PRECISION
 LANGUAGE SQL
 AS $$
   SELECT SUM(CAST(REPLACE("Kỳ báo cáo"::text, ',', '') AS DOUBLE PRECISION))
-  FROM "Doanh_thu"
-  WHERE (filter_year IS NULL OR nam::INTEGER = filter_year)
+  FROM "Doanh_thu" dr
+  WHERE (filter_year IS NULL OR dr."Năm"::INTEGER = filter_year)
     AND (
         filter_months IS NULL OR
         array_length(filter_months, 1) IS NULL OR
         array_length(filter_months, 1) = 0 OR
-        regexp_replace(thang, '\D', '', 'g')::INTEGER = ANY(filter_months)
+        regexp_replace(dr."Tháng", '\D', '', 'g')::INTEGER = ANY(filter_months)
     )
-    AND "Tên đơn vị" NOT IN ('Medcom', 'Medon', 'Medicons', 'Meddom', 'Med Group');
+    AND dr."Tên đơn vị" NOT IN ('Medcom', 'Medon', 'Medicons', 'Meddom', 'Med Group');
 $$;
 ```
 
@@ -165,7 +165,7 @@ $$;
 
 #### `get_monthly_salary_trend_parttime`
 
-This function is used by the Payroll Dashboard to fetch the total part-time salary (`"Tong tien"` from "Parttime" table) aggregated per month and year, for a given year. The X-axis of the chart will use the `Thang_x` column from your `Time` table.
+This function is used by the Payroll Dashboard to fetch the total part-time salary (`"Tong tien"` from "Parttime" table) aggregated per month and year, for a given year. The X-axis of the chart will use the `Thang_x` column from your `Time` table. It assumes "Parttime" has columns `"Nam"` (INTEGER) and `"Thoi gian"` (TEXT).
 
 **SQL Code:**
 ```sql
@@ -174,7 +174,7 @@ CREATE OR REPLACE FUNCTION get_monthly_salary_trend_parttime(
 )
 RETURNS TABLE(
     month_label TEXT,  -- This will be Time."Thang_x"
-    year_val INTEGER,    -- This will be Parttime.nam
+    year_val INTEGER,    -- This will be Parttime."Nam"
     total_salary DOUBLE PRECISION
 )
 LANGUAGE plpgsql
@@ -182,26 +182,26 @@ AS $$
 BEGIN
     -- IMPORTANT ASSUMPTIONS:
     -- 1. "Time" (capital T) table exists with "Năm" (INTEGER/INT8), "thangpro" (TEXT), "Thang_x" (TEXT).
-    -- 2. "Parttime" table exists with 'nam' (INTEGER), 'thang' (TEXT, e.g., 'Tháng 01'), and "Tong tien" (numeric or text convertible to number).
+    -- 2. "Parttime" table exists with '"Nam"' (INTEGER), '"Thoi gian"' (TEXT, e.g., 'Tháng 01'), and "Tong tien" (numeric or text convertible to number).
 
     RETURN QUERY
     SELECT
         t."Thang_x" AS month_label,
-        pt.nam::INTEGER AS year_val,
+        pt."Nam"::INTEGER AS year_val,
         SUM(CAST(REPLACE(pt."Tong tien"::text, ',', '') AS DOUBLE PRECISION)) AS total_salary
     FROM
         "Parttime" pt
     INNER JOIN
-        "Time" t ON pt.nam::INTEGER = t."Năm"::INTEGER
-                 AND pt.thang = t."Thang_x"
+        "Time" t ON pt."Nam"::INTEGER = t."Năm"::INTEGER
+                 AND pt."Thoi gian" = t."Thang_x"
     WHERE
-        (p_filter_year IS NULL OR pt.nam::INTEGER = p_filter_year)
+        (p_filter_year IS NULL OR pt."Nam"::INTEGER = p_filter_year)
     GROUP BY
-        pt.nam::INTEGER,
+        pt."Nam"::INTEGER,
         t."Thang_x",
         t.thangpro
     ORDER BY
-        pt.nam::INTEGER,
+        pt."Nam"::INTEGER,
         regexp_replace(t.thangpro, '\D', '', 'g')::INTEGER;
 END;
 $$;
@@ -209,7 +209,7 @@ $$;
 
 #### `get_monthly_revenue_trend`
 
-This function is used by the Payroll Dashboard to fetch the total revenue ("Kỳ báo cáo" from "Doanh_thu" table) aggregated per month and year, for a given year. It excludes specific "Tên đơn vị" values. The X-axis of the chart will use the `Thang_x` column from your `Time` table.
+This function is used by the Payroll Dashboard to fetch the total revenue ("Kỳ báo cáo" from "Doanh_thu" table) aggregated per month and year, for a given year. It excludes specific "Tên đơn vị" values. The X-axis of the chart will use the `Thang_x` column from your `Time` table. It assumes "Doanh_thu" has columns `"Năm"` (INTEGER) and `"Tháng"` (TEXT).
 
 **SQL Code:**
 ```sql
@@ -218,7 +218,7 @@ CREATE OR REPLACE FUNCTION get_monthly_revenue_trend(
 )
 RETURNS TABLE(
     month_label TEXT,  -- This will be Time."Thang_x"
-    year_val INTEGER,    -- This will be Doanh_thu.nam
+    year_val INTEGER,    -- This will be Doanh_thu."Năm"
     total_revenue DOUBLE PRECISION
 )
 LANGUAGE plpgsql
@@ -228,28 +228,28 @@ BEGIN
     -- 1. A table named "Time" (capital T) MUST exist with columns:
     --    - "Năm" (INTEGER or INT8): Numeric year.
     --    - "thangpro" (TEXT): Numeric month as text (e.g., '01', '12'). Used for sorting.
-    --    - "Thang_x" (TEXT): Display label for X-axis (e.g., 'Tháng 01'). Must match 'thang' in "Doanh_thu".
-    -- 2. A table named "Doanh_thu" MUST exist with columns "Kỳ báo cáo", "nam", "thang", and "Tên đơn vị".
+    --    - "Thang_x" (TEXT): Display label for X-axis (e.g., 'Tháng 01'). Must match '"Tháng"' in "Doanh_thu".
+    -- 2. A table named "Doanh_thu" MUST exist with columns "Kỳ báo cáo", "\"Năm\"", "\"Tháng\"", and "Tên đơn vị".
 
     RETURN QUERY
     SELECT
         t."Thang_x" AS month_label,
-        dr.nam::INTEGER AS year_val,
+        dr."Năm"::INTEGER AS year_val,
         SUM(CAST(REPLACE(dr."Kỳ báo cáo"::text, ',', '') AS DOUBLE PRECISION)) AS total_revenue
     FROM
         "Doanh_thu" dr
     INNER JOIN
-        "Time" t ON dr.nam::INTEGER = t."Năm"::INTEGER
-                 AND dr.thang = t."Thang_x"
+        "Time" t ON dr."Năm"::INTEGER = t."Năm"::INTEGER
+                 AND dr."Tháng" = t."Thang_x"
     WHERE
-        (p_filter_year IS NULL OR dr.nam::INTEGER = p_filter_year)
+        (p_filter_year IS NULL OR dr."Năm"::INTEGER = p_filter_year)
         AND dr."Tên đơn vị" NOT IN ('Medcom', 'Medon', 'Medicons', 'Meddom', 'Med Group')
     GROUP BY
-        dr.nam::INTEGER,
+        dr."Năm"::INTEGER,
         t."Thang_x",
         t.thangpro
     ORDER BY
-        dr.nam::INTEGER,
+        dr."Năm"::INTEGER,
         regexp_replace(t.thangpro, '\D', '', 'g')::INTEGER;
 END;
 $$;
