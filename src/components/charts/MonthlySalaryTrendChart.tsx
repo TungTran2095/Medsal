@@ -100,7 +100,7 @@ export default function CombinedMonthlyTrendChart({ selectedYear }: CombinedMont
         dataType: string,
         functionName: string,
         mainDataTableName: 'Fulltime' | 'Parttime' | 'Doanh_thu',
-        salaryColumnName: string = 'tong_thu_nhap' // Default for Fulltime
+        salaryColumnName: string = 'tong_thu_nhap' 
       ): { data: MonthlyTrendDataEntry[], error?: string } => {
         if (res.status === 'fulfilled' && !res.value.error) {
           return { data: (res.value.data || []) as MonthlyTrendDataEntry[] };
@@ -114,8 +114,8 @@ export default function CombinedMonthlyTrendChart({ selectedYear }: CombinedMont
             (rpcMessageText.includes(functionName.toLowerCase()) && rpcMessageText.includes('does not exist'));
 
           let setupErrorDetails = "";
-          let expectedNamColumn = 'nam';
-          let expectedThangColumn = 'thang';
+          let expectedNamColumn = 'nam'; // Default for Fulltime
+          let expectedThangColumn = 'thang'; // Default for Fulltime
           let expectedThangColumnExample = "'Tháng 01'";
 
           if (mainDataTableName === 'Parttime') {
@@ -230,9 +230,9 @@ export default function CombinedMonthlyTrendChart({ selectedYear }: CombinedMont
       const processedData = Array.from(mergedDataMap.values())
         .map(item => ({
           ...item,
-          totalRevenue: item.totalRevenue === 0 ? null : item.totalRevenue, // Convert 0 to null for better connectNulls behavior
-          totalCombinedSalary: item.totalCombinedSalary === 0 ? null : item.totalCombinedSalary, // Convert 0 to null
-          salaryRevenueRatio: (item.totalRevenue && item.totalRevenue !== 0) ? (item.totalCombinedSalary || 0) / item.totalRevenue : null, // Convert to null if ratio is undefined/NaN
+          totalRevenue: item.totalRevenue === 0 ? null : item.totalRevenue, 
+          totalCombinedSalary: item.totalCombinedSalary === 0 ? null : item.totalCombinedSalary, 
+          salaryRevenueRatio: (item.totalRevenue && item.totalRevenue !== 0) ? (item.totalCombinedSalary || 0) / item.totalRevenue : null, 
         }));
 
       const finalChartData = processedData
@@ -311,7 +311,7 @@ export default function CombinedMonthlyTrendChart({ selectedYear }: CombinedMont
                 <p className="text-xs text-muted-foreground mt-1 whitespace-pre-line">
                   Đây là một lỗi cấu hình quan trọng. Vui lòng kiểm tra kỹ các mục đã liệt kê ở trên trong cơ sở dữ liệu Supabase và tệp README.md.
                   Đảm bảo rằng tất cả các bảng và hàm RPC được đặt tên chính xác (có phân biệt chữ hoa chữ thường cho tên bảng như 'Time', 'Fulltime', 'Parttime', 'Doanh_thu') và có đúng các cột được yêu cầu.
-                  Đặc biệt, kiểm tra cột năm ('nam' hoặc '"Nam"' hoặc '"Năm"') và cột tháng ('thang' hoặc '"Thoi gian"' hoặc '"Tháng"') trong các bảng dữ liệu, và cấu trúc bảng 'Time' ('"Năm"', 'thangpro', '"Thang_x"').
+                  Đặc biệt, kiểm tra cột năm và cột tháng trong các bảng dữ liệu (ví dụ: 'Fulltime' cần 'nam' (năm) và 'thang' (tháng), 'Parttime' cần '"Nam"' và '"Thoi gian"', 'Doanh_thu' cần '"Năm"' và '"Tháng"'), và cấu trúc bảng 'Time' ('"Năm"', 'thangpro', '"Thang_x"').
                 </p>
               )}
             </div>
@@ -346,25 +346,21 @@ export default function CombinedMonthlyTrendChart({ selectedYear }: CombinedMont
       <CardContent className="pt-2">
         <ChartContainer config={chartConfig} className="aspect-auto h-[280px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={chartData} margin={{ top: 15, right: 10, left: -20, bottom: 5 }}>
+            <ComposedChart data={chartData} margin={{ top: 15, right: 10, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} className="text-xs" />
               <YAxis
                 yAxisId="left"
                 tickLine={false}
                 axisLine={false}
-                tickMargin={8}
-                className="text-xs"
-                tickFormatter={(value) => new Intl.NumberFormat('vi-VN', { notation: 'compact', compactDisplay: 'short' }).format(value)}
+                tickFormatter={() => ''}
               />
               <YAxis
                 yAxisId="right"
                 orientation="right"
                 tickLine={false}
                 axisLine={false}
-                tickMargin={8}
-                className="text-xs"
-                tickFormatter={(value) => `${(value * 100).toFixed(0)}%`}
+                tickFormatter={() => ''}
                 domain={[0, 'auto']} 
               />
               <Tooltip
