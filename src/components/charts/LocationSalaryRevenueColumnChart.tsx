@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { Loader2, AlertTriangle, BarChartHorizontal, TrendingUp, Percent } from 'lucide-react'; // Changed icon
+import { Loader2, AlertTriangle, BarChartHorizontal, TrendingUp, Percent } from 'lucide-react';
 import {
   BarChart,
   Bar,
@@ -36,7 +36,7 @@ interface LocationRatioData {
   total_ratio: number; 
 }
 
-interface LocationSalaryRevenueChartProps { // Renamed for clarity, was ...ColumnChartProps
+interface LocationSalaryRevenueChartProps {
   selectedYear?: number | null;
   selectedMonths?: number[];
 }
@@ -63,7 +63,9 @@ const CustomSegmentLabel = (props: any) => {
   if (value === 0 || value === null || value === undefined) return null;
 
   const formattedValue = `${(value * 100).toFixed(0)}%`;
-  const textWidth = formattedValue.length * 5; // Estimate text width
+  // Estimate text width (very rough, depends on font and actual characters)
+  // For small font size 9, average char width might be around 5-6px.
+  const textWidth = formattedValue.length * 5; 
   if (width < textWidth + 4) return null; // Check if text fits in bar segment width
 
   return (
@@ -80,9 +82,10 @@ const CustomTotalLabel = (props: any) => {
   if (!currentDataPoint || currentDataPoint.total_ratio === null || currentDataPoint.total_ratio === undefined) return null;
 
   const totalValue = currentDataPoint.total_ratio;
+  // Only show total label if there's a meaningful total (not all zero segments)
   if (totalValue === 0 && currentDataPoint.ft_salary_ratio_component === 0 && currentDataPoint.pt_salary_ratio_component === 0) return null;
 
-  // For layout="vertical", x is end of bar, y is middle of bar height
+  // For layout="vertical" (horizontal bars), x is end of bar, y is middle of bar height
   return (
     <text x={x + width + 5} y={y + height / 2} fill="hsl(var(--foreground))" textAnchor="start" dominantBaseline="middle" fontSize="10" fontWeight="500">
       {`${(totalValue * 100).toFixed(0)}%`}
@@ -91,7 +94,7 @@ const CustomTotalLabel = (props: any) => {
 };
 
 
-export default function LocationSalaryRevenueChart({ selectedYear, selectedMonths }: LocationSalaryRevenueChartProps) {
+export default function LocationSalaryRevenueColumnChart({ selectedYear, selectedMonths }: LocationSalaryRevenueChartProps) {
   const [chartData, setChartData] = useState<LocationRatioData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -174,11 +177,13 @@ export default function LocationSalaryRevenueChart({ selectedYear, selectedMonth
 
   const xAxisDomainMax = useMemo(() => {
     if (!chartData || chartData.length === 0) {
-      return 0.1; 
+      return 0.1; // Default small domain if no data
     }
+    // Calculate max based on the actual data for the bars themselves
     const maxRatio = Math.max(...chartData.map(item => item.total_ratio));
-    const paddedMax = maxRatio * 1.15; // Increased padding for total label
-    return Math.max(0.1, Math.ceil(paddedMax * 20) / 20); 
+    // Round up to the next 0.05 or 0.1 for a cleaner axis
+    const domainEnd = Math.max(0.1, Math.ceil(maxRatio * 20) / 20); 
+    return domainEnd;
   }, [chartData]);
 
 
@@ -241,20 +246,24 @@ export default function LocationSalaryRevenueChart({ selectedYear, selectedMonth
         </CardDescription>
       </CardHeader>
       <CardContent className="pt-2 flex-grow overflow-hidden">
-         <ScrollArea className="h-full w-full">
-            <ChartContainer config={chartConfig} className="w-full" style={{ height: `${chartContainerHeight}px`}}>
+         <ScrollArea className="h-full w-full"> {/* ScrollArea will manage vertical scroll if chartContainerHeight is larger */}
+            <ChartContainer 
+              config={chartConfig} 
+              className="w-full" // ChartContainer takes full width of ScrollArea viewport
+              style={{ height: `${chartContainerHeight}px`}} // Dynamic height based on data items
+            >
                 <ResponsiveContainer width="100%" height="100%">
                 <BarChart 
                     layout="vertical"
                     data={chartData} 
-                    margin={{ top: 5, right: 30, left: 10, bottom: 5 }} // Adjusted margins
-                    barCategoryGap="20%" // Can adjust for bar thickness relative to gap
-                    barGap={4} // Space between bars of the same category (not relevant for single stack)
+                    margin={{ top: 5, right: 60, left: 10, bottom: 5 }} // Increased right margin for labels
+                    barCategoryGap="20%" 
+                    barGap={4} 
                 >
                     <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                     <XAxis 
                         type="number"
-                        domain={[0, xAxisDomainMax]}
+                        domain={[0, xAxisDomainMax]} // Domain ensures bars fit
                         tickFormatter={(value) => `${(value * 100).toFixed(0)}%`}
                         axisLine={false}
                         tickLine={false}
@@ -264,12 +273,12 @@ export default function LocationSalaryRevenueChart({ selectedYear, selectedMonth
                     <YAxis 
                         type="category"
                         dataKey="location_name" 
-                        width={100} // Adjust width for location names
+                        width={110} // Adjusted width for location names, ensures single line via truncation if too long
                         tickLine={false} 
                         axisLine={false} 
                         tickMargin={5} 
                         className="text-xs"
-                        interval={0} 
+                        interval={0} // Show all location names
                     />
                     <Tooltip
                     content={<ChartTooltipContent
@@ -318,8 +327,8 @@ export default function LocationSalaryRevenueChart({ selectedYear, selectedMonth
                         stackId="a" 
                         fill="var(--color-ft_salary_ratio_component)" 
                         name={chartConfig.ft_salary_ratio_component.label}
-                        radius={[4, 0, 0, 4]} // top-left, top-right, bottom-right, bottom-left
-                        barSize={Math.max(15, MIN_CATEGORY_HEIGHT * 0.6)} // Control bar thickness
+                        radius={[4, 0, 0, 4]} 
+                        barSize={Math.max(15, MIN_CATEGORY_HEIGHT * 0.6)} 
                     >
                         <LabelList 
                             dataKey="ft_salary_ratio_component" 
@@ -342,7 +351,7 @@ export default function LocationSalaryRevenueChart({ selectedYear, selectedMonth
                         />
                         <LabelList 
                             dataKey="total_ratio" 
-                            position="right" // For horizontal bars, "right" is outside end
+                            position="right" 
                             content={<CustomTotalLabel chartData={chartData}/>}
                         />
                     </Bar>
