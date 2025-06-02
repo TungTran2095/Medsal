@@ -589,9 +589,11 @@ export default function WorkspaceContent() {
                     <SalaryToRevenueRatioCard selectedMonths={selectedMonths} selectedYear={selectedYear} /> 
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {/*
                     <div className="md:col-span-1">
                         <MonthlySalaryTrendChart selectedYear={selectedYear} />
                     </div>
+                    */}
                     {/* Placeholder for the second chart if needed */}
                     {/* <div className="md:col-span-1 bg-card rounded-lg p-4 shadow-md">
                          <p className="text-center text-muted-foreground">Second Chart Area</p>
