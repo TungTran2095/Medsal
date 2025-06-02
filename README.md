@@ -90,31 +90,51 @@ $$;
 
 #### `get_monthly_salary_trend_fulltime`
 
-This function is used by the Payroll Dashboard to fetch the total salary (`tong_thu_nhap`) aggregated per month and year, for a given year. This is used to display the monthly salary trend. It now correctly parses text-based month columns (e.g., "Tháng 01") into integers.
+This function is used by the Payroll Dashboard to fetch the total salary (`tong_thu_nhap`) aggregated per month and year, for a given year. The X-axis of the chart will use the `Thang_x` column from your `time` table.
 
 **SQL Code:**
 ```sql
 CREATE OR REPLACE FUNCTION get_monthly_salary_trend_fulltime(
     p_filter_year INTEGER DEFAULT NULL
 )
-RETURNS TABLE(month INTEGER, year INTEGER, total_salary DOUBLE PRECISION)
+RETURNS TABLE(
+    month_label TEXT,  -- This will be time.Thang_x
+    year_val INTEGER,    -- This will be Fulltime.nam
+    total_salary DOUBLE PRECISION
+)
 LANGUAGE plpgsql
 AS $$
 BEGIN
+    -- IMPORTANT ASSUMPTIONS FOR THIS FUNCTION TO WORK:
+    -- 1. A table named "time" MUST exist in your database.
+    -- 2. The "time" table MUST have the following columns (or equivalents):
+    --    - A column for the numeric year, e.g., "year_numeric" (INTEGER). Used for joining with Fulltime.nam.
+    --    - A column for the numeric month (1-12), e.g., "month_numeric" (INTEGER). Used for joining with the parsed month from Fulltime.thang AND for sorting.
+    --    - The display column for the X-axis, named "Thang_x" (TEXT). This is what will be shown on the chart.
+    --    If your "time" table uses different column names, please update the JOIN clause below.
+
     RETURN QUERY
     SELECT
-        regexp_replace(f.thang, '\D', '', 'g')::INTEGER AS month, -- Extract numeric month
-        f.nam::INTEGER AS year,
+        t."Thang_x" AS month_label,         -- X-axis label from the "time" table
+        f.nam::INTEGER AS year_val,         -- Year from Fulltime table
         SUM(CAST(REPLACE(f.tong_thu_nhap::text, ',', '') AS DOUBLE PRECISION)) AS total_salary
-    FROM "Fulltime" f
-    WHERE (
-        p_filter_year IS NULL OR
-        f.nam::INTEGER = p_filter_year
-      )
-    GROUP BY f.nam, regexp_replace(f.thang, '\D', '', 'g') -- Group by the extracted numeric month
-    ORDER BY f.nam, month; -- Order by the extracted numeric month
+    FROM
+        "Fulltime" f
+    INNER JOIN
+        "time" t ON f.nam::INTEGER = t.year_numeric  -- ASSUMED column name in "time" table
+                 AND regexp_replace(f.thang, '\D', '', 'g')::INTEGER = t.month_numeric -- ASSUMED column name in "time" table
+    WHERE
+        (p_filter_year IS NULL OR f.nam::INTEGER = p_filter_year) -- Filter on Fulltime.nam
+    GROUP BY
+        f.nam::INTEGER,
+        t."Thang_x",
+        t.month_numeric -- Group also by numeric month from "time" table for ordering
+    ORDER BY
+        f.nam::INTEGER,
+        t.month_numeric; -- Order by year, then by the numeric month from "time" table for correct trend
 END;
 $$;
 ```
 
 Once these functions are successfully created (or updated) in your Supabase SQL Editor, the application should be able to correctly filter and aggregate data. If you continue to encounter "unterminated dollar-quoted string" errors, please double-check for any invisible characters or ensure the entire function block is being processed correctly by the SQL editor, especially ensuring no comments are between `END;` and the final `$$;`.
+Additionally, for the `get_monthly_salary_trend_fulltime` function, ensure you have a `time` table with appropriate columns (`year_numeric`, `month_numeric`, `Thang_x`) as described in the function's comments.

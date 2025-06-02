@@ -35,10 +35,10 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 interface MonthlyData {
-  month: number;
-  year: number;
+  month_label: string; // Will come from time.Thang_x
+  year_val: number;    // Will come from Fulltime.nam
   total_salary: number;
-  name: string;
+  name: string;        // This will be the actual X-axis dataKey value, derived from month_label
 }
 
 interface MonthlySalaryTrendChartProps {
@@ -66,7 +66,6 @@ export default function MonthlySalaryTrendChart({ selectedYear }: MonthlySalaryT
         rpcArgs.p_filter_year = selectedYear;
       }
 
-
       const functionName = 'get_monthly_salary_trend_fulltime';
       const { data, error: rpcError } = await supabase.rpc(
         functionName,
@@ -77,21 +76,30 @@ export default function MonthlySalaryTrendChart({ selectedYear }: MonthlySalaryT
         const rpcMessageText = rpcError.message ? String(rpcError.message).toLowerCase() : '';
 
         const isFunctionMissingError =
-          rpcError.code === '42883' ||
-          (rpcError.code === 'PGRST202' && rpcMessageText.includes(functionName.toLowerCase())) ||
-          (rpcMessageText.includes(functionName.toLowerCase()) && rpcMessageText.includes('does not exist'));
+          rpcError.code === '42883' || // undefined_function
+          (rpcError.code === 'PGRST202' && rpcMessageText.includes(functionName.toLowerCase())) || // PostgREST could not find the function
+          (rpcMessageText.includes(functionName.toLowerCase()) && rpcMessageText.includes('does not exist')) ||
+          rpcMessageText.includes('relation "time" does not exist'); // If time table is missing
 
         if (isFunctionMissingError) {
-          throw new Error(`${CRITICAL_SETUP_ERROR_PREFIX} Hàm RPC Supabase '${functionName}' bị thiếu. Biểu đồ này không thể hiển thị dữ liệu nếu không có nó. Vui lòng tạo hàm này trong SQL Editor của Supabase bằng script trong phần 'Required SQL Functions' của README.md.`);
+           let setupErrorMessage = `${CRITICAL_SETUP_ERROR_PREFIX} Hàm RPC Supabase '${functionName}' hoặc bảng 'time' phụ thuộc của nó bị thiếu hoặc cấu hình sai.`;
+           if (rpcMessageText.includes('relation "time" does not exist')) {
+            setupErrorMessage += " Cụ thể, bảng 'time' không tồn tại. Vui lòng tạo bảng này với các cột cần thiết (ví dụ: year_numeric, month_numeric, Thang_x).";
+           } else {
+            setupErrorMessage += " Vui lòng tạo/cập nhật hàm này trong SQL Editor của Supabase bằng script trong README.md và đảm bảo bảng 'time' tồn tại và có cấu trúc đúng.";
+           }
+           throw new Error(setupErrorMessage);
         }
         throw rpcError;
       }
 
       if (data) {
+        // Data from RPC: { month_label: string, year_val: number, total_salary: number }
         const formattedData = data.map((item: any) => ({
-          ...item,
-          name: `${String(item.month).padStart(2, '0')}/${item.year}`, 
+          month_label: item.month_label,
+          year_val: item.year_val,
           total_salary: Number(item.total_salary) || 0,
+          name: item.month_label, // Use Thang_x directly as the X-axis label
         }));
         setChartData(formattedData);
       } else {
@@ -145,7 +153,7 @@ export default function MonthlySalaryTrendChart({ selectedYear }: MonthlySalaryT
         <CardContent className="pt-2">
           {error.startsWith(CRITICAL_SETUP_ERROR_PREFIX) && (
             <p className="text-xs text-muted-foreground mt-1">
-              Vui lòng tham khảo tệp `README.md`, cụ thể là phần "Required SQL Functions", để biết hướng dẫn cách tạo hàm Supabase bị thiếu. Kiểm tra kỹ lỗi sao chép khi chạy SQL.
+              Vui lòng tham khảo tệp `README.md`, cụ thể là phần "Required SQL Functions", để biết hướng dẫn cách tạo/sửa hàm Supabase hoặc bảng `time` bị thiếu. Kiểm tra kỹ lỗi sao chép khi chạy SQL và đảm bảo bảng `time` được cấu hình đúng với các cột giả định (ví dụ: `year_numeric`, `month_numeric`, `Thang_x`).
             </p>
           )}
         </CardContent>
@@ -172,7 +180,7 @@ export default function MonthlySalaryTrendChart({ selectedYear }: MonthlySalaryT
       <CardHeader className="pb-2 pt-3">
         <CardTitle className="text-base font-semibold">Xu Hướng Lương Theo Tháng</CardTitle>
         <CardDescription className="text-xs">
-          Tổng lương ('tong_thu_nhap') mỗi tháng cho {filterDescription}.
+          Tổng lương ('tong_thu_nhap') mỗi tháng cho {filterDescription}. Trục X lấy từ cột 'Thang_x' của bảng 'time'.
         </CardDescription>
       </CardHeader>
       <CardContent className="pt-2">
@@ -181,7 +189,7 @@ export default function MonthlySalaryTrendChart({ selectedYear }: MonthlySalaryT
             <LineChart data={chartData} margin={{ top: 5, right: 20, left: -25, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis
-                dataKey="name"
+                dataKey="name" // 'name' is now directly item.month_label (time.Thang_x)
                 tickLine={false}
                 axisLine={false}
                 tickMargin={8}
@@ -197,12 +205,20 @@ export default function MonthlySalaryTrendChart({ selectedYear }: MonthlySalaryT
               <Tooltip
                 content={<ChartTooltipContent
                     indicator="line"
-                    formatter={(value) => {
-                        if (typeof value === 'number') {
-                           return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', minimumFractionDigits: 0, maximumFractionDigits: 0  }).format(value);
+                    formatter={(value, name, props) => { // name here is 'total_salary'
+                        const payloadValue = props.payload?.total_salary;
+                        if (typeof payloadValue === 'number') {
+                           return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', minimumFractionDigits: 0, maximumFractionDigits: 0  }).format(payloadValue);
                         }
                         return String(value);
                     }}
+                     labelFormatter={(label, payload) => { // label here is the value of XAxis dataKey ('name')
+                        if (payload && payload.length > 0 && payload[0].payload) {
+                          const year = payload[0].payload.year_val;
+                          return `${label}, ${year}`; // Display "Thang_x, YYYY"
+                        }
+                        return label;
+                      }}
                 />}
               />
               <Legend wrapperStyle={{ fontSize: '0.75rem' }} />
