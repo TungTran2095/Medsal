@@ -56,18 +56,19 @@ interface CombinedMonthlyTrendData {
   month_label: string;
   year_val: number;
   name: string;
-  totalRevenue?: number | null; // Allow null for data processing
-  totalCombinedSalary?: number | null; // Allow null for data processing
-  salaryRevenueRatio?: number | null; // Allow null for data processing
+  totalRevenue?: number | null; 
+  totalCombinedSalary?: number | null; 
+  salaryRevenueRatio?: number | null; 
 }
 
 interface CombinedMonthlyTrendChartProps {
   selectedYear?: number | null;
+  selectedMonths?: number[];
 }
 
 const CRITICAL_SETUP_ERROR_PREFIX = "LỖI CÀI ĐẶT QUAN TRỌNG:";
 
-export default function CombinedMonthlyTrendChart({ selectedYear }: CombinedMonthlyTrendChartProps) {
+export default function CombinedMonthlyTrendChart({ selectedYear, selectedMonths }: CombinedMonthlyTrendChartProps) {
   const [chartData, setChartData] = useState<CombinedMonthlyTrendData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -78,8 +79,22 @@ export default function CombinedMonthlyTrendChart({ selectedYear }: CombinedMont
     setError(null);
     setChartData([]);
 
-    const description = selectedYear ? `Năm ${selectedYear}` : "tất cả các năm có sẵn";
+    let description;
+    const yearPart = selectedYear ? `Năm ${selectedYear}` : "tất cả các năm có sẵn";
+    let monthPart = "tất cả các tháng"; 
+
+    if (selectedMonths && selectedMonths.length > 0) {
+        if (selectedMonths.length === 12) {
+            monthPart = "tất cả các tháng";
+        } else if (selectedMonths.length === 1) {
+            monthPart = `Tháng ${String(selectedMonths[0]).padStart(2, '0')}`;
+        } else {
+            monthPart = `các tháng ${selectedMonths.map(m => String(m).padStart(2, '0')).join(', ')}`;
+        }
+    }
+    description = `${monthPart} của ${yearPart}`;
     setFilterDescription(description);
+
 
     const rpcArgs = { p_filter_year: selectedYear };
     let errorsOccurred: string[] = [];
@@ -109,13 +124,13 @@ export default function CombinedMonthlyTrendChart({ selectedYear }: CombinedMont
           const rpcMessageText = rpcError?.message ? String(rpcError.message).toLowerCase() : '';
 
           let isCriticalSetupError =
-            rpcError?.code === '42883' || // undefined_function
+            rpcError?.code === '42883' || 
             (rpcError?.code === 'PGRST202' && rpcMessageText.includes(functionName.toLowerCase())) ||
             (rpcMessageText.includes(functionName.toLowerCase()) && rpcMessageText.includes('does not exist'));
 
           let setupErrorDetails = "";
-          let expectedNamColumn = 'nam'; // Default for Fulltime
-          let expectedThangColumn = 'thang'; // Default for Fulltime
+          let expectedNamColumn = 'nam'; 
+          let expectedThangColumn = 'thang'; 
           let expectedThangColumnExample = "'Tháng 01'";
 
           if (mainDataTableName === 'Parttime') {
@@ -235,7 +250,7 @@ export default function CombinedMonthlyTrendChart({ selectedYear }: CombinedMont
           salaryRevenueRatio: (item.totalRevenue && item.totalRevenue !== 0) ? (item.totalCombinedSalary || 0) / item.totalRevenue : null, 
         }));
 
-      const finalChartData = processedData
+      const baseSortedData = processedData
         .filter(item => {
           const isRevenuePresent = typeof item.totalRevenue === 'number' && item.totalRevenue !== 0;
           const isSalaryPresent = typeof item.totalCombinedSalary === 'number' && item.totalCombinedSalary !== 0;
@@ -251,10 +266,16 @@ export default function CombinedMonthlyTrendChart({ selectedYear }: CombinedMont
           return String(a.month_label).localeCompare(String(b.month_label));
         });
 
-
-      if (finalChartData.length > 0) {
-        setChartData(finalChartData);
+      let finalChartDataToDisplay = baseSortedData;
+      if (selectedMonths && selectedMonths.length > 0) {
+          finalChartDataToDisplay = baseSortedData.filter(item => {
+              const monthNumber = parseInt(String(item.month_label).replace(/\D/g, ''), 10);
+              return !isNaN(monthNumber) && selectedMonths.includes(monthNumber);
+          });
       }
+      
+      setChartData(finalChartDataToDisplay);
+
 
     } catch (err: any) {
       setError(err.message || 'Không thể xử lý dữ liệu xu hướng hàng tháng.');
@@ -262,7 +283,7 @@ export default function CombinedMonthlyTrendChart({ selectedYear }: CombinedMont
     } finally {
       setIsLoading(false);
     }
-  }, [selectedYear]);
+  }, [selectedYear, selectedMonths]);
 
   useEffect(() => {
     fetchData();
@@ -340,7 +361,7 @@ export default function CombinedMonthlyTrendChart({ selectedYear }: CombinedMont
       <CardHeader className="pb-2 pt-3">
         <CardTitle className="text-base font-semibold flex items-center gap-1.5"><LineChartIcon className="h-4 w-4" />Xu Hướng Doanh Thu, Lương & Tỷ Lệ</CardTitle>
         <CardDescription className="text-xs">
-          Doanh thu, tổng lương và tỷ lệ QL/DT mỗi tháng cho {filterDescription}.
+          Doanh thu, tổng lương và tỷ lệ QL/DT cho {filterDescription}.
         </CardDescription>
       </CardHeader>
       <CardContent className="pt-2">

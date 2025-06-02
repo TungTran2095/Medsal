@@ -131,7 +131,7 @@ export default function WorkspaceContent() {
             }
         } else {
             setSelectedYear(null); 
-            setAvailableYears([]); // ensure availableYears is also empty
+            setAvailableYears([]); 
         }
 
       } else {
@@ -646,7 +646,7 @@ export default function WorkspaceContent() {
                         <SalaryToRevenueRatioCard selectedMonths={selectedMonths} selectedYear={selectedYear} />
                     </div>
                     <div className="grid grid-cols-1 gap-3">
-                        <CombinedMonthlyTrendChart selectedYear={selectedYear} />
+                        <CombinedMonthlyTrendChart selectedYear={selectedYear} selectedMonths={selectedMonths} />
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <div className="md:col-span-1">
