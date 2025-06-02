@@ -19,7 +19,7 @@ import RevenueCard from '@/components/dashboard/RevenueCard';
 import SalaryToRevenueRatioCard from '@/components/dashboard/SalaryToRevenueRatioCard';
 import CombinedMonthlyTrendChart from '@/components/charts/MonthlySalaryTrendChart';
 import SalaryProportionPieChart from '@/components/charts/SalaryProportionPieChart';
-// Removed import for LocationSalaryRevenueRatioStackedBarChart
+import LocationSalaryRevenueColumnChart from '@/components/charts/LocationSalaryRevenueColumnChart';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -560,8 +560,13 @@ export default function WorkspaceContent() {
                     <div className="grid grid-cols-1 gap-3">
                         <CombinedMonthlyTrendChart selectedYear={selectedYear} />
                     </div>
-                    <div className="grid grid-cols-1 gap-3"> 
-                        <SalaryProportionPieChart selectedMonths={selectedMonths} selectedYear={selectedYear} />
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3"> 
+                        <div className="md:col-span-1">
+                           <SalaryProportionPieChart selectedMonths={selectedMonths} selectedYear={selectedYear} />
+                        </div>
+                        <div className="md:col-span-2">
+                           <LocationSalaryRevenueColumnChart selectedMonths={selectedMonths} selectedYear={selectedYear} />
+                        </div>
                     </div>
                   </TabsContent>
                   <TabsContent value="comparison" className="flex-grow overflow-y-auto space-y-3 mt-2">
