@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, ChevronDown, Filter } from "lucide-react";
+import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, ChevronDown, Filter as FilterIcon } from "lucide-react";
 import type { PayrollEntry } from '@/types';
 import { supabase } from '@/lib/supabaseClient';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -17,22 +17,17 @@ import TotalSalaryCard from '@/components/dashboard/TotalSalaryCard';
 import TotalSalaryParttimeCard from '@/components/dashboard/TotalSalaryParttimeCard';
 import RevenueCard from '@/components/dashboard/RevenueCard';
 import SalaryToRevenueRatioCard from '@/components/dashboard/SalaryToRevenueRatioCard';
-import CombinedMonthlyTrendChart from '@/components/charts/MonthlySalaryTrendChart'; // Renamed import for clarity, file still MonthlySalaryTrendChart.tsx
+import CombinedMonthlyTrendChart from '@/components/charts/MonthlySalaryTrendChart';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator as DMSR,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   SidebarProvider,
@@ -93,7 +88,7 @@ export default function WorkspaceContent() {
       const tablesToQuery = ['Fulltime', 'Parttime', 'Doanh_thu']; 
 
       for (const tableName of tablesToQuery) {
-        const { data, error } = await supabase.from(tableName).select('thang');
+        const { data, error } = await supabase.from(tableName).select('thang'); // Assuming 'thang' column exists and stores month info like "Tháng 01"
         if (error && !String(error.message).toLowerCase().includes(`relation "${tableName.toLowerCase()}" does not exist`)) {
            console.warn(`Error fetching months from ${tableName}:`, error);
         }
@@ -142,7 +137,7 @@ export default function WorkspaceContent() {
       const tablesToQuery = ['Fulltime', 'Parttime', 'Doanh_thu'];
 
       for (const tableName of tablesToQuery) {
-        const { data, error } = await supabase.from(tableName).select('nam');
+        const { data, error } = await supabase.from(tableName).select('nam'); // Assuming 'nam' column exists for year
         if (error && !String(error.message).toLowerCase().includes(`relation "${tableName.toLowerCase()}" does not exist`)) {
            console.warn(`Error fetching years from ${tableName}:`, error);
         }
@@ -270,16 +265,17 @@ export default function WorkspaceContent() {
 
         if (entry.pay_date) {
           const datePartsDMY = entry.pay_date.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
-          const datePartsMDY = entry.pay_date.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+          const datePartsMDY = entry.pay_date.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/); // M/D/YYYY or MM/DD/YYYY
           const dateISO = entry.pay_date.match(/^\d{4}-\d{2}-\d{2}/);
 
           if (dateISO) {
              payDateObj = new Date(entry.pay_date);
-          } else if (datePartsDMY) {
+          } else if (datePartsDMY) { // Assuming D/M/YYYY or DD/MM/YYYY
             payDateObj = new Date(parseInt(datePartsDMY[3]), parseInt(datePartsDMY[2]) - 1, parseInt(datePartsDMY[1]));
-          } else if (datePartsMDY) {
+          } else if (datePartsMDY) { // Assuming M/D/YYYY or MM/DD/YYYY
             payDateObj = new Date(parseInt(datePartsMDY[3]), parseInt(datePartsMDY[1]) - 1, parseInt(datePartsMDY[2]));
           } else {
+             // Try parsing directly, might work for some unambiguous formats or ISO-like without full dashes
              payDateObj = new Date(entry.pay_date);
           }
 
@@ -289,7 +285,7 @@ export default function WorkspaceContent() {
             nam = payDateObj.getFullYear();
           } else {
             console.warn(`Invalid date format for pay_date: ${entry.pay_date}. Setting thang and nam to null.`);
-            payDateObj = null;
+            payDateObj = null; // Ensure payDateObj is null if parsing fails
             thang = null;
             nam = null;
           }
@@ -299,7 +295,7 @@ export default function WorkspaceContent() {
           employee_id: entry.employee_id,
           employee_name: entry.employee_name,
           tong_thu_nhap: entry.salary, 
-          pay_date: payDateObj ? payDateObj.toISOString().split('T')[0] : null,
+          pay_date: payDateObj ? payDateObj.toISOString().split('T')[0] : null, // Store as YYYY-MM-DD or null
           thang: thang,
           nam: nam,
         };
@@ -323,6 +319,7 @@ export default function WorkspaceContent() {
       const fileInput = document.getElementById('payroll-csv-input') as HTMLInputElement;
       if (fileInput) fileInput.value = '';
       
+      // Refresh dashboard filters if on dashboard view
       if (activeView === 'dashboard') {
           fetchDistinctMonths();
           fetchDistinctYears();
@@ -352,16 +349,23 @@ export default function WorkspaceContent() {
     });
   };
 
-  const getSelectedMonthsText = () => {
-    if (isLoadingMonths) return "Đang tải tháng...";
-    if (selectedMonths.length === 0 || selectedMonths.length === availableMonths.length) {
-      return "Tất cả các tháng";
-    }
-    if (selectedMonths.length === 1) {
+  const getFilterButtonLabel = () => {
+    const yearText = selectedYear ? `Năm ${selectedYear}` : "Tất cả năm";
+    
+    let monthText;
+    if (isLoadingMonths && !availableMonths.length) {
+      monthText = "Đang tải tháng...";
+    } else if (!availableMonths.length) {
+      monthText = "Không có tháng";
+    } else if (selectedMonths.length === 0 || selectedMonths.length === availableMonths.length) {
+      monthText = "Tất cả tháng";
+    } else if (selectedMonths.length === 1) {
       const month = availableMonths.find(m => m.value === selectedMonths[0]);
-      return month ? month.label : "1 tháng đã chọn";
+      monthText = month ? month.label : "1 tháng";
+    } else {
+      monthText = `${selectedMonths.length} tháng`;
     }
-    return `${selectedMonths.length} tháng đã chọn`;
+    return `${yearText} - ${monthText}`;
   };
 
 
@@ -521,63 +525,66 @@ export default function WorkspaceContent() {
                   <div className="flex items-center gap-2 mt-2 sm:mt-0">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="outline" className="h-9 text-sm min-w-[150px] justify-between">
-                          <div className="flex items-center gap-1.5">
-                            <Filter className="h-3.5 w-3.5 opacity-80" />
-                            <span>{getSelectedMonthsText()}</span>
+                        <Button variant="outline" className="h-9 text-sm min-w-[200px] justify-between px-3">
+                          <div className="flex items-center gap-1.5 truncate">
+                            <FilterIcon className="h-3.5 w-3.5 opacity-80 shrink-0" />
+                            <span className="truncate" title={getFilterButtonLabel()}>{getFilterButtonLabel()}</span>
                           </div>
-                          <ChevronDown className="ml-2 h-4 w-4 opacity-50" />
+                          <ChevronDown className="ml-1 h-4 w-4 opacity-50 shrink-0" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent className="w-[200px]" align="end">
-                        <DropdownMenuLabel>Chọn Tháng</DropdownMenuLabel>
+                      <DropdownMenuContent className="w-[280px]" align="end">
+                        <DropdownMenuLabel className="text-sm">Chọn Năm</DropdownMenuLabel>
                         <DMSR />
-                        {isLoadingMonths ? (
+                        <DropdownMenuRadioGroup
+                          value={selectedYear === null ? "all" : String(selectedYear)}
+                          onValueChange={(value) => {
+                            setSelectedYear(value === "all" ? null : parseInt(value));
+                          }}
+                          className="p-1"
+                        >
+                          <DropdownMenuRadioItem value="all" disabled={isLoadingYears} className="text-xs">
+                            Tất cả các năm
+                          </DropdownMenuRadioItem>
+                          {isLoadingYears && availableYears.length === 0 && (
+                             <div className="px-2 py-1.5 text-xs text-muted-foreground">Đang tải năm...</div>
+                          )}
+                          {!isLoadingYears && availableYears.length === 0 && (
+                            <div className="px-2 py-1.5 text-xs text-muted-foreground">Không có dữ liệu năm.</div>
+                          )}
+                          {availableYears.map((year) => (
+                            <DropdownMenuRadioItem key={year} value={String(year)} className="text-xs">
+                              Năm {year}
+                            </DropdownMenuRadioItem>
+                          ))}
+                        </DropdownMenuRadioGroup>
+                        
+                        <DMSR />
+                        <DropdownMenuLabel className="text-sm">Chọn Tháng</DropdownMenuLabel>
+                        <DMSR />
+                        {isLoadingMonths && availableMonths.length === 0 ? (
                           <div className="px-2 py-1.5 text-xs text-muted-foreground">Đang tải tháng...</div>
-                        ) : availableMonths.length === 0 ? (
-                          <div className="px-2 py-1.5 text-xs text-muted-foreground">Không có tháng.</div>
+                        ) : !isLoadingMonths && availableMonths.length === 0 ? (
+                          <div className="px-2 py-1.5 text-xs text-muted-foreground">Không có dữ liệu tháng.</div>
                         ) : (
                           <ScrollArea className="max-h-[200px]">
                             <div className="p-1">
-                            {availableMonths.map((month) => (
-                              <DropdownMenuCheckboxItem
-                                key={month.value}
-                                checked={selectedMonths.includes(month.value)}
-                                onCheckedChange={(checked) => handleMonthSelection(month.value, checked as boolean)}
-                                className="text-xs"
-                              >
-                                {month.label}
-                              </DropdownMenuCheckboxItem>
-                            ))}
+                              {availableMonths.map((month) => (
+                                <DropdownMenuCheckboxItem
+                                  key={month.value}
+                                  checked={selectedMonths.includes(month.value)}
+                                  onCheckedChange={(checked) => handleMonthSelection(month.value, checked as boolean)}
+                                  disabled={isLoadingMonths}
+                                  className="text-xs"
+                                >
+                                  {month.label}
+                                </DropdownMenuCheckboxItem>
+                              ))}
                             </div>
                           </ScrollArea>
                         )}
                       </DropdownMenuContent>
                     </DropdownMenu>
-
-                    <Select
-                      value={selectedYear !== null ? selectedYear.toString() : "all"}
-                      onValueChange={(value) => setSelectedYear(value === "all" ? null : parseInt(value))}
-                      disabled={isLoadingYears}
-                    >
-                      <SelectTrigger className="h-9 text-sm min-w-[120px]">
-                        <div className="flex items-center gap-1.5">
-                           <Filter className="h-3.5 w-3.5 opacity-80" />
-                           <SelectValue placeholder={isLoadingYears ? "Đang tải năm..." : "Chọn Năm"} />
-                        </div>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all" className="text-xs">Tất cả các năm</SelectItem>
-                        {availableYears.map((year) => (
-                          <SelectItem key={year} value={String(year)} className="text-xs">
-                            Năm {year}
-                          </SelectItem>
-                        ))}
-                         {availableYears.length === 0 && !isLoadingYears && (
-                            <div className="px-2 py-1.5 text-xs text-muted-foreground text-center">Không có năm.</div>
-                        )}
-                      </SelectContent>
-                    </Select>
                   </div>
                 </div>
               </CardHeader>
@@ -589,6 +596,7 @@ export default function WorkspaceContent() {
                     <SalaryToRevenueRatioCard selectedMonths={selectedMonths} selectedYear={selectedYear} /> 
                 </div>
                 <div className="grid grid-cols-1 gap-3">
+                    {/* Render CombinedMonthlyTrendChart only if activeView is dashboard, and it's not commented out */}
                     <CombinedMonthlyTrendChart selectedYear={selectedYear} />
                 </div>
               </CardContent>
