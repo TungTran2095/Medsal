@@ -44,12 +44,12 @@ interface LocationSalaryRevenueChartProps {
 const chartConfig = {
   ft_salary_ratio_component: {
     label: 'Lương FT / Doanh Thu',
-    color: 'hsl(var(--chart-4))',
+    color: 'hsl(var(--chart-1))', // Changed from --chart-4 to --chart-1 (purple)
     icon: TrendingUp,
   },
   pt_salary_ratio_component: {
     label: 'Lương PT / Doanh Thu',
-    color: 'hsl(var(--chart-5))',
+    color: 'hsl(var(--chart-2))', // Changed from --chart-5 to --chart-2 (orange)
     icon: Percent,
   },
 } satisfies ChartConfig;
@@ -193,7 +193,9 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
       return 0.1; 
     }
     const maxRatioInData = Math.max(0.01, ...chartData.map(item => item.total_ratio));
-    const dataEndTick = Math.max(0.1, Math.ceil(maxRatioInData * 20) / 20);
+    const dataEndTick = Math.max(0.1, Math.ceil(maxRatioInData * 20) / 20); // Rounds up to nearest 0.05
+    // Add some padding to the domain max for the total label to fit.
+    // Ensure it doesn't exceed 1.6 (160%) to avoid extreme scales.
     const finalDomain = Math.min(1.6, dataEndTick + Math.max(0.05, dataEndTick * 0.15));
     return finalDomain;
   }, [chartData]);
