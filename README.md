@@ -88,21 +88,21 @@ AS $$
 $$;
 ```
 
-#### `get_employee_count_fulltime`
+#### `get_total_revenue`
 
-This function is used by the Payroll Dashboard to count the number of unique employees from the `Fulltime` table, with optional filters for a selected year and an array of months. It correctly parses text-based month columns (e.g., "Tháng 01") into integers.
+This function is used by the Payroll Dashboard to calculate the total sum of "Kỳ báo cáo" from the "Doanh_thu" table, with optional filters for a selected year and an array of months. It assumes "Doanh_thu" table has `nam` (integer) and `thang` (text, e.g., "Tháng 01") columns for filtering.
 
 **SQL Code:**
 ```sql
-CREATE OR REPLACE FUNCTION get_employee_count_fulltime(
+CREATE OR REPLACE FUNCTION get_total_revenue(
     filter_year INTEGER DEFAULT NULL,
     filter_months INTEGER[] DEFAULT NULL
 )
-RETURNS INTEGER
+RETURNS DOUBLE PRECISION
 LANGUAGE SQL
 AS $$
-  SELECT COUNT(DISTINCT employee_id)::INTEGER
-  FROM "Fulltime"
+  SELECT SUM(CAST(REPLACE("Kỳ báo cáo"::text, ',', '') AS DOUBLE PRECISION))
+  FROM "Doanh_thu"
   WHERE (filter_year IS NULL OR nam::INTEGER = filter_year)
     AND (
         filter_months IS NULL OR

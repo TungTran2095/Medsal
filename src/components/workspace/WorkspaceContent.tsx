@@ -14,8 +14,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import SupabaseTableList from './SupabaseTableList';
 import { Separator } from '@/components/ui/separator';
 import TotalSalaryCard from '@/components/dashboard/TotalSalaryCard';
-import TotalSalaryParttimeCard from '@/components/dashboard/TotalSalaryParttimeCard'; // Added import
-import EmployeeCountCard from '@/components/dashboard/EmployeeCountCard';
+import TotalSalaryParttimeCard from '@/components/dashboard/TotalSalaryParttimeCard';
+import RevenueCard from '@/components/dashboard/RevenueCard'; // Added import
 import MonthlySalaryTrendChart from '@/components/charts/MonthlySalaryTrendChart';
 import {
   DropdownMenu,
@@ -89,32 +89,24 @@ export default function WorkspaceContent() {
     if (activeView !== 'dashboard') return;
     setIsLoadingMonths(true);
     try {
-      // Attempt to fetch from Fulltime first, then Parttime if Fulltime has no months
-      let monthsData = [];
-      const { data: fulltimeData, error: fulltimeError } = await supabase.from('Fulltime').select('thang');
-      if (fulltimeError && !String(fulltimeError.message).includes('relation "Fulltime" does not exist')) {
-         // Log or handle specific error for Fulltime if it's not just "table does not exist"
-         console.warn("Error fetching months from Fulltime:", fulltimeError);
-      }
-      if (fulltimeData && fulltimeData.length > 0) {
-        monthsData.push(...fulltimeData.map(item => item.thang));
-      }
+      let monthsData: string[] = [];
+      const tablesToQuery = ['Fulltime', 'Parttime', 'Doanh_thu']; 
 
-      const { data: parttimeData, error: parttimeError } = await supabase.from('Parttime').select('thang');
-       if (parttimeError && !String(parttimeError.message).includes('relation "Parttime" does not exist')) {
-         console.warn("Error fetching months from Parttime:", parttimeError);
+      for (const tableName of tablesToQuery) {
+        const { data, error } = await supabase.from(tableName).select('thang');
+        if (error && !String(error.message).toLowerCase().includes(`relation "${tableName.toLowerCase()}" does not exist`)) {
+           console.warn(`Error fetching months from ${tableName}:`, error);
+        }
+        if (data && data.length > 0) {
+          monthsData.push(...data.map(item => item.thang).filter(thang => thang !== null && thang !== undefined) as string[]);
+        }
       }
-      if (parttimeData && parttimeData.length > 0) {
-        monthsData.push(...parttimeData.map(item => item.thang));
-      }
-
-
+      
       if (monthsData.length > 0) {
         const monthSet = new Set<number>();
         monthsData.forEach(thangValue => {
-          if (thangValue === null || thangValue === undefined) return;
           const monthStr = String(thangValue).trim();
-          const numericPart = monthStr.replace(/\D/g, ''); // Remove non-digits
+          const numericPart = monthStr.replace(/\D/g, ''); 
           if (numericPart) {
             const monthNum = parseInt(numericPart, 10);
             if (!isNaN(monthNum) && monthNum >= 1 && monthNum <= 12) {
@@ -146,34 +138,29 @@ export default function WorkspaceContent() {
     if (activeView !== 'dashboard') return;
     setIsLoadingYears(true);
     try {
-      let yearsData = [];
-      const { data: fulltimeData, error: fulltimeError } = await supabase.from('Fulltime').select('nam');
-       if (fulltimeError && !String(fulltimeError.message).includes('relation "Fulltime" does not exist')) {
-         console.warn("Error fetching years from Fulltime:", fulltimeError);
-      }
-      if (fulltimeData && fulltimeData.length > 0) {
-        yearsData.push(...fulltimeData.map(item => item.nam));
-      }
+      let yearsData: (number | string)[] = [];
+      const tablesToQuery = ['Fulltime', 'Parttime', 'Doanh_thu'];
 
-      const { data: parttimeData, error: parttimeError } = await supabase.from('Parttime').select('nam');
-      if (parttimeError && !String(parttimeError.message).includes('relation "Parttime" does not exist')) {
-         console.warn("Error fetching years from Parttime:", parttimeError);
+      for (const tableName of tablesToQuery) {
+        const { data, error } = await supabase.from(tableName).select('nam');
+        if (error && !String(error.message).toLowerCase().includes(`relation "${tableName.toLowerCase()}" does not exist`)) {
+           console.warn(`Error fetching years from ${tableName}:`, error);
+        }
+        if (data && data.length > 0) {
+          yearsData.push(...data.map(item => item.nam).filter(nam => nam !== null && nam !== undefined));
+        }
       }
-      if (parttimeData && parttimeData.length > 0) {
-        yearsData.push(...parttimeData.map(item => item.nam));
-      }
-
 
       if (yearsData.length > 0) {
         const yearSet = new Set<number>();
         yearsData.forEach(namValue => {
-          if (namValue !== null && namValue !== undefined && !isNaN(Number(namValue))) {
+          if (!isNaN(Number(namValue))) {
             yearSet.add(Number(namValue));
           }
         });
-        const sortedYears = Array.from(yearSet).sort((a, b) => b - a); // Sort descending
+        const sortedYears = Array.from(yearSet).sort((a, b) => b - a); 
         setAvailableYears(sortedYears);
-        if (sortedYears.length > 0 && selectedYear === null) { // Set default selected year only if not already set
+        if (sortedYears.length > 0 && selectedYear === null) { 
             setSelectedYear(sortedYears[0]);
         }
       } else {
@@ -311,7 +298,7 @@ export default function WorkspaceContent() {
         return {
           employee_id: entry.employee_id,
           employee_name: entry.employee_name,
-          tong_thu_nhap: entry.salary, // This is the 'salary' from CSV, mapped to 'tong_thu_nhap'
+          tong_thu_nhap: entry.salary, 
           pay_date: payDateObj ? payDateObj.toISOString().split('T')[0] : null,
           thang: thang,
           nam: nam,
@@ -320,7 +307,7 @@ export default function WorkspaceContent() {
 
 
       const { error } = await supabase
-        .from('Fulltime') // Assuming CSV uploads go to Fulltime, adjust if needed for Parttime
+        .from('Fulltime') 
         .insert(dataToUpload);
 
       if (error) {
@@ -335,7 +322,7 @@ export default function WorkspaceContent() {
       setSelectedFile(null);
       const fileInput = document.getElementById('payroll-csv-input') as HTMLInputElement;
       if (fileInput) fileInput.value = '';
-      // Refresh filter options after upload
+      
       if (activeView === 'dashboard') {
           fetchDistinctMonths();
           fetchDistinctYears();
@@ -525,14 +512,13 @@ export default function WorkspaceContent() {
                   <div className="flex-1">
                     <CardTitle className="text-lg font-semibold text-primary flex items-center gap-1.5">
                       <LayoutDashboard className="h-5 w-5" />
-                      Bảng Điều Khiển Lương
+                      Bảng Điều Khiển Lương & Doanh Thu
                     </CardTitle>
                     <CardDescription className="text-xs text-muted-foreground mt-0.5">
-                      Phân tích và tổng quan dữ liệu lương từ bảng 'Fulltime' và 'Parttime'.
+                      Phân tích và tổng quan dữ liệu từ các bảng 'Fulltime', 'Parttime', và 'Doanh_thu'.
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-2 mt-2 sm:mt-0">
-                     {/* Month Filter */}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="outline" className="h-9 text-sm min-w-[150px] justify-between">
@@ -569,7 +555,6 @@ export default function WorkspaceContent() {
                       </DropdownMenuContent>
                     </DropdownMenu>
 
-                    {/* Year Filter */}
                     <Select
                       value={selectedYear !== null ? selectedYear.toString() : "all"}
                       onValueChange={(value) => setSelectedYear(value === "all" ? null : parseInt(value))}
@@ -600,8 +585,7 @@ export default function WorkspaceContent() {
                 <div className="grid gap-3 md:grid-cols-4">
                     <TotalSalaryCard selectedMonths={selectedMonths} selectedYear={selectedYear} />
                     <TotalSalaryParttimeCard selectedMonths={selectedMonths} selectedYear={selectedYear} />
-                    <EmployeeCountCard selectedMonths={selectedMonths} selectedYear={selectedYear} />
-                    {/* Add one more placeholder card or actual card here for a 4-column layout */}
+                    <RevenueCard selectedMonths={selectedMonths} selectedYear={selectedYear} />
                 </div>
                 <div className="mt-0">
                     <MonthlySalaryTrendChart selectedYear={selectedYear} />
@@ -614,4 +598,3 @@ export default function WorkspaceContent() {
     </SidebarProvider>
   );
 }
-
