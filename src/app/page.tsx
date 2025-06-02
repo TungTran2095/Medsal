@@ -24,7 +24,7 @@ export default function DashboardPage() {
     setMessages([
       {
         id: 'welcome-' + Date.now(),
-        text: "Hello! I'm your AI Echo. Ask me anything or request data from your database!",
+        text: "Xin chào! Tôi là Echo, trợ lý AI của bạn. Hãy hỏi tôi bất cứ điều gì hoặc yêu cầu dữ liệu từ cơ sở dữ liệu của bạn nhé!",
         sender: 'ai',
         timestamp: Date.now(),
       },
@@ -150,3 +150,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+

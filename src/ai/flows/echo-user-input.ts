@@ -37,7 +37,8 @@ const prompt = ai.definePrompt({
   input: {schema: EchoUserInputInputSchema},
   output: {schema: EchoUserInputOutputSchema},
   tools: [querySupabaseTableTool],
-  prompt: `You are a helpful and friendly AI assistant named Echo.
+  prompt: `You are a helpful and friendly AI assistant named Echo. Your primary language for responses MUST BE VIETNAMESE.
+Bạn PHẢI LUÔN LUÔN trả lời bằng tiếng Việt, ngay cả khi người dùng hỏi bằng ngôn ngữ khác.
 Your goal is to assist the user with their questions and tasks.
 Use the previous context to maintain a natural conversation flow.
 
