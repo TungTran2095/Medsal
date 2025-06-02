@@ -20,8 +20,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
+  ChartContainer,
   ChartTooltipContent,
-} from '@/components/ui/chart'; // Assuming ChartTooltipContent can be reused/adapted
+  type ChartConfig,
+} from '@/components/ui/chart';
 
 interface SalaryProportionPieChartProps {
   selectedMonths?: number[];
@@ -39,7 +41,18 @@ interface FetchError {
   message: string;
 }
 
-const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))']; // Colors for Full-time and Part-time
+const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))']; 
+
+const pieChartConfig = {
+  "Lương Full-time": {
+    label: "Lương Full-time",
+    color: COLORS[0],
+  },
+  "Lương Part-time": {
+    label: "Lương Part-time",
+    color: COLORS[1],
+  },
+} satisfies ChartConfig;
 
 export default function SalaryProportionPieChart({ selectedMonths, selectedYear }: SalaryProportionPieChartProps) {
   const [pieData, setPieData] = useState<PieDataEntry[]>([]);
@@ -123,13 +136,12 @@ export default function SalaryProportionPieChart({ selectedMonths, selectedYear 
       }
 
       if (ftSal === 0 && ptSal === 0) {
-        // Both are zero, so pie chart will be empty or show "no data"
         setPieData([]);
       } else {
         setPieData([
           { name: 'Lương Full-time', value: ftSal, color: COLORS[0] },
           { name: 'Lương Part-time', value: ptSal, color: COLORS[1] },
-        ].filter(entry => entry.value > 0)); // Only include segments with value > 0 for cleaner pie
+        ].filter(entry => entry.value > 0)); 
       }
 
     } catch (err: any) {
@@ -146,7 +158,7 @@ export default function SalaryProportionPieChart({ selectedMonths, selectedYear 
   
   const RADIAN = Math.PI / 180;
   const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name, value }: any) => {
-    if (percent < 0.05) return null; // Don't render label for very small slices
+    if (percent < 0.05) return null; 
     const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
     const x = cx + radius * Math.cos(-midAngle * RADIAN);
     const y = cy + radius * Math.sin(-midAngle * RADIAN);
@@ -217,46 +229,49 @@ export default function SalaryProportionPieChart({ selectedMonths, selectedYear 
         </CardDescription>
       </CardHeader>
       <CardContent className="pt-0 -mt-2">
-        <ResponsiveContainer width="100%" height={280}>
-          <PieChart>
-            <Pie
-              data={pieData}
-              cx="50%"
-              cy="50%"
-              labelLine={false}
-              label={renderCustomizedLabel}
-              outerRadius={100}
-              innerRadius={50}
-              fill="#8884d8"
-              dataKey="value"
-              nameKey="name"
-              paddingAngle={2}
-            >
-              {pieData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={entry.color} stroke={entry.color} />
-              ))}
-            </Pie>
-            <Tooltip
-              content={<ChartTooltipContent
-                formatter={(value, name, props) => {
-                    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value as number);
+        <ChartContainer config={pieChartConfig} className="aspect-auto h-[280px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={pieData}
+                cx="50%"
+                cy="50%"
+                labelLine={false}
+                label={renderCustomizedLabel}
+                outerRadius={100}
+                innerRadius={50}
+                fill="#8884d8"
+                dataKey="value"
+                nameKey="name"
+                paddingAngle={2}
+              >
+                {pieData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.color} stroke={entry.color} />
+                ))}
+              </Pie>
+              <Tooltip
+                content={<ChartTooltipContent
+                    nameKey="name"
+                    formatter={(value, name, props) => {
+                        return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value as number);
+                    }}
+                    indicator="dot"
+                   />}
+              />
+              <Legend
+                verticalAlign="bottom"
+                height={36}
+                iconSize={10}
+                formatter={(value, entry) => {
+                  const { color } = entry;
+                  return <span style={{ color }} className="text-xs">{value}</span>;
                 }}
-                labelFormatter={(label, payload) => (payload && payload.length > 0 && payload[0].name) ? `${payload[0].name}` : label}
-                indicator="dot"
-               />}
-            />
-            <Legend
-              verticalAlign="bottom"
-              height={36}
-              iconSize={10}
-              formatter={(value, entry) => {
-                const { color } = entry;
-                return <span style={{ color }} className="text-xs">{value}</span>;
-              }}
-            />
-          </PieChart>
-        </ResponsiveContainer>
+              />
+            </PieChart>
+          </ResponsiveContainer>
+        </ChartContainer>
       </CardContent>
     </Card>
   );
 }
+
