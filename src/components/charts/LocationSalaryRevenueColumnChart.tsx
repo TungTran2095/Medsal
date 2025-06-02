@@ -8,7 +8,7 @@ import {
   BarChart,
   Bar,
   XAxis,
-  // YAxis, // YAxis is intentionally removed
+  YAxis, // Import YAxis
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
@@ -54,19 +54,17 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-const MIN_CATEGORY_WIDTH = 50; // Min width for each location column
+const MIN_CATEGORY_WIDTH = 50; 
 const CRITICAL_SETUP_ERROR_PREFIX = "LỖI CÀI ĐẶT QUAN TRỌNG:";
 
 
-// Custom label for segments (optional, if needed for specific styling)
 const CustomSegmentLabel = (props: any) => {
   const { x, y, width, height, value } = props;
-  if (value === 0 || value === null || value === undefined) return null; // Don't render label for 0 or null/undefined
+  if (value === 0 || value === null || value === undefined) return null;
 
   const formattedValue = `${(value * 100).toFixed(0)}%`;
-  // Basic check to avoid rendering label in very small segments
-  const textHeight = 10; // Approximate height of the text
-  if (height < textHeight + 4) return null; // +4 for some padding
+  const textHeight = 10; 
+  if (height < textHeight + 4) return null;
 
   return (
     <text x={x + width / 2} y={y + height / 2} fill="hsl(var(--primary-foreground))" textAnchor="middle" dominantBaseline="middle" fontSize="9">
@@ -75,7 +73,6 @@ const CustomSegmentLabel = (props: any) => {
   );
 };
 
-// Custom label for the total on top of the stacked bar
 const CustomTotalLabel = (props: any) => {
   const { x, y, width, value, index, chartData } = props; 
   
@@ -83,7 +80,7 @@ const CustomTotalLabel = (props: any) => {
   if (!currentDataPoint || currentDataPoint.total_ratio === null || currentDataPoint.total_ratio === undefined) return null;
 
   const totalValue = currentDataPoint.total_ratio;
-  if (totalValue === 0 && currentDataPoint.ft_salary_ratio_component === 0 && currentDataPoint.pt_salary_ratio_component === 0) return null; // Hide if all components are zero
+  if (totalValue === 0 && currentDataPoint.ft_salary_ratio_component === 0 && currentDataPoint.pt_salary_ratio_component === 0) return null;
 
   return (
     <text x={x + width / 2} y={y - 5} fill="hsl(var(--foreground))" textAnchor="middle" dominantBaseline="auto" fontSize="10" fontWeight="500">
@@ -102,7 +99,6 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
-    // setChartData([]); // Clear previous data immediately for better UX if needed, or let it persist until new data arrives
 
     let description;
     let yearDesc = selectedYear ? `Năm ${selectedYear}` : "Tất cả các năm";
@@ -173,6 +169,17 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
 
   const barChartMarginBottom = chartData.length > 7 ? 35 : 25;
 
+  const yAxisDomainMax = useMemo(() => {
+    if (!chartData || chartData.length === 0) {
+      return 0.1; // Default to a small positive value if no data, e.g., 10%
+    }
+    const maxRatio = Math.max(...chartData.map(item => item.total_ratio));
+    // Ensure the domain is at least, say, 0.1 (10%) or slightly above the max ratio
+    // Add some padding (e.g., 10% of maxRatio or a fixed 0.05)
+    const paddedMax = maxRatio * 1.1;
+    return Math.max(0.1, Math.ceil(paddedMax * 20) / 20); // Round up to nearest 0.05, ensure at least 0.1
+  }, [chartData]);
+
 
   if (isLoading) {
     return (
@@ -232,13 +239,13 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
           Tỷ lệ (Lương FT + Lương PT) / Doanh thu cho mỗi địa điểm. Sắp xếp từ cao đến thấp. Cho: {filterDescription}.
         </CardDescription>
       </CardHeader>
-      <CardContent className="pt-2 flex-grow overflow-hidden"> {/* Ensures CardContent takes up remaining space and hides its own overflow */}
-         <ScrollArea className="h-full w-full"> {/* ScrollArea will fill CardContent */}
-            <ChartContainer config={chartConfig} className="h-full min-h-[270px]" style={{ width: `${chartContainerWidth}px`}}> {/* ChartContainer defines scrollable content width and ensures min height */}
+      <CardContent className="pt-2 flex-grow overflow-hidden">
+         <ScrollArea className="h-full w-full">
+            <ChartContainer config={chartConfig} className="h-full min-h-[270px]" style={{ width: `${chartContainerWidth}px`}}>
                 <ResponsiveContainer width="100%" height="100%">
                 <BarChart 
                     data={chartData} 
-                    margin={{ top: 15, right: 10, left: 0, bottom: barChartMarginBottom }} // Reduced top margin
+                    margin={{ top: 15, right: 10, left: 0, bottom: barChartMarginBottom }}
                     barCategoryGap="15%"
                 >
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -252,7 +259,7 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
                         textAnchor={chartData.length > 7 ? "end" : "middle"}
                         interval={0} 
                     />
-                    {/* YAxis removed */}
+                    <YAxis hide={true} domain={[0, yAxisDomainMax]} />
                     <Tooltip
                     content={<ChartTooltipContent
                         formatter={(value, name, props) => {
@@ -276,8 +283,8 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
                     />
                     <Legend
                         verticalAlign="top"
-                        height={30} // Standard height for legend
-                        wrapperStyle={{paddingBottom: "5px"}} // Add some space below legend
+                        height={30}
+                        wrapperStyle={{paddingBottom: "5px"}}
                         content={({ payload }) => (
                             <div className="flex items-center justify-center gap-2 mb-1 flex-wrap">
                             {payload?.sort((a,b) => (a.dataKey === 'ft_salary_ratio_component' ? -1 : 1))
