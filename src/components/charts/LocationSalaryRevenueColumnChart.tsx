@@ -8,7 +8,7 @@ import {
   BarChart,
   Bar,
   XAxis,
-  YAxis,
+  // YAxis, // YAxis is intentionally removed
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
@@ -64,10 +64,9 @@ const CustomSegmentLabel = (props: any) => {
   if (value === 0 || value === null || value === undefined) return null; // Don't render label for 0 or null/undefined
 
   const formattedValue = `${(value * 100).toFixed(0)}%`;
-  const textWidth = formattedValue.length * 5; // Rough estimate
-  const textHeight = 10;
-
-  if (width < textWidth || height < textHeight) return null; // Don't render if too small
+  // Basic check to avoid rendering label in very small segments
+  const textHeight = 10; // Approximate height of the text
+  if (height < textHeight + 4) return null; // +4 for some padding
 
   return (
     <text x={x + width / 2} y={y + height / 2} fill="hsl(var(--primary-foreground))" textAnchor="middle" dominantBaseline="middle" fontSize="9">
@@ -78,15 +77,13 @@ const CustomSegmentLabel = (props: any) => {
 
 // Custom label for the total on top of the stacked bar
 const CustomTotalLabel = (props: any) => {
-  const { x, y, width, value, index, chartData } = props; // \`value\` here is from the specific bar segment LabelList is attached to
+  const { x, y, width, value, index, chartData } = props; 
   
-  // We need to get the total_ratio for this specific bar
   const currentDataPoint = chartData[index];
   if (!currentDataPoint || currentDataPoint.total_ratio === null || currentDataPoint.total_ratio === undefined) return null;
 
   const totalValue = currentDataPoint.total_ratio;
-  if (totalValue === 0) return null;
-
+  if (totalValue === 0 && currentDataPoint.ft_salary_ratio_component === 0 && currentDataPoint.pt_salary_ratio_component === 0) return null; // Hide if all components are zero
 
   return (
     <text x={x + width / 2} y={y - 5} fill="hsl(var(--foreground))" textAnchor="middle" dominantBaseline="auto" fontSize="10" fontWeight="500">
@@ -105,7 +102,7 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
-    setChartData([]);
+    // setChartData([]); // Clear previous data immediately for better UX if needed, or let it persist until new data arrives
 
     let description;
     let yearDesc = selectedYear ? `Năm ${selectedYear}` : "Tất cả các năm";
@@ -130,7 +127,7 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
       if (rpcError) {
         const rpcMessageText = rpcError.message ? String(rpcError.message).toLowerCase() : '';
         let isCriticalSetupError =
-            rpcError.code === '42883' || // undefined_function
+            rpcError.code === '42883' || 
             (rpcError.code === 'PGRST202' && rpcMessageText.includes(functionName.toLowerCase())) ||
             (rpcMessageText.includes(functionName.toLowerCase()) && rpcMessageText.includes('does not exist'));
         
@@ -138,7 +135,6 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
         if (rpcMessageText.includes('relation "fulltime" does not exist')) { setupErrorDetails += " Bảng 'Fulltime' không tồn tại."; isCriticalSetupError = true; }
         if (rpcMessageText.includes('relation "parttime" does not exist')) { setupErrorDetails += " Bảng 'Parttime' không tồn tại."; isCriticalSetupError = true; }
         if (rpcMessageText.includes('relation "doanh_thu" does not exist')) { setupErrorDetails += " Bảng 'Doanh_thu' không tồn tại."; isCriticalSetupError = true; }
-        // Add more specific column/table checks if needed based on typical errors
         
         if (isCriticalSetupError) {
           let detailedGuidance = `${CRITICAL_SETUP_ERROR_PREFIX} Lỗi với hàm RPC '${functionName}' hoặc các bảng/cột phụ thuộc. Chi tiết:${setupErrorDetails.trim()}`;
@@ -155,7 +151,7 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
         ft_salary_ratio_component: Number(item.ft_salary_ratio_component) || 0,
         pt_salary_ratio_component: Number(item.pt_salary_ratio_component) || 0,
         total_ratio: (Number(item.ft_salary_ratio_component) || 0) + (Number(item.pt_salary_ratio_component) || 0),
-      })).sort((a,b) => b.total_ratio - a.total_ratio); // Sort descending by total_ratio
+      })).sort((a,b) => b.total_ratio - a.total_ratio); 
 
       setChartData(processedData);
 
@@ -180,12 +176,12 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
 
   if (isLoading) {
     return (
-      <Card className="h-[350px]">
+      <Card className="h-[350px] flex flex-col">
         <CardHeader className="pb-2 pt-3">
           <CardTitle className="text-base font-semibold flex items-center gap-1.5"><BarChart3 className="h-4 w-4" />Quỹ Lương/Doanh Thu theo Địa Điểm</CardTitle>
           <CardDescription className="text-xs">Đang tải dữ liệu...</CardDescription>
         </CardHeader>
-        <CardContent className="flex items-center justify-center h-[280px] pt-2">
+        <CardContent className="flex items-center justify-center flex-grow pt-2">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </CardContent>
       </Card>
@@ -194,14 +190,14 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
 
   if (error) {
     return (
-      <Card className="border-destructive/50 h-[350px]">
+      <Card className="border-destructive/50 h-[350px] flex flex-col">
         <CardHeader className="pb-2 pt-3">
           <CardTitle className="text-base font-semibold text-destructive flex items-center gap-1">
             <AlertTriangle className="h-4 w-4" />
             Lỗi Chart Địa Điểm
           </CardTitle>
         </CardHeader>
-        <CardContent className="pt-2">
+        <CardContent className="pt-2 flex-grow">
            <p className="text-xs text-destructive whitespace-pre-line">{error}</p>
             {(error.includes(CRITICAL_SETUP_ERROR_PREFIX)) && (
                 <p className="text-xs text-muted-foreground mt-1 whitespace-pre-line">
@@ -216,12 +212,12 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
 
   if (chartData.length === 0) {
     return (
-     <Card className="h-[350px]">
+     <Card className="h-[350px] flex flex-col">
        <CardHeader className="pb-2 pt-3">
           <CardTitle className="text-base font-semibold text-muted-foreground flex items-center gap-1.5"><BarChart3 className="h-4 w-4" />Quỹ Lương/Doanh Thu theo Địa Điểm</CardTitle>
           <CardDescription className="text-xs">Cho: {filterDescription}</CardDescription>
        </CardHeader>
-       <CardContent className="pt-2 flex items-center justify-center h-[280px]">
+       <CardContent className="pt-2 flex items-center justify-center flex-grow">
          <p className="text-sm text-muted-foreground">Không có dữ liệu cho kỳ đã chọn.</p>
        </CardContent>
      </Card>
@@ -236,13 +232,13 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
           Tỷ lệ (Lương FT + Lương PT) / Doanh thu cho mỗi địa điểm. Sắp xếp từ cao đến thấp. Cho: {filterDescription}.
         </CardDescription>
       </CardHeader>
-      <CardContent className="pt-2 flex-grow overflow-hidden">
-         <ScrollArea className="h-full w-full">
-            <ChartContainer config={chartConfig} className="h-full min-h-[270px]" style={{ width: `${chartContainerWidth}px`}}>
+      <CardContent className="pt-2 flex-grow overflow-hidden"> {/* Ensures CardContent takes up remaining space and hides its own overflow */}
+         <ScrollArea className="h-full w-full"> {/* ScrollArea will fill CardContent */}
+            <ChartContainer config={chartConfig} className="h-full min-h-[270px]" style={{ width: `${chartContainerWidth}px`}}> {/* ChartContainer defines scrollable content width and ensures min height */}
                 <ResponsiveContainer width="100%" height="100%">
                 <BarChart 
                     data={chartData} 
-                    margin={{ top: 25, right: 10, left: 0, bottom: barChartMarginBottom }}
+                    margin={{ top: 15, right: 10, left: 0, bottom: barChartMarginBottom }} // Reduced top margin
                     barCategoryGap="15%"
                 >
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -256,7 +252,7 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
                         textAnchor={chartData.length > 7 ? "end" : "middle"}
                         interval={0} 
                     />
-                    {/* YAxis removed as per request */}
+                    {/* YAxis removed */}
                     <Tooltip
                     content={<ChartTooltipContent
                         formatter={(value, name, props) => {
@@ -280,7 +276,8 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
                     />
                     <Legend
                         verticalAlign="top"
-                        height={30}
+                        height={30} // Standard height for legend
+                        wrapperStyle={{paddingBottom: "5px"}} // Add some space below legend
                         content={({ payload }) => (
                             <div className="flex items-center justify-center gap-2 mb-1 flex-wrap">
                             {payload?.sort((a,b) => (a.dataKey === 'ft_salary_ratio_component' ? -1 : 1))
@@ -322,7 +319,6 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
                             position="center" 
                             content={<CustomSegmentLabel />} 
                         />
-                        {/* Attach total label to the top-most bar segment */}
                         <LabelList 
                             dataKey="total_ratio" 
                             position="top"
