@@ -54,7 +54,7 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-const MIN_CATEGORY_WIDTH = 60; // Min width for each location column
+const MIN_CATEGORY_WIDTH = 50; // Min width for each location column
 const CRITICAL_SETUP_ERROR_PREFIX = "LỖI CÀI ĐẶT QUAN TRỌNG:";
 
 
@@ -78,7 +78,7 @@ const CustomSegmentLabel = (props: any) => {
 
 // Custom label for the total on top of the stacked bar
 const CustomTotalLabel = (props: any) => {
-  const { x, y, width, value, index, chartData } = props; // `value` here is from the specific bar segment LabelList is attached to
+  const { x, y, width, value, index, chartData } = props; // \`value\` here is from the specific bar segment LabelList is attached to
   
   // We need to get the total_ratio for this specific bar
   const currentDataPoint = chartData[index];
@@ -175,7 +175,7 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
     return Math.max(300, chartData.length * MIN_CATEGORY_WIDTH); 
   }, [chartData.length]);
 
-  const barChartMarginBottom = chartData.length > 5 ? 40 : 25; // More space for angled labels if many items
+  const barChartMarginBottom = chartData.length > 7 ? 35 : 25;
 
 
   if (isLoading) {
@@ -206,7 +206,7 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
             {(error.includes(CRITICAL_SETUP_ERROR_PREFIX)) && (
                 <p className="text-xs text-muted-foreground mt-1 whitespace-pre-line">
                   Đây là một lỗi cấu hình quan trọng. Vui lòng kiểm tra kỹ các mục đã liệt kê ở trên trong cơ sở dữ liệu Supabase và tệp README.md.
-                  Đảm bảo rằng hàm RPC `get_salary_revenue_ratio_components_by_location` và các bảng/cột liên quan được tạo và đặt tên chính xác.
+                  Đảm bảo rằng hàm RPC \`get_salary_revenue_ratio_components_by_location\` và các bảng/cột liên quan được tạo và đặt tên chính xác.
                 </p>
             )}
         </CardContent>
@@ -237,8 +237,8 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
         </CardDescription>
       </CardHeader>
       <CardContent className="pt-2 flex-grow overflow-hidden">
-         <ScrollArea className="h-full w-full overflow-y-hidden" orientation="horizontal">
-            <ChartContainer config={chartConfig} className="h-[270px]" style={{ width: `${chartContainerWidth}px`}}>
+         <ScrollArea className="h-full w-full">
+            <ChartContainer config={chartConfig} className="h-full min-h-[270px]" style={{ width: `${chartContainerWidth}px`}}>
                 <ResponsiveContainer width="100%" height="100%">
                 <BarChart 
                     data={chartData} 
