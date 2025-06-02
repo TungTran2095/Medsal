@@ -39,22 +39,32 @@ export default function SalaryToRevenueRatioCard({ selectedMonths, selectedYear 
     setParttimeSalary(null);
     setTotalRevenue(null);
 
-    let description;
-    let yearDesc = selectedYear ? `Năm ${selectedYear}` : "Tất cả các năm";
-    let monthDesc = (selectedMonths && selectedMonths.length > 0)
-      ? `Tháng ${selectedMonths.join(', ')}`
-      : "Tất cả các tháng";
-
-    if (selectedYear && selectedMonths && selectedMonths.length > 0) {
-      description = `${monthDesc}, ${yearDesc}`;
-    } else if (selectedYear) {
-      description = yearDesc;
-    } else if (selectedMonths && selectedMonths.length > 0) {
-      description = `${monthDesc} (mọi năm)`;
+    let finalFilterDescription: string;
+    const yearSegment = selectedYear ? `Năm ${selectedYear}` : "Tất cả các năm";
+    
+    let monthSegment: string;
+    if (selectedMonths && selectedMonths.length > 0) {
+      if (selectedMonths.length === 12) {
+        monthSegment = "tất cả các tháng";
+      } else if (selectedMonths.length === 1) {
+        monthSegment = `Tháng ${String(selectedMonths[0]).padStart(2, '0')}`;
+      } else {
+        monthSegment = `các tháng ${selectedMonths.map(m => String(m).padStart(2, '0')).join(', ')}`;
+      }
     } else {
-      description = "tất cả các kỳ";
+      monthSegment = "tất cả các tháng";
     }
-    setFilterDescription(description);
+
+    if (selectedYear) {
+      finalFilterDescription = `${monthSegment} của ${yearSegment}`;
+    } else {
+      if (selectedMonths && selectedMonths.length > 0 && selectedMonths.length < 12) {
+        finalFilterDescription = `${monthSegment} (trong mọi năm)`;
+      } else {
+        finalFilterDescription = "tất cả các kỳ";
+      }
+    }
+    setFilterDescription(finalFilterDescription);
 
     const rpcArgs = {
       filter_year: selectedYear,
@@ -101,7 +111,7 @@ export default function SalaryToRevenueRatioCard({ selectedMonths, selectedYear 
       if (typeof ftSalResult === 'object') currentError = ftSalResult; else ftSal = ftSalResult;
       setFulltimeSalary(ftSal);
 
-      const ptSalResult = processResult(ptSalaryRes, 'Lương Part-time', 'Parttime', 'tong_thu_nhap');
+      const ptSalResult = processResult(ptSalaryRes, 'Lương Part-time', 'Parttime', 'tong_thu_nhap'); // Assuming 'tong_thu_nhap' for part-time as well. Check table schema if different.
       if (typeof ptSalResult === 'object' && !currentError) currentError = ptSalResult; else ptSal = ptSalResult;
       setParttimeSalary(ptSal);
       
@@ -118,7 +128,6 @@ export default function SalaryToRevenueRatioCard({ selectedMonths, selectedYear 
         if (ftSal > 0 || ptSal > 0) {
           setError({ type: 'dataIssue', message: 'Không thể tính tỷ lệ do tổng doanh thu bằng 0.' });
         } else {
-          // If all are zero, it's not an error, just no data or zero values
           setRatio(0);
         }
       } else {
@@ -147,17 +156,17 @@ export default function SalaryToRevenueRatioCard({ selectedMonths, selectedYear 
     cardState = "error";
   } else if (ratio === null) {
      if (totalRevenue === 0 && ( (fulltimeSalary ?? 0) > 0 || (parttimeSalary ?? 0) > 0) ) {
-        displayValue = "N/A"; // Specifically for div by zero where numerator isn't zero
+        displayValue = "N/A"; 
         cardState = "warning";
      } else if (totalRevenue === 0 && (fulltimeSalary ?? 0) === 0 && (parttimeSalary ?? 0) === 0) {
-        displayValue = "0.0%"; // All values are zero
+        displayValue = "0.0%"; 
      }
      else {
         displayValue = "Không có dữ liệu";
         cardState = "noData";
      }
   } else if (totalRevenue === 0 && ratio === 0 && (fulltimeSalary ?? 0) === 0 && (parttimeSalary ?? 0) === 0) {
-    displayValue = "0.0%"; // Explicitly handle if all inputs are zero
+    displayValue = "0.0%"; 
   } else if (totalRevenue === 0) {
     displayValue = "N/A";
     cardState = "warning";

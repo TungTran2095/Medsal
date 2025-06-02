@@ -26,20 +26,32 @@ export default function EmployeeCountCard({ selectedMonths, selectedYear }: Empl
     setIsLoading(true);
     setError(null);
 
-    let yearDesc = selectedYear ? `Năm ${selectedYear}` : "Tất cả các năm";
-    let monthDesc = (selectedMonths && selectedMonths.length > 0)
-      ? `Tháng ${selectedMonths.join(', ')}`
-      : "Tất cả các tháng";
+    let finalFilterDescription: string;
+    const yearSegment = selectedYear ? `Năm ${selectedYear}` : "Tất cả các năm";
     
-    let description = "tất cả các kỳ";
-    if (selectedYear && selectedMonths && selectedMonths.length > 0) {
-      description = `${monthDesc}, ${yearDesc}`;
-    } else if (selectedYear) {
-      description = yearDesc;
-    } else if (selectedMonths && selectedMonths.length > 0) {
-      description = `${monthDesc} (mọi năm)`;
+    let monthSegment: string;
+    if (selectedMonths && selectedMonths.length > 0) {
+      if (selectedMonths.length === 12) {
+        monthSegment = "tất cả các tháng";
+      } else if (selectedMonths.length === 1) {
+        monthSegment = `Tháng ${String(selectedMonths[0]).padStart(2, '0')}`;
+      } else {
+        monthSegment = `các tháng ${selectedMonths.map(m => String(m).padStart(2, '0')).join(', ')}`;
+      }
+    } else {
+      monthSegment = "tất cả các tháng";
     }
-    setFilterDescription(description);
+
+    if (selectedYear) {
+      finalFilterDescription = `${monthSegment} của ${yearSegment}`;
+    } else {
+      if (selectedMonths && selectedMonths.length > 0 && selectedMonths.length < 12) {
+        finalFilterDescription = `${monthSegment} (trong mọi năm)`;
+      } else {
+        finalFilterDescription = "tất cả các kỳ";
+      }
+    }
+    setFilterDescription(finalFilterDescription);
 
 
     try {

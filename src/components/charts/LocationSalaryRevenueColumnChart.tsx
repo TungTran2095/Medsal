@@ -101,16 +101,32 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
     setIsLoading(true);
     setError(null);
 
-    let description;
-    let yearDesc = selectedYear ? `Năm ${selectedYear}` : "Tất cả các năm";
-    let monthDesc = (selectedMonths && selectedMonths.length > 0)
-      ? `Tháng ${selectedMonths.join(', ')}`
-      : "Tất cả các tháng";
-    if (selectedYear && selectedMonths && selectedMonths.length > 0) description = `${monthDesc}, ${yearDesc}`;
-    else if (selectedYear) description = yearDesc;
-    else if (selectedMonths && selectedMonths.length > 0) description = `${monthDesc} (mọi năm)`;
-    else description = "tất cả các kỳ";
-    setFilterDescription(description);
+    let finalFilterDescription: string;
+    const yearSegment = selectedYear ? `Năm ${selectedYear}` : "Tất cả các năm";
+    
+    let monthSegment: string;
+    if (selectedMonths && selectedMonths.length > 0) {
+      if (selectedMonths.length === 12) {
+        monthSegment = "tất cả các tháng";
+      } else if (selectedMonths.length === 1) {
+        monthSegment = `Tháng ${String(selectedMonths[0]).padStart(2, '0')}`;
+      } else {
+        monthSegment = `các tháng ${selectedMonths.map(m => String(m).padStart(2, '0')).join(', ')}`;
+      }
+    } else {
+      monthSegment = "tất cả các tháng";
+    }
+
+    if (selectedYear) {
+      finalFilterDescription = `${monthSegment} của ${yearSegment}`;
+    } else {
+      if (selectedMonths && selectedMonths.length > 0 && selectedMonths.length < 12) {
+        finalFilterDescription = `${monthSegment} (trong mọi năm)`;
+      } else {
+        finalFilterDescription = "tất cả các kỳ";
+      }
+    }
+    setFilterDescription(finalFilterDescription);
 
     const rpcArgs = {
       p_filter_year: selectedYear,
@@ -169,7 +185,7 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
   }, [fetchData]);
 
   const chartContainerHeight = useMemo(() => {
-    return Math.max(750); 
+    return Math.max(chartData.length * MIN_CATEGORY_HEIGHT, 250);
   }, [chartData.length]);
 
   const xAxisDomainMax = useMemo(() => {
@@ -177,9 +193,7 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
       return 0.1; 
     }
     const maxRatioInData = Math.max(0.01, ...chartData.map(item => item.total_ratio));
-    // Round up to the next 0.05 for a clean tick where data ends
     const dataEndTick = Math.max(0.1, Math.ceil(maxRatioInData * 20) / 20);
-    // Add padding to this data end tick for labels. Add 15% of dataEndTick, or at least 0.05. Cap at 1.6 (for 150% data max + 10% padding).
     const finalDomain = Math.min(1.6, dataEndTick + Math.max(0.05, dataEndTick * 0.15));
     return finalDomain;
   }, [chartData]);
@@ -252,7 +266,7 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
               className="h-full w-full" 
               style={{ height: `${chartContainerHeight}px`}} 
             >
-                <ResponsiveContainer width="150%" height="100%">
+                <ResponsiveContainer width="100%" height="100%">
                 <BarChart 
                     layout="vertical"
                     data={chartData} 
