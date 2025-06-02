@@ -162,6 +162,50 @@ END;
 $$;
 ```
 
-Once these functions are successfully created (or updated) in your Supabase SQL Editor, the application should be able to correctly filter and aggregate data. If you continue to encounter "unterminated dollar-quoted string" errors, please double-check for any invisible characters or ensure the entire function block is being processed correctly by the SQL editor, especially ensuring no comments are between `END;` and the final `$$;`.
-Additionally, for the `get_monthly_salary_trend_fulltime` function, ensure you have a `time` table with appropriate columns (`year_numeric`, `month_numeric`, `Thang_x`) as described in the function's comments.
+#### `get_monthly_revenue_trend`
 
+This function is used by the Payroll Dashboard to fetch the total revenue ("Kỳ báo cáo") aggregated per month and year, for a given year. It excludes specific "Tên đơn vị" values. The X-axis of the chart will use the `Thang_x` column from your `time` table.
+
+**SQL Code:**
+```sql
+CREATE OR REPLACE FUNCTION get_monthly_revenue_trend(
+    p_filter_year INTEGER DEFAULT NULL
+)
+RETURNS TABLE(
+    month_label TEXT,  -- This will be time.Thang_x
+    year_val INTEGER,    -- This will be Doanh_thu.nam
+    total_revenue DOUBLE PRECISION
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    -- IMPORTANT ASSUMPTIONS FOR THIS FUNCTION TO WORK:
+    -- 1. A table named "time" MUST exist in your database with appropriate columns (year_numeric, month_numeric, Thang_x).
+    -- 2. A table named "Doanh_thu" MUST exist with columns "Kỳ báo cáo", "nam", "thang", and "Tên đơn vị".
+
+    RETURN QUERY
+    SELECT
+        t."Thang_x" AS month_label,
+        dr.nam::INTEGER AS year_val,
+        SUM(CAST(REPLACE(dr."Kỳ báo cáo"::text, ',', '') AS DOUBLE PRECISION)) AS total_revenue
+    FROM
+        "Doanh_thu" dr
+    INNER JOIN
+        "time" t ON dr.nam::INTEGER = t.year_numeric
+                 AND regexp_replace(dr.thang, '\D', '', 'g')::INTEGER = t.month_numeric
+    WHERE
+        (p_filter_year IS NULL OR dr.nam::INTEGER = p_filter_year)
+        AND dr."Tên đơn vị" NOT IN ('Medcom', 'Medon', 'Medicons', 'Meddom', 'Med Group')
+    GROUP BY
+        dr.nam::INTEGER,
+        t."Thang_x",
+        t.month_numeric
+    ORDER BY
+        dr.nam::INTEGER,
+        t.month_numeric;
+END;
+$$;
+```
+
+Once these functions are successfully created (or updated) in your Supabase SQL Editor, the application should be able to correctly filter and aggregate data. If you continue to encounter "unterminated dollar-quoted string" errors, please double-check for any invisible characters or ensure the entire function block is being processed correctly by the SQL editor, especially ensuring no comments are between `END;` and the final `$$;`.
+Additionally, for the `get_monthly_salary_trend_fulltime` and `get_monthly_revenue_trend` functions, ensure you have a `time` table with appropriate columns (`year_numeric`, `month_numeric`, `Thang_x`) as described in the function's comments.
