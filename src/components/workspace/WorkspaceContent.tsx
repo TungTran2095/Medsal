@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, ChevronDown, Filter as FilterIcon } from "lucide-react";
+import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, ChevronDown, Filter as FilterIcon, GanttChartSquare } from "lucide-react";
 import type { PayrollEntry } from '@/types';
 import { supabase } from '@/lib/supabaseClient';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -47,7 +47,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type WorkspaceView = 'dbManagement' | 'dashboard';
-type DashboardTab = 'payrollOverview' | 'anotherTab'; // Example for future tabs
+type DashboardTab = 'payrollOverview' | 'comparison'; 
 
 interface NavItem {
   id: WorkspaceView;
@@ -539,10 +539,16 @@ export default function WorkspaceContent() {
               </CardHeader>
               <CardContent className="pt-3 px-3 md:px-4 pb-3 flex-grow flex flex-col overflow-hidden space-y-3">
                 <Tabs value={activeDashboardTab} onValueChange={(value) => setActiveDashboardTab(value as DashboardTab)} className="flex-grow flex flex-col overflow-hidden">
-                  <TabsList className="shrink-0">
-                    <TabsTrigger value="payrollOverview" className="text-xs px-2.5 py-1.5">Tổng Quan Lương & Doanh Thu</TabsTrigger>
-                    {/* Add more TabsTrigger components here for future dashboard pages */}
-                  </TabsList>
+                  <div className="flex justify-start">
+                    <TabsList className="shrink-0">
+                      <TabsTrigger value="payrollOverview" className="text-xs px-2.5 py-1.5 flex items-center gap-1">
+                        <LayoutDashboard className="h-3.5 w-3.5"/> Tổng Quan Lương & Doanh Thu
+                      </TabsTrigger>
+                      <TabsTrigger value="comparison" className="text-xs px-2.5 py-1.5 flex items-center gap-1">
+                        <GanttChartSquare className="h-3.5 w-3.5"/> So sánh cùng kỳ
+                      </TabsTrigger>
+                    </TabsList>
+                  </div>
                   <TabsContent value="payrollOverview" className="flex-grow overflow-y-auto space-y-3 mt-2">
                     <div className="grid gap-3 md:grid-cols-4">
                         <TotalSalaryCard selectedMonths={selectedMonths} selectedYear={selectedYear} />
@@ -558,7 +564,13 @@ export default function WorkspaceContent() {
                         {/* Placeholder for another half-width chart can go here */}
                     </div>
                   </TabsContent>
-                  {/* Add more TabsContent components here */}
+                  <TabsContent value="comparison" className="flex-grow overflow-y-auto space-y-3 mt-2">
+                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                      <GanttChartSquare className="h-12 w-12 mb-4" />
+                      <p className="text-lg font-medium">Trang So Sánh Cùng Kỳ</p>
+                      <p className="text-sm">Nội dung cho trang này sẽ được phát triển.</p>
+                    </div>
+                  </TabsContent>
                 </Tabs>
               </CardContent>
             </Card>
@@ -568,6 +580,3 @@ export default function WorkspaceContent() {
     </SidebarProvider>
   );
 }
-
-
-    
