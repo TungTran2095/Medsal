@@ -339,7 +339,7 @@ export default function WorkspaceContent() {
   };
 
   return (
-    <SidebarProvider defaultOpen={false}>
+    <SidebarProvider defaultOpen={false} >
       <Sidebar collapsible="icon">
         <SidebarHeader>
            <div className="flex items-center justify-between p-2">
@@ -531,6 +531,7 @@ export default function WorkspaceContent() {
                                           setSelectedYear(null);
                                           handleMonthSelection(month.value, checked as boolean);
                                         }}
+                                        onSelect={(e) => e.preventDefault()}
                                         className="text-xs"
                                       >
                                         {month.label}
@@ -575,6 +576,7 @@ export default function WorkspaceContent() {
                                             setSelectedYear(year);
                                             handleMonthSelection(month.value, checked as boolean);
                                           }}
+                                          onSelect={(e) => e.preventDefault()}
                                           className="text-xs"
                                         >
                                           {month.label}
@@ -639,5 +641,3 @@ export default function WorkspaceContent() {
     </SidebarProvider>
   );
 }
-
-    
