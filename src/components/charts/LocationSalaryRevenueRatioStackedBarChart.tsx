@@ -62,10 +62,8 @@ const percentageFormatter = (value: number | null | undefined): string => {
 
 // Custom label component for total_ratio
 const CustomTotalLabel = (props: any) => {
-  const { x, y, width, index, chartData } = props; // y is the y-coordinate of the top of the bar segment it's attached to
+  const { x, y, width, index, chartData } = props; 
 
-  // Access the specific data point from chartData using the index
-  // This requires chartData to be passed into CustomTotalLabel or accessed from context/closure
   const dataPoint = chartData[index];
   if (!dataPoint) return null;
 
@@ -74,14 +72,13 @@ const CustomTotalLabel = (props: any) => {
   if (totalValue === null || totalValue === undefined || Number.isNaN(totalValue) ) {
       return null;
   }
-   // Even if totalValue is 0, we might want to show "0%"
   const formattedTotal = (totalValue * 100).toFixed(0) + '%';
 
 
   return (
     <text
       x={(x as number) + (width as number) / 2}
-      y={(y as number) - 6} // Position 6px above the top of the bar
+      y={(y as number) - 6} 
       fill="hsl(var(--foreground))"
       textAnchor="middle"
       dominantBaseline="auto"
@@ -248,7 +245,7 @@ export default function LocationSalaryRevenueRatioStackedBarChart({ selectedMont
         </CardDescription>
       </CardHeader>
       <CardContent className="pt-2 flex-grow overflow-hidden">
-        <ScrollArea className="h-full w-full pb-4" orientation="horizontal">
+        <ScrollArea className="h-full w-full overflow-y-hidden" orientation="horizontal">
           <ChartContainer config={chartConfig} className="h-[280px]" style={{ width: `${chartWidth}px` }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} margin={{ top: 25, right: 10, left: 0, bottom: 20 }} barCategoryGap="20%">
@@ -263,7 +260,6 @@ export default function LocationSalaryRevenueRatioStackedBarChart({ selectedMont
                   height={chartData.length > 5 ? 50 : 30}
                   dy={chartData.length > 5 ? 5 : 0}
                 />
-                {/* YAxis removed as per request */}
                 <Tooltip
                   content={<ChartTooltipContent
                     formatter={(value, name, props) => {
@@ -333,7 +329,6 @@ export default function LocationSalaryRevenueRatioStackedBarChart({ selectedMont
                     formatter={percentageFormatter}
                     className="text-xs fill-primary-foreground"
                   />
-                  {/* Total Label on top of the stack */}
                   <LabelList content={<CustomTotalLabel chartData={chartData} />} />
                 </Bar>
               </BarChart>
@@ -345,3 +340,4 @@ export default function LocationSalaryRevenueRatioStackedBarChart({ selectedMont
   );
 }
 
+    
