@@ -19,7 +19,7 @@ import RevenueCard from '@/components/dashboard/RevenueCard';
 import SalaryToRevenueRatioCard from '@/components/dashboard/SalaryToRevenueRatioCard';
 import CombinedMonthlyTrendChart from '@/components/charts/MonthlySalaryTrendChart';
 import SalaryProportionPieChart from '@/components/charts/SalaryProportionPieChart';
-import LocationSalaryRevenueRatioStackedBarChart from '@/components/charts/LocationSalaryRevenueRatioStackedBarChart';
+// Removed import for LocationSalaryRevenueRatioStackedBarChart
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -97,8 +97,8 @@ export default function WorkspaceContent() {
       const tablesToQuery = ['Fulltime', 'Parttime', 'Doanh_thu'];
       const yearColumns = {
         'Fulltime': 'nam',
-        'Parttime': 'Nam', // Corrected as per earlier instruction
-        'Doanh_thu': 'Năm' // Corrected as per earlier instruction
+        'Parttime': 'Nam', 
+        'Doanh_thu': 'Năm' 
       };
 
 
@@ -560,9 +560,8 @@ export default function WorkspaceContent() {
                     <div className="grid grid-cols-1 gap-3">
                         <CombinedMonthlyTrendChart selectedYear={selectedYear} />
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 gap-3"> 
                         <SalaryProportionPieChart selectedMonths={selectedMonths} selectedYear={selectedYear} />
-                        <LocationSalaryRevenueRatioStackedBarChart selectedMonths={selectedMonths} selectedYear={selectedYear} />
                     </div>
                   </TabsContent>
                   <TabsContent value="comparison" className="flex-grow overflow-y-auto space-y-3 mt-2">
