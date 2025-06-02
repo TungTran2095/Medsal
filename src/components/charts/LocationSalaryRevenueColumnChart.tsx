@@ -243,12 +243,12 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
       </CardHeader>
       <CardContent className="pt-2 flex-grow overflow-hidden">
          <ScrollArea className="h-full w-full">
-            <ChartContainer config={chartConfig} className="h-full min-h-[270px]" style={{ width: `${chartContainerWidth}px`}}>
+            <ChartContainer config={chartConfig} className="h-full" style={{ width: `${chartContainerWidth}px`}}>
                 <ResponsiveContainer width="100%" height="100%">
                 <BarChart 
                     data={chartData} 
                     margin={{ top: 15, right: 10, left: 0, bottom: barChartMarginBottom }}
-                    barCategoryGap="15%"
+                    barCategoryGap="10%"
                 >
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
                     <XAxis 
