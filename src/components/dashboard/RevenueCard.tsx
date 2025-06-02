@@ -73,7 +73,7 @@ export default function RevenueCard({ selectedMonths, selectedYear }: RevenueCar
           (rpcMessageText.includes(functionName.toLowerCase()) && rpcMessageText.includes('does not exist'));
         
         const isTableMissingError = rpcMessageText.includes('relation "doanh_thu" does not exist');
-        const isColumnMissingError = rpcMessageText.includes('column "kỳ báo cáo" does not exist');
+        const isColumnMissingError = rpcMessageText.includes('column "kỳ báo cáo" does not exist') || rpcMessageText.includes('column "tên đơn vị" does not exist');
 
 
         if (isFunctionMissingError) {
@@ -91,7 +91,7 @@ export default function RevenueCard({ selectedMonths, selectedYear }: RevenueCar
          if (isColumnMissingError) {
            throw {
             type: 'rpcMissing' as 'rpcMissing', // Re-using type for simplicity
-            message: `Cột 'Kỳ báo cáo' không tồn tại trong bảng 'Doanh_thu'. Hàm RPC '${functionName}' cần cột này.`
+            message: `Một trong các cột 'Kỳ báo cáo' hoặc 'Tên đơn vị' không tồn tại trong bảng 'Doanh_thu'. Hàm RPC '${functionName}' cần các cột này.`
           };
         }
         throw { type: 'generic' as 'generic', message: rpcError.message || 'Đã xảy ra lỗi RPC không xác định.'};
@@ -153,15 +153,15 @@ export default function RevenueCard({ selectedMonths, selectedYear }: RevenueCar
             <p className="text-xs text-muted-foreground mt-1">
               {error.message.includes("Bảng 'Doanh_thu' không tồn tại") 
                 ? "Vui lòng đảm bảo bảng 'Doanh_thu' tồn tại trong cơ sở dữ liệu của bạn."
-                : error.message.includes("Cột 'Kỳ báo cáo' không tồn tại")
-                ? "Vui lòng đảm bảo cột 'Kỳ báo cáo' tồn tại trong bảng 'Doanh_thu'."
-                : "Vui lòng tạo hàm `get_total_revenue` trong SQL Editor của Supabase. Tham khảo README.md để biết script SQL. Đảm bảo bảng 'Doanh_thu' có cột 'Kỳ báo cáo', 'nam', và 'thang'."
+                : error.message.includes("Cột") && error.message.includes("không tồn tại")
+                ? `Vui lòng đảm bảo các cột cần thiết (ví dụ: 'Kỳ báo cáo', 'Tên đơn vị') tồn tại trong bảng 'Doanh_thu'.`
+                : "Vui lòng tạo hàm `get_total_revenue` trong SQL Editor của Supabase. Tham khảo README.md để biết script SQL. Đảm bảo bảng 'Doanh_thu' có cột 'Kỳ báo cáo', 'Tên đơn vị', 'nam', và 'thang'."
               }
             </p>
           )}
           {error.type === 'generic' && (
             <p className="text-xs text-muted-foreground mt-1">
-              Kiểm tra cấu trúc bảng 'Doanh_thu': cột 'Kỳ báo cáo' (số hoặc văn bản có thể chuyển thành double precision), 'thang' (văn bản như 'Tháng 01'), và 'nam' (số).
+              Kiểm tra cấu trúc bảng 'Doanh_thu': cột 'Kỳ báo cáo' (số hoặc văn bản có thể chuyển thành double precision), 'Tên đơn vị' (văn bản), 'thang' (văn bản như 'Tháng 01'), và 'nam' (số).
             </p>
           )}
         </CardContent>
@@ -182,6 +182,9 @@ export default function RevenueCard({ selectedMonths, selectedYear }: RevenueCar
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">
             Không có dữ liệu doanh thu cho: {filterDescription}.
+          </p>
+           <p className="text-xs text-muted-foreground mt-0.5">
+            (Lưu ý: Một số 'Tên đơn vị' như Medcom, Medon,... bị loại trừ.)
           </p>
         </CardContent>
       </Card>
@@ -208,7 +211,11 @@ export default function RevenueCard({ selectedMonths, selectedYear }: RevenueCar
           <p className="text-xs text-muted-foreground">
             Cho: {filterDescription}
           </p>
+           <p className="text-xs text-muted-foreground mt-0.5">
+            (Lưu ý: Một số 'Tên đơn vị' như Medcom, Medon,... bị loại trừ.)
+          </p>
       </CardContent>
     </Card>
   );
 }
+

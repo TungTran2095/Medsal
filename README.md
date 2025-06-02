@@ -90,7 +90,7 @@ $$;
 
 #### `get_total_revenue`
 
-This function is used by the Payroll Dashboard to calculate the total sum of "Kỳ báo cáo" from the "Doanh_thu" table, with optional filters for a selected year and an array of months. It assumes "Doanh_thu" table has `nam` (integer) and `thang` (text, e.g., "Tháng 01") columns for filtering.
+This function is used by the Payroll Dashboard to calculate the total sum of "Kỳ báo cáo" from the "Doanh_thu" table, with optional filters for a selected year and an array of months. It assumes "Doanh_thu" table has `nam` (integer), `thang` (text, e.g., "Tháng 01"), and "Tên đơn vị" (text) columns for filtering. Rows where "Tên đơn vị" is "Medcom", "Medon", "Medicons", "Meddom", or "Med Group" are excluded.
 
 **SQL Code:**
 ```sql
@@ -109,7 +109,8 @@ AS $$
         array_length(filter_months, 1) IS NULL OR
         array_length(filter_months, 1) = 0 OR
         regexp_replace(thang, '\D', '', 'g')::INTEGER = ANY(filter_months)
-    );
+    )
+    AND "Tên đơn vị" NOT IN ('Medcom', 'Medon', 'Medicons', 'Meddom', 'Med Group');
 $$;
 ```
 
