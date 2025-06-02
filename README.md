@@ -117,7 +117,7 @@ $$;
 
 #### `get_monthly_salary_trend_fulltime`
 
-This function is used by the Payroll Dashboard to fetch the total salary (`tong_thu_nhap` from "Fulltime" table) aggregated per month and year, for a given year. The X-axis of the chart will use the `Thang_x` column from your `time` table.
+This function is used by the Payroll Dashboard to fetch the total salary (`tong_thu_nhap` from "Fulltime" table) aggregated per month and year, for a given year. The X-axis of the chart will use the `Thang_x` column from your `Time` table.
 
 **SQL Code:**
 ```sql
@@ -125,7 +125,7 @@ CREATE OR REPLACE FUNCTION get_monthly_salary_trend_fulltime(
     p_filter_year INTEGER DEFAULT NULL
 )
 RETURNS TABLE(
-    month_label TEXT,  -- This will be time.Thang_x
+    month_label TEXT,  -- This will be Time."Thang_x"
     year_val INTEGER,    -- This will be Fulltime.nam
     total_salary DOUBLE PRECISION
 )
@@ -133,39 +133,39 @@ LANGUAGE plpgsql
 AS $$
 BEGIN
     -- IMPORTANT ASSUMPTIONS FOR THIS FUNCTION TO WORK:
-    -- 1. A table named "time" MUST exist in your database.
-    -- 2. The "time" table MUST have the following columns (or equivalents):
-    --    - A column for the numeric year, e.g., "year_numeric" (INTEGER). Used for joining with Fulltime.nam.
-    --    - A column for the numeric month (1-12), e.g., "month_numeric" (INTEGER). Used for joining with the parsed month from Fulltime.thang AND for sorting.
+    -- 1. A table named "Time" (capital T) MUST exist in your database.
+    -- 2. The "Time" table MUST have the following columns (or equivalents):
+    --    - A column for the numeric year, e.g., "Năm" (INTEGER). Used for joining with Fulltime.nam.
+    --    - A column for the numeric month (1-12), e.g., "thangpro" (INTEGER). Used for joining with the parsed month from Fulltime.thang AND for sorting.
     --    - The display column for the X-axis, named "Thang_x" (TEXT). This is what will be shown on the chart.
-    --    If your "time" table uses different column names, please update the JOIN clause below.
+    --    If your "Time" table uses different column names, please update the JOIN clause below.
 
     RETURN QUERY
     SELECT
-        t."Thang_x" AS month_label,         -- X-axis label from the "time" table
+        t."Thang_x" AS month_label,         -- X-axis label from the "Time" table
         f.nam::INTEGER AS year_val,         -- Year from Fulltime table
         SUM(CAST(REPLACE(f.tong_thu_nhap::text, ',', '') AS DOUBLE PRECISION)) AS total_salary
     FROM
         "Fulltime" f
     INNER JOIN
-        "time" t ON f.nam::INTEGER = t.year_numeric  -- ASSUMED column name in "time" table
-                 AND regexp_replace(f.thang, '\D', '', 'g')::INTEGER = t.month_numeric -- ASSUMED column name in "time" table
+        "Time" t ON f.nam::INTEGER = t."Năm"  -- ASSUMED column name "Năm" (year) in "Time" table
+                 AND regexp_replace(f.thang, '\D', '', 'g')::INTEGER = t."thangpro" -- ASSUMED column name "thangpro" (numeric month) in "Time" table
     WHERE
         (p_filter_year IS NULL OR f.nam::INTEGER = p_filter_year) -- Filter on Fulltime.nam
     GROUP BY
         f.nam::INTEGER,
         t."Thang_x",
-        t.month_numeric -- Group also by numeric month from "time" table for ordering
+        t."thangpro" -- Group also by numeric month from "Time" table for ordering
     ORDER BY
         f.nam::INTEGER,
-        t.month_numeric; -- Order by year, then by the numeric month from "time" table for correct trend
+        t."thangpro"; -- Order by year, then by the numeric month from "Time" table for correct trend
 END;
 $$;
 ```
 
 #### `get_monthly_salary_trend_parttime`
 
-This function is used by the Payroll Dashboard to fetch the total part-time salary (`tong_thu_nhap` from "Parttime" table) aggregated per month and year, for a given year. The X-axis of the chart will use the `Thang_x` column from your `time` table.
+This function is used by the Payroll Dashboard to fetch the total part-time salary (`tong_thu_nhap` from "Parttime" table) aggregated per month and year, for a given year. The X-axis of the chart will use the `Thang_x` column from your `Time` table.
 
 **SQL Code:**
 ```sql
@@ -173,14 +173,15 @@ CREATE OR REPLACE FUNCTION get_monthly_salary_trend_parttime(
     p_filter_year INTEGER DEFAULT NULL
 )
 RETURNS TABLE(
-    month_label TEXT,  -- This will be time.Thang_x
+    month_label TEXT,  -- This will be Time."Thang_x"
     year_val INTEGER,    -- This will be Parttime.nam
     total_salary DOUBLE PRECISION
 )
 LANGUAGE plpgsql
 AS $$
 BEGIN
-    -- IMPORTANT ASSUMPTIONS: "time" table exists and "Parttime" table exists.
+    -- IMPORTANT ASSUMPTIONS: "Time" (capital T) table exists with "Năm", "thangpro", "Thang_x".
+    -- "Parttime" table exists.
 
     RETURN QUERY
     SELECT
@@ -190,24 +191,24 @@ BEGIN
     FROM
         "Parttime" pt
     INNER JOIN
-        "time" t ON pt.nam::INTEGER = t.year_numeric
-                 AND regexp_replace(pt.thang, '\D', '', 'g')::INTEGER = t.month_numeric
+        "Time" t ON pt.nam::INTEGER = t."Năm"
+                 AND regexp_replace(pt.thang, '\D', '', 'g')::INTEGER = t."thangpro"
     WHERE
         (p_filter_year IS NULL OR pt.nam::INTEGER = p_filter_year)
     GROUP BY
         pt.nam::INTEGER,
         t."Thang_x",
-        t.month_numeric
+        t."thangpro"
     ORDER BY
         pt.nam::INTEGER,
-        t.month_numeric;
+        t."thangpro";
 END;
 $$;
 ```
 
 #### `get_monthly_revenue_trend`
 
-This function is used by the Payroll Dashboard to fetch the total revenue ("Kỳ báo cáo" from "Doanh_thu" table) aggregated per month and year, for a given year. It excludes specific "Tên đơn vị" values. The X-axis of the chart will use the `Thang_x` column from your `time` table.
+This function is used by the Payroll Dashboard to fetch the total revenue ("Kỳ báo cáo" from "Doanh_thu" table) aggregated per month and year, for a given year. It excludes specific "Tên đơn vị" values. The X-axis of the chart will use the `Thang_x` column from your `Time` table.
 
 **SQL Code:**
 ```sql
@@ -215,7 +216,7 @@ CREATE OR REPLACE FUNCTION get_monthly_revenue_trend(
     p_filter_year INTEGER DEFAULT NULL
 )
 RETURNS TABLE(
-    month_label TEXT,  -- This will be time.Thang_x
+    month_label TEXT,  -- This will be Time."Thang_x"
     year_val INTEGER,    -- This will be Doanh_thu.nam
     total_revenue DOUBLE PRECISION
 )
@@ -223,7 +224,7 @@ LANGUAGE plpgsql
 AS $$
 BEGIN
     -- IMPORTANT ASSUMPTIONS FOR THIS FUNCTION TO WORK:
-    -- 1. A table named "time" MUST exist in your database with appropriate columns (year_numeric, month_numeric, Thang_x).
+    -- 1. A table named "Time" (capital T) MUST exist in your database with appropriate columns ("Năm", "thangpro", "Thang_x").
     -- 2. A table named "Doanh_thu" MUST exist with columns "Kỳ báo cáo", "nam", "thang", and "Tên đơn vị".
 
     RETURN QUERY
@@ -234,23 +235,24 @@ BEGIN
     FROM
         "Doanh_thu" dr
     INNER JOIN
-        "time" t ON dr.nam::INTEGER = t.year_numeric
-                 AND regexp_replace(dr.thang, '\D', '', 'g')::INTEGER = t.month_numeric
+        "Time" t ON dr.nam::INTEGER = t."Năm"
+                 AND regexp_replace(dr.thang, '\D', '', 'g')::INTEGER = t."thangpro"
     WHERE
         (p_filter_year IS NULL OR dr.nam::INTEGER = p_filter_year)
         AND dr."Tên đơn vị" NOT IN ('Medcom', 'Medon', 'Medicons', 'Meddom', 'Med Group')
     GROUP BY
         dr.nam::INTEGER,
         t."Thang_x",
-        t.month_numeric
+        t."thangpro"
     ORDER BY
         dr.nam::INTEGER,
-        t.month_numeric;
+        t."thangpro";
 END;
 $$;
 ```
 
 Once these functions are successfully created (or updated) in your Supabase SQL Editor, the application should be able to correctly filter and aggregate data. If you continue to encounter "unterminated dollar-quoted string" errors, please double-check for any invisible characters or ensure the entire function block is being processed correctly by the SQL editor, especially ensuring no comments are between `END;` and the final `$$;`.
-Additionally, for the `get_monthly_salary_trend_fulltime`, `get_monthly_salary_trend_parttime`, and `get_monthly_revenue_trend` functions, ensure you have a `time` table with appropriate columns (`year_numeric`, `month_numeric`, `Thang_x`) as described in the function's comments.
+Additionally, for the `get_monthly_salary_trend_fulltime`, `get_monthly_salary_trend_parttime`, and `get_monthly_revenue_trend` functions, ensure you have a `Time` table (capital T) with appropriate columns (`"Năm"`, `"thangpro"`, `"Thang_x"`) as described in the function's comments.
 
-```
+
+    

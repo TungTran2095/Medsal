@@ -105,16 +105,16 @@ export default function CombinedMonthlyTrendChart({ selectedYear }: CombinedMont
           return { data: (res.value.data || []) as MonthlyTrendDataEntry[] };
         } else {
           const rpcError = res.status === 'fulfilled' ? res.value.error : res.reason;
-          const rpcMessageText = rpcError.message ? String(rpcError.message).toLowerCase() : '';
+          const rpcMessageText = rpcError?.message ? String(rpcError.message).toLowerCase() : '';
           
           let isFunctionMissingError =
-            rpcError.code === '42883' || // undefined_function
-            (rpcError.code === 'PGRST202' && rpcMessageText.includes(functionName.toLowerCase())) ||
+            rpcError?.code === '42883' || // undefined_function
+            (rpcError?.code === 'PGRST202' && rpcMessageText.includes(functionName.toLowerCase())) ||
             (rpcMessageText.includes(functionName.toLowerCase()) && rpcMessageText.includes('does not exist'));
 
           let tableMissingErrorMsg = "";
-          if (rpcMessageText.includes('relation "time" does not exist')) {
-            tableMissingErrorMsg = " Bảng 'time' không tồn tại.";
+          if (rpcMessageText.includes('relation "time" does not exist')) { // Note: SQL uses "Time", error might show "time"
+            tableMissingErrorMsg = " Bảng 'Time' (hoặc 'time') không tồn tại.";
             isFunctionMissingError = true; // Treat as setup error
           }
           dependentTables.forEach(table => {
@@ -125,11 +125,11 @@ export default function CombinedMonthlyTrendChart({ selectedYear }: CombinedMont
           });
 
           if (isFunctionMissingError) {
-            return { data: [], error: `${CRITICAL_SETUP_ERROR_PREFIX} Hàm RPC '${functionName}' hoặc bảng phụ thuộc ('time'${dependentTables.length > 0 ? `, ${dependentTables.join(', ')}` : ''}) bị thiếu/sai cấu hình.${tableMissingErrorMsg}` };
+            return { data: [], error: `${CRITICAL_SETUP_ERROR_PREFIX} Hàm RPC '${functionName}' hoặc bảng phụ thuộc ('Time'${dependentTables.length > 0 ? `, ${dependentTables.join(', ')}` : ''}) bị thiếu/sai cấu hình.${tableMissingErrorMsg} Hãy kiểm tra tên cột trong bảng 'Time' là "Năm", "thangpro", và "Thang_x" theo README.md.` };
           }
           const baseMessage = `Lỗi tải dữ liệu ${dataType}`;
-          const messageDetail = rpcError?.message ? `: ${rpcError.message}` : ".";
-          return { data: [], error: `${baseMessage}${messageDetail}` };
+          const messageDetail = rpcError?.message ? `: ${rpcError.message}` : (res.status === 'rejected' ? `: ${String(res.reason)}` : ".");
+          return { data: [], error: `${baseMessage}${messageDetail}${messageDetail === '.' ? ' Kiểm tra cấu hình RPC hoặc bảng trong Supabase.' : ''}` };
         }
       };
       
@@ -183,9 +183,14 @@ export default function CombinedMonthlyTrendChart({ selectedYear }: CombinedMont
         }))
         .sort((a, b) => {
           if (a.year_val !== b.year_val) return a.year_val - b.year_val;
-          const monthA = parseInt(a.month_label.replace(/\D/g, ''));
-          const monthB = parseInt(b.month_label.replace(/\D/g, ''));
-          return monthA - monthB;
+          // Attempt to parse month_label for sorting if it's like "Tháng XX"
+          const monthANum = parseInt(String(a.month_label).replace(/\D/g, ''), 10);
+          const monthBNum = parseInt(String(b.month_label).replace(/\D/g, ''), 10);
+          if (!isNaN(monthANum) && !isNaN(monthBNum)) {
+            return monthANum - monthBNum;
+          }
+          // Fallback to string sort if parsing fails (shouldn't happen if Time.thangpro is used for sorting in SQL)
+          return String(a.month_label).localeCompare(String(b.month_label));
         });
 
       if (finalChartData.length > 0) {
@@ -231,7 +236,7 @@ export default function CombinedMonthlyTrendChart({ selectedYear }: CombinedMont
         <CardContent className="pt-2">
           {(error.includes(CRITICAL_SETUP_ERROR_PREFIX)) && (
             <p className="text-xs text-muted-foreground mt-1">
-              Vui lòng tham khảo tệp `README.md` để biết hướng dẫn tạo/sửa hàm Supabase hoặc bảng (`time`, `Fulltime`, `Parttime`, `Doanh_thu`) bị thiếu/sai. Kiểm tra lỗi sao chép khi chạy SQL và đảm bảo bảng `time` được cấu hình đúng.
+              Vui lòng tham khảo tệp `README.md` để biết hướng dẫn tạo/sửa hàm Supabase hoặc bảng (`Time`, `Fulltime`, `Parttime`, `Doanh_thu`) bị thiếu/sai. Đảm bảo bảng `Time` (viết hoa T) được cấu hình đúng với các cột: `"Năm"` (INTEGER), `"thangpro"` (INTEGER, 1-12), và `"Thang_x"` (TEXT). Kiểm tra lỗi sao chép khi chạy SQL.
             </p>
           )}
         </CardContent>
@@ -339,3 +344,6 @@ export default function CombinedMonthlyTrendChart({ selectedYear }: CombinedMont
     </Card>
   );
 }
+
+
+    
