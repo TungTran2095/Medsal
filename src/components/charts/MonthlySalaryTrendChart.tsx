@@ -101,7 +101,9 @@ export default function MonthlySalaryTrendChart({ selectedYear }: MonthlySalaryT
            }
            setError(setupErrorMessage);
         } else {
-          setError(`Lỗi tải dữ liệu lương: ${rpcError.message}`);
+          const baseMessage = "Lỗi tải dữ liệu lương";
+          const messageDetail = rpcError?.message ? `: ${rpcError.message}` : ". Vui lòng kiểm tra cài đặt hàm RPC hoặc bảng.";
+          setError(`${baseMessage}${messageDetail}`);
         }
         console.error(`Error fetching monthly salary trend via RPC for ${functionName}:`, rpcError);
         rpcErrorOccurred = true;
@@ -128,21 +130,21 @@ export default function MonthlySalaryTrendChart({ selectedYear }: MonthlySalaryT
            } else if (rpcMessageText.includes('relation "doanh_thu" does not exist')){
             setupErrorMessage += " Cụ thể, bảng 'Doanh_thu' không tồn tại.";
            }
-           setError(prevError => prevError ? `${prevError}\n${setupErrorMessage}` : setupErrorMessage); // Append if salary error already exists
+           setError(prevError => prevError ? `${prevError}\n${setupErrorMessage}` : setupErrorMessage);
         } else {
-          setError(prevError => prevError ? `${prevError}\nLỗi tải dữ liệu doanh thu: ${rpcError.message}` : `Lỗi tải dữ liệu doanh thu: ${rpcError.message}`);
+          const baseMessage = "Lỗi tải dữ liệu doanh thu";
+          const messageDetail = rpcError?.message ? `: ${rpcError.message}` : ". Vui lòng kiểm tra cài đặt hàm RPC hoặc bảng.";
+          setError(prevError => prevError ? `${prevError}\n${baseMessage}${messageDetail}` : `${baseMessage}${messageDetail}`);
         }
         console.error(`Error fetching monthly revenue trend via RPC for ${functionName}:`, rpcError);
         rpcErrorOccurred = true;
       }
       
-      if (rpcErrorOccurred && !error) { // If individual RPCs failed but didn't set a critical setup error
-        // Fallback error message if specific errors weren't critical type.
+      if (rpcErrorOccurred && !error) { 
         if(!error) setError("Đã có lỗi xảy ra khi tải dữ liệu cho biểu đồ xu hướng.");
       }
 
 
-      // Merge data
       const mergedDataMap = new Map<string, MonthlyTrendData>();
 
       salaryData.forEach(item => {
@@ -163,21 +165,15 @@ export default function MonthlySalaryTrendChart({ selectedYear }: MonthlySalaryT
           month_label: item.month_label,
           year_val: item.year_val,
           total_revenue: Number(item.total_revenue) || 0,
-          name: item.month_label, // Ensure name is set even if only revenue exists for a month
+          name: item.month_label, 
         });
       });
       
-      // Sort data: Need to convert month_label (Thang_x) to a sortable numeric month if not already sorted by time table's month_numeric
-      // The SQL query for both functions *should* already be ordering by time.month_numeric.
-      // If Thang_x is like "Tháng 01", "Tháng 02", it might sort okay as string.
-      // If it's "Jan", "Feb", it will need numeric month for sorting.
-      // For now, assuming SQL sort is sufficient. If not, will need to map Thang_x back to month_numeric here.
       const finalChartData = Array.from(mergedDataMap.values())
         .sort((a, b) => {
           if (a.year_val !== b.year_val) {
             return a.year_val - b.year_val;
           }
-          // This is a basic sort for "Tháng XX" format. A robust solution would use month_numeric from time table if available.
           const monthA = parseInt(a.month_label.replace(/\D/g, ''));
           const monthB = parseInt(b.month_label.replace(/\D/g, ''));
           return monthA - monthB;
@@ -186,14 +182,13 @@ export default function MonthlySalaryTrendChart({ selectedYear }: MonthlySalaryT
 
       if (finalChartData.length > 0) {
         setChartData(finalChartData);
-      } else if (!rpcErrorOccurred && !error) { // Only set to empty if no errors occurred during fetch
+      } else if (!rpcErrorOccurred && !error) { 
         setChartData([]);
       }
 
 
     } catch (err: any) {
-      // Catch-all for unexpected errors during merging or processing
-      if (!error) { // Avoid overwriting specific RPC errors
+      if (!error) { 
         setError(err.message || 'Không thể tải dữ liệu xu hướng hàng tháng.');
       }
       console.error("Error processing monthly trend data:", err);
@@ -201,7 +196,7 @@ export default function MonthlySalaryTrendChart({ selectedYear }: MonthlySalaryT
     } finally {
       setIsLoading(false);
     }
-  }, [selectedYear, error]); // Added error to dependency to prevent re-fetch loops on error
+  }, [selectedYear, error]); 
 
   useEffect(() => {
     fetchMonthlyTrends();
@@ -270,7 +265,7 @@ export default function MonthlySalaryTrendChart({ selectedYear }: MonthlySalaryT
             <LineChart data={chartData} margin={{ top: 5, right: 20, left: -25, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis
-                dataKey="name" // 'name' is item.month_label (time.Thang_x)
+                dataKey="name" 
                 tickLine={false}
                 axisLine={false}
                 tickMargin={8}
@@ -291,7 +286,7 @@ export default function MonthlySalaryTrendChart({ selectedYear }: MonthlySalaryT
                         if (typeof payloadValue === 'number') {
                            return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', minimumFractionDigits: 0, maximumFractionDigits: 0  }).format(payloadValue);
                         }
-                        return String(value); // Fallback if payloadValue is undefined
+                        return String(value); 
                     }}
                      labelFormatter={(label, payload) => {
                         if (payload && payload.length > 0 && payload[0].payload) {
@@ -300,7 +295,7 @@ export default function MonthlySalaryTrendChart({ selectedYear }: MonthlySalaryT
                         }
                         return label;
                       }}
-                     itemSorter={(item) => (item.name === 'totalSalary' ? 0 : 1)} // Ensure salary appears before revenue
+                     itemSorter={(item) => (item.name === 'totalSalary' ? 0 : 1)} 
                 />}
               />
               <Legend
@@ -335,7 +330,7 @@ export default function MonthlySalaryTrendChart({ selectedYear }: MonthlySalaryT
                 strokeWidth={2}
                 dot={false}
                 name={chartConfig.totalSalary.label}
-                connectNulls // Connect line over missing data points
+                connectNulls 
               />
               <Line
                 type="monotone"
@@ -344,7 +339,7 @@ export default function MonthlySalaryTrendChart({ selectedYear }: MonthlySalaryT
                 strokeWidth={2}
                 dot={false}
                 name={chartConfig.totalRevenue.label}
-                connectNulls // Connect line over missing data points
+                connectNulls 
               />
             </LineChart>
           </ResponsiveContainer>
@@ -353,3 +348,5 @@ export default function MonthlySalaryTrendChart({ selectedYear }: MonthlySalaryT
     </Card>
   );
 }
+
+    
