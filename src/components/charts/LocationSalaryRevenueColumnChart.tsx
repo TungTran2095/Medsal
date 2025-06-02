@@ -2,19 +2,22 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import { supabase } from '@/lib/supabaseClient';
 import { Loader2, AlertTriangle, BarChartHorizontal, TrendingUp, Percent } from 'lucide-react';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis, 
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-  LabelList,
-} from 'recharts';
+// BarChart is now dynamically imported
+// import {
+//   BarChart,
+//   Bar,
+//   XAxis,
+//   YAxis,
+//   CartesianGrid,
+//   Tooltip,
+//   ResponsiveContainer,
+//   Legend,
+//   LabelList,
+// } from 'recharts';
+import { Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LabelList } from 'recharts';
 import {
   Card,
   CardContent,
@@ -29,11 +32,16 @@ import {
 } from '@/components/ui/chart';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
+const DynamicBarChart = dynamic(() => import('recharts').then(mod => mod.BarChart), {
+  ssr: false,
+  loading: () => <div className="flex items-center justify-center h-[250px]"><Loader2 className="h-8 w-8 animate-spin text-primary" /> <p className="ml-2">Loading chart...</p></div>,
+});
+
 interface LocationRatioData {
   location_name: string;
   ft_salary_ratio_component: number;
   pt_salary_ratio_component: number;
-  total_ratio: number; 
+  total_ratio: number;
 }
 
 interface LocationSalaryRevenueChartProps {
@@ -44,17 +52,17 @@ interface LocationSalaryRevenueChartProps {
 const chartConfig = {
   ft_salary_ratio_component: {
     label: 'Lương FT / Doanh Thu',
-    color: 'hsl(var(--chart-1))', // Changed from --chart-4 to --chart-1 (purple)
+    color: 'hsl(var(--chart-1))',
     icon: TrendingUp,
   },
   pt_salary_ratio_component: {
     label: 'Lương PT / Doanh Thu',
-    color: 'hsl(var(--chart-2))', // Changed from --chart-5 to --chart-2 (orange)
+    color: 'hsl(var(--chart-2))',
     icon: Percent,
   },
 } satisfies ChartConfig;
 
-const MIN_CATEGORY_HEIGHT = 40; 
+const MIN_CATEGORY_HEIGHT = 40;
 const CRITICAL_SETUP_ERROR_PREFIX = "LỖI CÀI ĐẶT QUAN TRỌNG:";
 const Y_AXIS_WIDTH = 110;
 
@@ -64,8 +72,8 @@ const CustomSegmentLabel = (props: any) => {
   if (value === 0 || value === null || value === undefined) return null;
 
   const formattedValue = `${(value * 100).toFixed(0)}%`;
-  const textWidth = formattedValue.length * 5; 
-  if (width < textWidth + 4) return null; 
+  const textWidth = formattedValue.length * 5;
+  if (width < textWidth + 4) return null;
 
   return (
     <text x={x + width / 2} y={y + height / 2} fill="hsl(var(--primary-foreground))" textAnchor="middle" dominantBaseline="middle" fontSize="9">
@@ -75,8 +83,8 @@ const CustomSegmentLabel = (props: any) => {
 };
 
 const CustomTotalLabel = (props: any) => {
-  const { x, y, width, height, index, chartData } = props; 
-  
+  const { x, y, width, height, index, chartData } = props;
+
   const currentDataPoint = chartData[index];
   if (!currentDataPoint || currentDataPoint.total_ratio === null || currentDataPoint.total_ratio === undefined) return null;
 
@@ -103,7 +111,7 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
 
     let finalFilterDescription: string;
     const yearSegment = selectedYear ? `Năm ${selectedYear}` : "Tất cả các năm";
-    
+
     let monthSegment: string;
     if (selectedMonths && selectedMonths.length > 0) {
       if (selectedMonths.length === 12) {
@@ -140,15 +148,15 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
       if (rpcError) {
         const rpcMessageText = rpcError.message ? String(rpcError.message).toLowerCase() : '';
         let isCriticalSetupError =
-            rpcError.code === '42883' || 
+            rpcError.code === '42883' ||
             (rpcError.code === 'PGRST202' && rpcMessageText.includes(functionName.toLowerCase())) ||
             (rpcMessageText.includes(functionName.toLowerCase()) && rpcMessageText.includes('does not exist'));
-        
+
         let setupErrorDetails = "";
         if (rpcMessageText.includes('relation "fulltime" does not exist')) { setupErrorDetails += " Bảng 'Fulltime' không tồn tại."; isCriticalSetupError = true; }
         if (rpcMessageText.includes('relation "parttime" does not exist')) { setupErrorDetails += " Bảng 'Parttime' không tồn tại."; isCriticalSetupError = true; }
         if (rpcMessageText.includes('relation "doanh_thu" does not exist')) { setupErrorDetails += " Bảng 'Doanh_thu' không tồn tại."; isCriticalSetupError = true; }
-        
+
         if (isCriticalSetupError) {
           let detailedGuidance = `${CRITICAL_SETUP_ERROR_PREFIX} Lỗi với hàm RPC '${functionName}' hoặc các bảng/cột phụ thuộc. Chi tiết:${setupErrorDetails.trim()}`;
             detailedGuidance += `\n\nVui lòng kiểm tra và đảm bảo các mục sau theo README.md:`;
@@ -158,7 +166,7 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
         }
         throw rpcError;
       }
-      
+
       const allProcessedData = (rpcData || []).map((item: any) => ({
         location_name: item.location_name,
         ft_salary_ratio_component: Number(item.ft_salary_ratio_component) || 0,
@@ -168,7 +176,7 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
 
       const filteredData = allProcessedData
         .filter(item => item.total_ratio >= 0.02 && item.total_ratio <= 1.5)
-        .sort((a,b) => b.total_ratio - a.total_ratio); 
+        .sort((a,b) => b.total_ratio - a.total_ratio);
 
       setChartData(filteredData);
 
@@ -190,12 +198,10 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
 
   const xAxisDomainMax = useMemo(() => {
     if (!chartData || chartData.length === 0) {
-      return 0.1; 
+      return 0.1;
     }
     const maxRatioInData = Math.max(0.01, ...chartData.map(item => item.total_ratio));
-    const dataEndTick = Math.max(0.1, Math.ceil(maxRatioInData * 20) / 20); // Rounds up to nearest 0.05
-    // Add some padding to the domain max for the total label to fit.
-    // Ensure it doesn't exceed 1.6 (160%) to avoid extreme scales.
+    const dataEndTick = Math.max(0.1, Math.ceil(maxRatioInData * 20) / 20);
     const finalDomain = Math.min(1.6, dataEndTick + Math.max(0.05, dataEndTick * 0.15));
     return finalDomain;
   }, [chartData]);
@@ -262,39 +268,39 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
         </CardDescription>
       </CardHeader>
       <CardContent className="pt-2 flex-grow overflow-hidden">
-         <ScrollArea className="h-full w-full"> 
-            <ChartContainer 
-              config={chartConfig} 
-              className="h-full w-full" 
-              style={{ height: `${chartContainerHeight}px`}} 
+         <ScrollArea className="h-full w-full">
+            <ChartContainer
+              config={chartConfig}
+              className="h-full w-full"
+              style={{ height: `${chartContainerHeight}px`}}
             >
                 <ResponsiveContainer width="100%" height="100%">
-                <BarChart 
+                <DynamicBarChart
                     layout="vertical"
-                    data={chartData} 
-                    margin={{ top: 15, right: 60, left: 20, bottom: barChartMarginBottom }} 
-                    barCategoryGap="20%" 
-                    barGap={4} 
+                    data={chartData}
+                    margin={{ top: 15, right: 60, left: 20, bottom: barChartMarginBottom }}
+                    barCategoryGap="20%"
+                    barGap={4}
                 >
                     <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                    <XAxis 
+                    <XAxis
                         type="number"
-                        domain={[0, xAxisDomainMax]} 
+                        domain={[0, xAxisDomainMax]}
                         tickFormatter={(value) => `${(value * 100).toFixed(0)}%`}
                         axisLine={false}
                         tickLine={false}
                         tickMargin={8}
                         className="text-xs"
                     />
-                    <YAxis 
+                    <YAxis
                         type="category"
-                        dataKey="location_name" 
-                        width={Y_AXIS_WIDTH} 
-                        tickLine={false} 
-                        axisLine={false} 
-                        tickMargin={5} 
+                        dataKey="location_name"
+                        width={Y_AXIS_WIDTH}
+                        tickLine={false}
+                        axisLine={false}
+                        tickMargin={5}
                         className="text-xs"
-                        interval={0} 
+                        interval={0}
                     />
                     <Tooltip
                     content={<ChartTooltipContent
@@ -304,7 +310,7 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
                             if (typeof payloadValue === 'number') {
                                 return `${(payloadValue * 100).toFixed(1)}%`;
                             }
-                            return String(value); 
+                            return String(value);
                         }}
                         labelFormatter={(label, payload) => {
                            if (payload && payload.length > 0 && payload[0].payload) {
@@ -338,40 +344,40 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
                             </div>
                         )}
                     />
-                    <Bar 
-                        dataKey="ft_salary_ratio_component" 
-                        stackId="a" 
-                        fill="var(--color-ft_salary_ratio_component)" 
+                    <Bar
+                        dataKey="ft_salary_ratio_component"
+                        stackId="a"
+                        fill="var(--color-ft_salary_ratio_component)"
                         name={chartConfig.ft_salary_ratio_component.label}
-                        radius={[4, 0, 0, 4]} 
-                        barSize={Math.max(15, MIN_CATEGORY_HEIGHT * 0.6)} 
+                        radius={[4, 0, 0, 4]}
+                        barSize={Math.max(15, MIN_CATEGORY_HEIGHT * 0.6)}
                     >
-                        <LabelList 
-                            dataKey="ft_salary_ratio_component" 
-                            position="center" 
-                            content={<CustomSegmentLabel />} 
+                        <LabelList
+                            dataKey="ft_salary_ratio_component"
+                            position="center"
+                            content={<CustomSegmentLabel />}
                         />
                     </Bar>
-                    <Bar 
-                        dataKey="pt_salary_ratio_component" 
-                        stackId="a" 
-                        fill="var(--color-pt_salary_ratio_component)" 
+                    <Bar
+                        dataKey="pt_salary_ratio_component"
+                        stackId="a"
+                        fill="var(--color-pt_salary_ratio_component)"
                         name={chartConfig.pt_salary_ratio_component.label}
                         radius={[0, 4, 4, 0]}
                         barSize={Math.max(15, MIN_CATEGORY_HEIGHT * 0.6)}
                     >
-                        <LabelList 
-                            dataKey="pt_salary_ratio_component" 
-                            position="center" 
-                            content={<CustomSegmentLabel />} 
+                        <LabelList
+                            dataKey="pt_salary_ratio_component"
+                            position="center"
+                            content={<CustomSegmentLabel />}
                         />
-                        <LabelList 
-                            dataKey="total_ratio" 
-                            position="right" 
+                        <LabelList
+                            dataKey="total_ratio"
+                            position="right"
                             content={<CustomTotalLabel chartData={chartData}/>}
                         />
                     </Bar>
-                </BarChart>
+                </DynamicBarChart>
                 </ResponsiveContainer>
             </ChartContainer>
         </ScrollArea>

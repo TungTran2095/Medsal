@@ -2,16 +2,20 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import { supabase } from '@/lib/supabaseClient';
 import { Loader2, AlertTriangle, PieChart as PieChartIcon } from 'lucide-react';
-import {
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  Tooltip,
-  Legend,
-} from 'recharts';
+// PieChart is now dynamically imported
+// import {
+//   PieChart,
+//   Pie,
+//   Cell,
+//   ResponsiveContainer,
+//   Tooltip,
+//   Legend,
+// } from 'recharts';
+import { Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
+
 import {
   Card,
   CardContent,
@@ -24,6 +28,11 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from '@/components/ui/chart';
+
+const DynamicPieChart = dynamic(() => import('recharts').then(mod => mod.PieChart), {
+  ssr: false,
+  loading: () => <div className="flex items-center justify-center h-[280px]"><Loader2 className="h-8 w-8 animate-spin text-primary" /> <p className="ml-2">Loading chart...</p></div>,
+});
 
 interface SalaryProportionPieChartProps {
   selectedMonths?: number[];
@@ -41,7 +50,7 @@ interface FetchError {
   message: string;
 }
 
-const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))']; 
+const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))'];
 
 const pieChartConfig = {
   "Lương Full-time": {
@@ -67,7 +76,7 @@ export default function SalaryProportionPieChart({ selectedMonths, selectedYear 
 
     let finalFilterDescription: string;
     const yearSegment = selectedYear ? `Năm ${selectedYear}` : "Tất cả các năm";
-    
+
     let monthSegment: string;
     if (selectedMonths && selectedMonths.length > 0) {
       if (selectedMonths.length === 12) {
@@ -115,12 +124,12 @@ export default function SalaryProportionPieChart({ selectedMonths, selectedYear 
           const functionName = salaryType === 'Full-time' ? 'get_total_salary_fulltime' : 'get_total_salary_parttime';
           const tableName = salaryType === 'Full-time' ? 'Fulltime' : 'Parttime';
           const salaryColumn = salaryType === 'Full-time' ? 'tong_thu_nhap' : '"Tong tien"';
-          
+
           const isFunctionMissingError =
             rpcError.code === '42883' ||
             (rpcError.code === 'PGRST202' && rpcMessageText.includes(functionName)) ||
             (rpcMessageText.includes(functionName) && rpcMessageText.includes('does not exist'));
-          
+
           const isTableMissingError = rpcMessageText.includes(`relation "${tableName.toLowerCase()}" does not exist`);
           const isColumnMissingError = salaryColumn ? rpcMessageText.includes(`column ${salaryColumn.toLowerCase()} does not exist`) || rpcMessageText.includes(`column "${salaryColumn.toLowerCase()}" does not exist`) : false;
 
@@ -128,7 +137,7 @@ export default function SalaryProportionPieChart({ selectedMonths, selectedYear 
           if (isFunctionMissingError) return { type: 'rpcMissing' as 'rpcMissing', message: `Hàm RPC '${functionName}' cho Lương ${salaryType} bị thiếu. Kiểm tra README.md.` };
           if (isTableMissingError) return { type: 'rpcMissing' as 'rpcMissing', message: `Bảng '${tableName}' cho Lương ${salaryType} không tồn tại.`};
           if (isColumnMissingError) return { type: 'rpcMissing' as 'rpcMissing', message: `Cột lương ('${salaryColumn}') trong bảng '${tableName}' cho Lương ${salaryType} không tồn tại.`};
-          
+
           return { type: 'generic' as 'generic', message: `Lỗi tải Lương ${salaryType}: ${rpcError.message || 'Lỗi RPC không xác định'}` };
         }
         const rawValue = res.status === 'fulfilled' ? res.value.data : 0;
@@ -140,7 +149,7 @@ export default function SalaryProportionPieChart({ selectedMonths, selectedYear 
 
       const ptSalResult = processResult(ptSalaryRes, 'Part-time');
       if (typeof ptSalResult === 'object' && !currentError) currentError = ptSalResult; else ptSal = ptSalResult;
-      
+
       if (currentError) {
         setError(currentError);
         return;
@@ -152,7 +161,7 @@ export default function SalaryProportionPieChart({ selectedMonths, selectedYear 
         setPieData([
           { name: 'Lương Full-time', value: ftSal, color: COLORS[0] },
           { name: 'Lương Part-time', value: ptSal, color: COLORS[1] },
-        ].filter(entry => entry.value > 0)); 
+        ].filter(entry => entry.value > 0));
       }
 
     } catch (err: any) {
@@ -166,10 +175,10 @@ export default function SalaryProportionPieChart({ selectedMonths, selectedYear 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
-  
+
   const RADIAN = Math.PI / 180;
   const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name, value }: any) => {
-    if (percent < 0.05) return null; 
+    if (percent < 0.05) return null;
     const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
     const x = cx + radius * Math.cos(-midAngle * RADIAN);
     const y = cy + radius * Math.sin(-midAngle * RADIAN);
@@ -242,7 +251,7 @@ export default function SalaryProportionPieChart({ selectedMonths, selectedYear 
       <CardContent className="pt-0 -mt-2">
         <ChartContainer config={pieChartConfig} className="aspect-auto h-[280px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
+            <DynamicPieChart>
               <Pie
                 data={pieData}
                 cx="50%"
@@ -278,7 +287,7 @@ export default function SalaryProportionPieChart({ selectedMonths, selectedYear 
                   return <span style={{ color }} className="text-xs">{value}</span>;
                 }}
               />
-            </PieChart>
+            </DynamicPieChart>
           </ResponsiveContainer>
         </ChartContainer>
       </CardContent>
