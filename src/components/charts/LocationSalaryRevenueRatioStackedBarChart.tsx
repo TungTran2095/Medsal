@@ -247,8 +247,8 @@ export default function LocationSalaryRevenueRatioStackedBarChart({ selectedMont
         </CardDescription>
       </CardHeader>
       <CardContent className="pt-2 flex-grow overflow-hidden">
-        <ScrollArea className="h-full w-full overflow-y-hidden" orientation="horizontal">
-          <ChartContainer config={chartConfig} className="h-[270px]" style={{ width: `${chartWidth}px` }}> {/* Reduced height */}
+        <ScrollArea className="h-[270px] w-full overflow-y-hidden" orientation="horizontal">
+          <ChartContainer config={chartConfig} className="h-full" style={{ width: `${chartWidth}px` }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart 
                 data={chartData} 
@@ -345,5 +345,4 @@ export default function LocationSalaryRevenueRatioStackedBarChart({ selectedMont
     </Card>
   );
 }
-
     
