@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, ChevronDown, Filter as FilterIcon, GanttChartSquare, BarChartHorizontal } from "lucide-react"; // Updated icon
+import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, ChevronDown, Filter as FilterIcon, GanttChartSquare, BarChartHorizontal, Circle } from "lucide-react";
 import type { PayrollEntry } from '@/types';
 import { supabase } from '@/lib/supabaseClient';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -19,14 +19,15 @@ import RevenueCard from '@/components/dashboard/RevenueCard';
 import SalaryToRevenueRatioCard from '@/components/dashboard/SalaryToRevenueRatioCard';
 import CombinedMonthlyTrendChart from '@/components/charts/MonthlySalaryTrendChart';
 import SalaryProportionPieChart from '@/components/charts/SalaryProportionPieChart';
-import LocationSalaryRevenueChart from '@/components/charts/LocationSalaryRevenueColumnChart'; // Updated import name for clarity
+import LocationSalaryRevenueColumnChart from '@/components/charts/LocationSalaryRevenueColumnChart';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuSeparator as DMSR,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -48,7 +49,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type WorkspaceView = 'dbManagement' | 'dashboard';
-type DashboardTab = 'payrollOverview' | 'comparison'; 
+type DashboardTab = 'payrollOverview' | 'comparison';
 
 interface NavItem {
   id: WorkspaceView;
@@ -97,15 +98,15 @@ export default function WorkspaceContent() {
       const tablesToQuery = ['Fulltime', 'Parttime', 'Doanh_thu'];
       const yearColumns = {
         'Fulltime': 'nam',
-        'Parttime': 'Nam', 
-        'Doanh_thu': 'Năm' 
+        'Parttime': 'Nam',
+        'Doanh_thu': 'Năm'
       };
 
 
       for (const tableName of tablesToQuery) {
         const yearColumn = yearColumns[tableName as keyof typeof yearColumns];
         const { data, error } = await supabase.from(tableName).select(yearColumn);
-        
+
         if (error && !String(error.message).toLowerCase().includes(`relation "${tableName.toLowerCase()}" does not exist`)) {
            console.warn(`Error fetching years from ${tableName} using column ${yearColumn}:`, error);
         }
@@ -121,13 +122,16 @@ export default function WorkspaceContent() {
             yearSet.add(Number(namValue));
           }
         });
-        const sortedYears = Array.from(yearSet).sort((a, b) => b - a); 
+        const sortedYears = Array.from(yearSet).sort((a, b) => b - a);
         setAvailableYears(sortedYears);
-        if (sortedYears.length > 0 && selectedYear === null) { 
+        if (sortedYears.length > 0 && selectedYear === null) {
             setSelectedYear(sortedYears[0]);
         }
       } else {
          setAvailableYears([]);
+         if(selectedYear === null && !isLoadingYears){ // if no years and not loading, default to all years context
+            setSelectedYear(null);
+         }
       }
     } catch (error: any) {
       console.error("Error fetching distinct years:", error);
@@ -140,7 +144,7 @@ export default function WorkspaceContent() {
     } finally {
       setIsLoadingYears(false);
     }
-  }, [activeView, toast, selectedYear]);
+  }, [activeView, toast, selectedYear, isLoadingYears]);
 
 
   useEffect(() => {
@@ -232,14 +236,14 @@ export default function WorkspaceContent() {
 
         if (entry.pay_date) {
           const datePartsDMY = entry.pay_date.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
-          const datePartsMDY = entry.pay_date.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/); // M/D/YYYY or MM/DD/YYYY
+          const datePartsMDY = entry.pay_date.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/); 
           const dateISO = entry.pay_date.match(/^\d{4}-\d{2}-\d{2}/);
 
           if (dateISO) {
              payDateObj = new Date(entry.pay_date);
-          } else if (datePartsDMY) { // Assuming D/M/YYYY or DD/MM/YYYY
+          } else if (datePartsDMY) { 
             payDateObj = new Date(parseInt(datePartsDMY[3]), parseInt(datePartsDMY[2]) - 1, parseInt(datePartsDMY[1]));
-          } else if (datePartsMDY) { // Assuming M/D/YYYY or MM/DD/YYYY
+          } else if (datePartsMDY) { 
             payDateObj = new Date(parseInt(datePartsMDY[3]), parseInt(datePartsMDY[1]) - 1, parseInt(datePartsMDY[2]));
           } else {
              payDateObj = new Date(entry.pay_date);
@@ -251,7 +255,7 @@ export default function WorkspaceContent() {
             nam = payDateObj.getFullYear();
           } else {
             console.warn(`Invalid date format for pay_date: ${entry.pay_date}. Setting thang and nam to null.`);
-            payDateObj = null; 
+            payDateObj = null;
             thang = null;
             nam = null;
           }
@@ -260,7 +264,7 @@ export default function WorkspaceContent() {
         return {
           employee_id: entry.employee_id,
           employee_name: entry.employee_name,
-          tong_thu_nhap: entry.salary, 
+          tong_thu_nhap: entry.salary,
           pay_date: payDateObj ? payDateObj.toISOString().split('T')[0] : null,
           thang: thang,
           nam: nam,
@@ -269,7 +273,7 @@ export default function WorkspaceContent() {
 
 
       const { error } = await supabase
-        .from('Fulltime') 
+        .from('Fulltime')
         .insert(dataToUpload);
 
       if (error) {
@@ -284,7 +288,7 @@ export default function WorkspaceContent() {
       setSelectedFile(null);
       const fileInput = document.getElementById('payroll-csv-input') as HTMLInputElement;
       if (fileInput) fileInput.value = '';
-      
+
       if (activeView === 'dashboard') {
           fetchDistinctYears();
       }
@@ -314,8 +318,8 @@ export default function WorkspaceContent() {
   };
 
   const getFilterButtonLabel = () => {
-    const yearText = selectedYear ? `Năm ${selectedYear}` : "Tất cả năm";
-    
+    const yearText = selectedYear === null ? "Tất cả năm" : `Năm ${selectedYear}`;
+
     let monthText;
     if (selectedMonths.length === 0 || selectedMonths.length === staticMonths.length) {
       monthText = "Tất cả tháng";
@@ -490,46 +494,87 @@ export default function WorkspaceContent() {
                           <ChevronDown className="ml-1 h-4 w-4 opacity-50 shrink-0" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent className="w-[280px]" align="end">
-                        <DropdownMenuLabel className="text-sm">Chọn Năm</DropdownMenuLabel>
+                      <DropdownMenuContent className="w-[300px]" align="end">
+                        <DropdownMenuLabel className="text-sm">Chọn Năm & Tháng</DropdownMenuLabel>
                         <DMSR />
-                        <DropdownMenuRadioGroup
-                          value={selectedYear === null ? "all" : String(selectedYear)}
-                          onValueChange={(value) => {
-                            setSelectedYear(value === "all" ? null : parseInt(value));
-                          }}
-                          className="p-1"
-                        >
-                          <DropdownMenuRadioItem value="all" disabled={isLoadingYears} className="text-xs">
-                            Tất cả các năm
-                          </DropdownMenuRadioItem>
-                          {isLoadingYears && availableYears.length === 0 && (
-                             <div className="px-2 py-1.5 text-xs text-muted-foreground">Đang tải năm...</div>
-                          )}
-                          {!isLoadingYears && availableYears.length === 0 && (
-                            <div className="px-2 py-1.5 text-xs text-muted-foreground">Không có dữ liệu năm.</div>
-                          )}
-                          {availableYears.map((year) => (
-                            <DropdownMenuRadioItem key={year} value={String(year)} className="text-xs">
-                              Năm {year}
-                            </DropdownMenuRadioItem>
-                          ))}
-                        </DropdownMenuRadioGroup>
-                        
-                        <DMSR />
-                        <DropdownMenuLabel className="text-sm">Chọn Tháng</DropdownMenuLabel>
-                        <DMSR />
-                        <ScrollArea className="max-h-[200px]">
+                        <ScrollArea className="max-h-[300px]">
                           <div className="p-1">
-                            {staticMonths.map((month) => (
-                              <DropdownMenuCheckboxItem
-                                key={month.value}
-                                checked={selectedMonths.includes(month.value)}
-                                onCheckedChange={(checked) => handleMonthSelection(month.value, checked as boolean)}
-                                className="text-xs"
+                            {/* All Years Option */}
+                            <DropdownMenuSub key="all-years-sub">
+                              <DropdownMenuSubTrigger
+                                className="text-xs pl-2 pr-1 py-1.5 w-full justify-start relative hover:bg-accent"
+                                onSelect={(e) => e.preventDefault()}
                               >
-                                {month.label}
-                              </DropdownMenuCheckboxItem>
+                                <span className="flex items-center gap-2">
+                                  {selectedYear === null && <Circle className="h-2 w-2 fill-current text-primary" />}
+                                  {selectedYear !== null && <span className="w-2 h-2 block"></span>} {/* Placeholder for alignment */}
+                                  Tất cả các năm
+                                </span>
+                              </DropdownMenuSubTrigger>
+                              <DropdownMenuSubContent className="w-[220px]">
+                                <DropdownMenuLabel className="text-xs">Chọn Tháng (cho Tất cả các năm)</DropdownMenuLabel>
+                                <DMSR />
+                                <ScrollArea className="max-h-[200px]">
+                                  <div className="p-1">
+                                    {staticMonths.map((month) => (
+                                      <DropdownMenuCheckboxItem
+                                        key={`all-years-${month.value}`}
+                                        checked={selectedMonths.includes(month.value)}
+                                        onCheckedChange={(checked) => {
+                                          setSelectedYear(null);
+                                          handleMonthSelection(month.value, checked as boolean);
+                                        }}
+                                        className="text-xs"
+                                      >
+                                        {month.label}
+                                      </DropdownMenuCheckboxItem>
+                                    ))}
+                                  </div>
+                                </ScrollArea>
+                              </DropdownMenuSubContent>
+                            </DropdownMenuSub>
+
+                            {/* Specific Years Options */}
+                            {isLoadingYears && availableYears.length === 0 && (
+                              <div className="px-2 py-1.5 text-xs text-muted-foreground">Đang tải năm...</div>
+                            )}
+                            {!isLoadingYears && availableYears.length === 0 && selectedYear !== null && ( // Only show if no years AND a specific year was somehow selected (e.g. default)
+                              <div className="px-2 py-1.5 text-xs text-muted-foreground">Không có dữ liệu năm.</div>
+                            )}
+                            {availableYears.map((year) => (
+                              <DropdownMenuSub key={year}>
+                                <DropdownMenuSubTrigger
+                                  className="text-xs pl-2 pr-1 py-1.5 w-full justify-start relative hover:bg-accent"
+                                  onSelect={(e) => e.preventDefault()}
+                                >
+                                  <span className="flex items-center gap-2">
+                                    {selectedYear === year && <Circle className="h-2 w-2 fill-current text-primary" />}
+                                    {selectedYear !== year && <span className="w-2 h-2 block"></span>} {/* Placeholder for alignment */}
+                                    Năm {year}
+                                  </span>
+                                </DropdownMenuSubTrigger>
+                                <DropdownMenuSubContent className="w-[220px]">
+                                  <DropdownMenuLabel className="text-xs">Chọn Tháng (cho Năm {year})</DropdownMenuLabel>
+                                  <DMSR />
+                                  <ScrollArea className="max-h-[200px]">
+                                    <div className="p-1">
+                                      {staticMonths.map((month) => (
+                                        <DropdownMenuCheckboxItem
+                                          key={`${year}-${month.value}`}
+                                          checked={selectedMonths.includes(month.value)}
+                                          onCheckedChange={(checked) => {
+                                            setSelectedYear(year);
+                                            handleMonthSelection(month.value, checked as boolean);
+                                          }}
+                                          className="text-xs"
+                                        >
+                                          {month.label}
+                                        </DropdownMenuCheckboxItem>
+                                      ))}
+                                    </div>
+                                  </ScrollArea>
+                                </DropdownMenuSubContent>
+                              </DropdownMenuSub>
                             ))}
                           </div>
                         </ScrollArea>
@@ -555,17 +600,17 @@ export default function WorkspaceContent() {
                         <TotalSalaryCard selectedMonths={selectedMonths} selectedYear={selectedYear} />
                         <TotalSalaryParttimeCard selectedMonths={selectedMonths} selectedYear={selectedYear} />
                         <RevenueCard selectedMonths={selectedMonths} selectedYear={selectedYear} />
-                        <SalaryToRevenueRatioCard selectedMonths={selectedMonths} selectedYear={selectedYear} /> 
+                        <SalaryToRevenueRatioCard selectedMonths={selectedMonths} selectedYear={selectedYear} />
                     </div>
                     <div className="grid grid-cols-1 gap-3">
                         <CombinedMonthlyTrendChart selectedYear={selectedYear} />
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3"> 
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <div className="md:col-span-1">
                            <SalaryProportionPieChart selectedMonths={selectedMonths} selectedYear={selectedYear} />
                         </div>
                         <div className="md:col-span-2">
-                           <LocationSalaryRevenueChart selectedMonths={selectedMonths} selectedYear={selectedYear} />
+                           <LocationSalaryRevenueColumnChart selectedMonths={selectedMonths} selectedYear={selectedYear} />
                         </div>
                     </div>
                   </TabsContent>

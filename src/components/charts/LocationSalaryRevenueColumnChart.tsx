@@ -169,7 +169,7 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
   }, [fetchData]);
 
   const chartContainerHeight = useMemo(() => {
-    return Math.max(250, chartData.length * MIN_CATEGORY_HEIGHT); 
+    return Math.max(750); 
   }, [chartData.length]);
 
   const xAxisDomainMax = useMemo(() => {
@@ -252,7 +252,7 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
               className="h-full w-full" 
               style={{ height: `${chartContainerHeight}px`}} 
             >
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="150%" height="100%">
                 <BarChart 
                     layout="vertical"
                     data={chartData} 
