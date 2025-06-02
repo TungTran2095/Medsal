@@ -131,6 +131,7 @@ export default function WorkspaceContent() {
             }
         } else {
             setSelectedYear(null); 
+            setAvailableYears([]); // ensure availableYears is also empty
         }
 
       } else {
@@ -323,11 +324,22 @@ export default function WorkspaceContent() {
     });
   };
 
+  const handleAllMonthsSelection = (yearForContext: number | null, checked: boolean) => {
+    setSelectedYear(yearForContext);
+    if (checked) {
+      setSelectedMonths(staticMonths.map(m => m.value));
+    } else {
+      setSelectedMonths([]);
+    }
+  };
+
   const getFilterButtonLabel = () => {
     const yearText = selectedYear === null ? "Tất cả năm" : `Năm ${selectedYear}`;
 
     let monthText;
-    if (selectedMonths.length === 0 || selectedMonths.length === staticMonths.length) {
+    if (selectedMonths.length === 0) {
+        monthText = "Không chọn tháng";
+    } else if (selectedMonths.length === staticMonths.length) {
       monthText = "Tất cả tháng";
     } else if (selectedMonths.length === 1) {
       const month = staticMonths.find(m => m.value === selectedMonths[0]);
@@ -523,6 +535,16 @@ export default function WorkspaceContent() {
                                 <DMSR />
                                 <ScrollArea className="max-h-[380px]">
                                   <div className="p-1">
+                                     <DropdownMenuCheckboxItem
+                                        key="all-years-all-months"
+                                        checked={selectedMonths.length === staticMonths.length}
+                                        onCheckedChange={(checked) => handleAllMonthsSelection(null, checked as boolean)}
+                                        onSelect={(e) => e.preventDefault()}
+                                        className="text-xs font-medium"
+                                      >
+                                        Tất cả các tháng
+                                      </DropdownMenuCheckboxItem>
+                                      <DMSR />
                                     {staticMonths.map((month) => (
                                       <DropdownMenuCheckboxItem
                                         key={`all-years-${month.value}`}
@@ -568,6 +590,16 @@ export default function WorkspaceContent() {
                                   <DMSR />
                                   <ScrollArea className="max-h-[380px]">
                                     <div className="p-1">
+                                       <DropdownMenuCheckboxItem
+                                        key={`${year}-all-months`}
+                                        checked={selectedMonths.length === staticMonths.length}
+                                        onCheckedChange={(checked) => handleAllMonthsSelection(year, checked as boolean)}
+                                        onSelect={(e) => e.preventDefault()}
+                                        className="text-xs font-medium"
+                                      >
+                                        Tất cả các tháng
+                                      </DropdownMenuCheckboxItem>
+                                      <DMSR />
                                       {staticMonths.map((month) => (
                                         <DropdownMenuCheckboxItem
                                           key={`${year}-${month.value}`}
