@@ -15,7 +15,8 @@ import SupabaseTableList from './SupabaseTableList';
 import { Separator } from '@/components/ui/separator';
 import TotalSalaryCard from '@/components/dashboard/TotalSalaryCard';
 import TotalSalaryParttimeCard from '@/components/dashboard/TotalSalaryParttimeCard';
-import RevenueCard from '@/components/dashboard/RevenueCard'; // Added import
+import RevenueCard from '@/components/dashboard/RevenueCard';
+import SalaryToRevenueRatioCard from '@/components/dashboard/SalaryToRevenueRatioCard'; // Added import
 import MonthlySalaryTrendChart from '@/components/charts/MonthlySalaryTrendChart';
 import {
   DropdownMenu,
@@ -586,6 +587,7 @@ export default function WorkspaceContent() {
                     <TotalSalaryCard selectedMonths={selectedMonths} selectedYear={selectedYear} />
                     <TotalSalaryParttimeCard selectedMonths={selectedMonths} selectedYear={selectedYear} />
                     <RevenueCard selectedMonths={selectedMonths} selectedYear={selectedYear} />
+                    <SalaryToRevenueRatioCard selectedMonths={selectedMonths} selectedYear={selectedYear} /> 
                 </div>
                 <div className="mt-0">
                     <MonthlySalaryTrendChart selectedYear={selectedYear} />
@@ -598,3 +600,4 @@ export default function WorkspaceContent() {
     </SidebarProvider>
   );
 }
+
