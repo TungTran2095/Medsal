@@ -21,7 +21,7 @@ To create these functions:
         *   Ensure your selection is exact.
         *   **Before clicking RUN, visually inspect the pasted code in the Supabase SQL Editor. If the editor has automatically added any comments (lines starting with `--`, like `-- source: dashboard...`) at the very end of the function block (especially after the `END;` line but before the final `$$;`), you MUST manually delete those comments from the editor before running the SQL. Otherwise, you will get an "unterminated dollar-quoted string" error.**
 5.  Click **Run** for each function.
-    *   **For `get_monthly_salary_trend_fulltime` or `get_monthly_salary_trend_parttime`**: If you encounter an error like "cannot change return type of existing function", you MUST first run `DROP FUNCTION function_name(integer);` (e.g., `DROP FUNCTION get_monthly_salary_trend_fulltime(integer);`) and then run the `CREATE OR REPLACE FUNCTION` script for it.
+    *   **For `get_monthly_salary_trend_fulltime` or `get_monthly_salary_trend_parttime` or `get_monthly_revenue_trend`**: If you encounter an error like "cannot change return type of existing function", you MUST first run `DROP FUNCTION function_name(integer);` (e.g., `DROP FUNCTION get_monthly_salary_trend_fulltime(integer);`) and then run the `CREATE OR REPLACE FUNCTION` script for it.
 
 #### `get_public_tables`
 
@@ -66,7 +66,7 @@ $$;
 
 #### `get_total_salary_parttime`
 
-This function is used by the Payroll Dashboard to calculate the total sum of `tong_thu_nhap` from the `Parttime` table, with optional filters for a selected year and an array of months. It correctly parses text-based month columns (e.g., "Tháng 01") into integers.
+This function is used by the Payroll Dashboard to calculate the total sum of `"Tong tien"` from the `Parttime` table, with optional filters for a selected year and an array of months. It correctly parses text-based month columns (e.g., "Tháng 01") into integers.
 
 **SQL Code:**
 ```sql
@@ -77,8 +77,8 @@ CREATE OR REPLACE FUNCTION get_total_salary_parttime(
 RETURNS DOUBLE PRECISION
 LANGUAGE SQL
 AS $$
-  SELECT SUM(CAST(REPLACE(tong_thu_nhap::text, ',', '') AS DOUBLE PRECISION))
-  FROM "Parttime"  -- Querying the Parttime table
+  SELECT SUM(CAST(REPLACE("Tong tien"::text, ',', '') AS DOUBLE PRECISION))
+  FROM "Parttime"
   WHERE (filter_year IS NULL OR nam::INTEGER = filter_year)
     AND (
         filter_months IS NULL OR
@@ -134,38 +134,38 @@ AS $$
 BEGIN
     -- IMPORTANT ASSUMPTIONS FOR THIS FUNCTION TO WORK:
     -- 1. A table named "Time" (capital T) MUST exist in your database.
-    -- 2. The "Time" table MUST have the following columns (or equivalents):
-    --    - A column for the numeric year, e.g., "Năm" (INTEGER). Used for joining with Fulltime.nam.
-    --    - A column for the numeric month (1-12), e.g., "thangpro" (INTEGER). Used for joining with the parsed month from Fulltime.thang AND for sorting.
-    --    - The display column for the X-axis, named "Thang_x" (TEXT). This is what will be shown on the chart.
-    --    If your "Time" table uses different column names, please update the JOIN clause below.
+    -- 2. The "Time" table MUST have the following columns:
+    --    - "Năm" (INTEGER or INT8): Numeric year.
+    --    - "thangpro" (TEXT): Numeric month as text (e.g., '01', '1', '12'). Used for sorting.
+    --    - "Thang_x" (TEXT): Display label for the X-axis (e.g., 'Tháng 01'). This MUST match the format of the 'thang' column in the "Fulltime" table.
+    -- 3. The "Fulltime" table MUST have 'nam' (INTEGER) for year and 'thang' (TEXT, e.g., 'Tháng 01') for month.
 
     RETURN QUERY
     SELECT
-        t."Thang_x" AS month_label,         -- X-axis label from the "Time" table
-        f.nam::INTEGER AS year_val,         -- Year from Fulltime table
+        t."Thang_x" AS month_label,
+        f.nam::INTEGER AS year_val,
         SUM(CAST(REPLACE(f.tong_thu_nhap::text, ',', '') AS DOUBLE PRECISION)) AS total_salary
     FROM
         "Fulltime" f
     INNER JOIN
-        "Time" t ON f.nam::INTEGER = t."Năm"  -- ASSUMED column name "Năm" (year) in "Time" table
-                 AND regexp_replace(f.thang, '\D', '', 'g')::INTEGER = t."thangpro" -- ASSUMED column name "thangpro" (numeric month) in "Time" table
+        "Time" t ON f.nam::INTEGER = t."Năm"::INTEGER -- Join on year
+                 AND f.thang = t."Thang_x"            -- Join on month text label (e.g., "Tháng 01" = "Tháng 01")
     WHERE
-        (p_filter_year IS NULL OR f.nam::INTEGER = p_filter_year) -- Filter on Fulltime.nam
+        (p_filter_year IS NULL OR f.nam::INTEGER = p_filter_year)
     GROUP BY
         f.nam::INTEGER,
         t."Thang_x",
-        t."thangpro" -- Group also by numeric month from "Time" table for ordering
+        t.thangpro -- Group also by textual month from "Time" table for sorting
     ORDER BY
         f.nam::INTEGER,
-        t."thangpro"; -- Order by year, then by the numeric month from "Time" table for correct trend
+        regexp_replace(t.thangpro, '\D', '', 'g')::INTEGER; -- Order by year, then by the numeric version of thangpro for correct trend
 END;
 $$;
 ```
 
 #### `get_monthly_salary_trend_parttime`
 
-This function is used by the Payroll Dashboard to fetch the total part-time salary (`tong_thu_nhap` from "Parttime" table) aggregated per month and year, for a given year. The X-axis of the chart will use the `Thang_x` column from your `Time` table.
+This function is used by the Payroll Dashboard to fetch the total part-time salary (`"Tong tien"` from "Parttime" table) aggregated per month and year, for a given year. The X-axis of the chart will use the `Thang_x` column from your `Time` table.
 
 **SQL Code:**
 ```sql
@@ -180,28 +180,29 @@ RETURNS TABLE(
 LANGUAGE plpgsql
 AS $$
 BEGIN
-    -- IMPORTANT ASSUMPTIONS: "Time" (capital T) table exists with "Năm", "thangpro", "Thang_x".
-    -- "Parttime" table exists.
+    -- IMPORTANT ASSUMPTIONS:
+    -- 1. "Time" (capital T) table exists with "Năm" (INTEGER/INT8), "thangpro" (TEXT), "Thang_x" (TEXT).
+    -- 2. "Parttime" table exists with 'nam' (INTEGER), 'thang' (TEXT, e.g., 'Tháng 01'), and "Tong tien" (numeric or text convertible to number).
 
     RETURN QUERY
     SELECT
         t."Thang_x" AS month_label,
         pt.nam::INTEGER AS year_val,
-        SUM(CAST(REPLACE(pt.tong_thu_nhap::text, ',', '') AS DOUBLE PRECISION)) AS total_salary
+        SUM(CAST(REPLACE(pt."Tong tien"::text, ',', '') AS DOUBLE PRECISION)) AS total_salary
     FROM
         "Parttime" pt
     INNER JOIN
-        "Time" t ON pt.nam::INTEGER = t."Năm"
-                 AND regexp_replace(pt.thang, '\D', '', 'g')::INTEGER = t."thangpro"
+        "Time" t ON pt.nam::INTEGER = t."Năm"::INTEGER
+                 AND pt.thang = t."Thang_x"
     WHERE
         (p_filter_year IS NULL OR pt.nam::INTEGER = p_filter_year)
     GROUP BY
         pt.nam::INTEGER,
         t."Thang_x",
-        t."thangpro"
+        t.thangpro
     ORDER BY
         pt.nam::INTEGER,
-        t."thangpro";
+        regexp_replace(t.thangpro, '\D', '', 'g')::INTEGER;
 END;
 $$;
 ```
@@ -224,7 +225,10 @@ LANGUAGE plpgsql
 AS $$
 BEGIN
     -- IMPORTANT ASSUMPTIONS FOR THIS FUNCTION TO WORK:
-    -- 1. A table named "Time" (capital T) MUST exist in your database with appropriate columns ("Năm", "thangpro", "Thang_x").
+    -- 1. A table named "Time" (capital T) MUST exist with columns:
+    --    - "Năm" (INTEGER or INT8): Numeric year.
+    --    - "thangpro" (TEXT): Numeric month as text (e.g., '01', '12'). Used for sorting.
+    --    - "Thang_x" (TEXT): Display label for X-axis (e.g., 'Tháng 01'). Must match 'thang' in "Doanh_thu".
     -- 2. A table named "Doanh_thu" MUST exist with columns "Kỳ báo cáo", "nam", "thang", and "Tên đơn vị".
 
     RETURN QUERY
@@ -235,24 +239,23 @@ BEGIN
     FROM
         "Doanh_thu" dr
     INNER JOIN
-        "Time" t ON dr.nam::INTEGER = t."Năm"
-                 AND regexp_replace(dr.thang, '\D', '', 'g')::INTEGER = t."thangpro"
+        "Time" t ON dr.nam::INTEGER = t."Năm"::INTEGER
+                 AND dr.thang = t."Thang_x"
     WHERE
         (p_filter_year IS NULL OR dr.nam::INTEGER = p_filter_year)
         AND dr."Tên đơn vị" NOT IN ('Medcom', 'Medon', 'Medicons', 'Meddom', 'Med Group')
     GROUP BY
         dr.nam::INTEGER,
         t."Thang_x",
-        t."thangpro"
+        t.thangpro
     ORDER BY
         dr.nam::INTEGER,
-        t."thangpro";
+        regexp_replace(t.thangpro, '\D', '', 'g')::INTEGER;
 END;
 $$;
 ```
 
 Once these functions are successfully created (or updated) in your Supabase SQL Editor, the application should be able to correctly filter and aggregate data. If you continue to encounter "unterminated dollar-quoted string" errors, please double-check for any invisible characters or ensure the entire function block is being processed correctly by the SQL editor, especially ensuring no comments are between `END;` and the final `$$;`.
-Additionally, for the `get_monthly_salary_trend_fulltime`, `get_monthly_salary_trend_parttime`, and `get_monthly_revenue_trend` functions, ensure you have a `Time` table (capital T) with appropriate columns (`"Năm"`, `"thangpro"`, `"Thang_x"`) as described in the function's comments.
-
+Additionally, for the `get_monthly_salary_trend_fulltime`, `get_monthly_salary_trend_parttime`, and `get_monthly_revenue_trend` functions, ensure you have a `Time` table (capital T) with appropriate columns (`"Năm"`, `thangpro` (TEXT), `"Thang_x"` (TEXT)) as described in the function's comments.
 
     

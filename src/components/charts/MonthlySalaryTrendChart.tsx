@@ -48,14 +48,14 @@ const chartConfig = {
 interface MonthlyTrendDataEntry {
   month_label: string;
   year_val: number;
-  total_salary?: number;
-  total_revenue?: number;
+  total_salary?: number; // Used by salary trend functions
+  total_revenue?: number; // Used by revenue trend function
 }
 
 interface CombinedMonthlyTrendData {
-  month_label: string;
+  month_label: string; // This is Time."Thang_x"
   year_val: number;
-  name: string;
+  name: string; // This is also Time."Thang_x", used by Recharts XAxis dataKey
   totalRevenue?: number;
   totalCombinedSalary?: number;
   salaryRevenueRatio?: number;
@@ -97,9 +97,10 @@ export default function CombinedMonthlyTrendChart({ selectedYear }: CombinedMont
 
       const processResponse = (
         res: PromiseSettledResult<any>,
-        dataType: string,
-        functionName: string,
-        mainDataTableName: string // e.g., 'Fulltime', 'Parttime', 'Doanh_thu'
+        dataType: string, // e.g., "lương full-time"
+        functionName: string, // e.g., 'get_monthly_salary_trend_fulltime'
+        mainDataTableName: string, // e.g., 'Fulltime', 'Parttime', 'Doanh_thu'
+        salaryColumnName: string = 'tong_thu_nhap' // Default salary column, overridden for part-time
       ): { data: MonthlyTrendDataEntry[], error?: string } => {
         if (res.status === 'fulfilled' && !res.value.error) {
           return { data: (res.value.data || []) as MonthlyTrendDataEntry[] };
@@ -108,44 +109,59 @@ export default function CombinedMonthlyTrendChart({ selectedYear }: CombinedMont
           const rpcMessageText = rpcError?.message ? String(rpcError.message).toLowerCase() : '';
           
           let isCriticalSetupError =
-            rpcError?.code === '42883' || 
-            (rpcError?.code === 'PGRST202' && rpcMessageText.includes(functionName.toLowerCase())) ||
+            rpcError?.code === '42883' || // undefined_function
+            (rpcError?.code === 'PGRST202' && rpcMessageText.includes(functionName.toLowerCase())) || // Could not find the function
             (rpcMessageText.includes(functionName.toLowerCase()) && rpcMessageText.includes('does not exist'));
 
           let setupErrorDetails = "";
 
+          // Check for "Time" table issues
           if (rpcMessageText.includes('relation "time" does not exist')) {
             setupErrorDetails += " Bảng 'Time' (viết hoa T) không tồn tại.";
             isCriticalSetupError = true;
           }
-          if (rpcMessageText.includes(`relation "${mainDataTableName.toLowerCase()}" does not exist`)) {
+          
+          // Check for main data table issues (e.g., Fulltime, Parttime, Doanh_thu)
+          const mainTableLc = mainDataTableName.toLowerCase();
+          if (rpcMessageText.includes(`relation "${mainTableLc}" does not exist`)) {
               setupErrorDetails += ` Bảng '${mainDataTableName}' không tồn tại.`;
               isCriticalSetupError = true;
           }
 
-          const namColumnMissingPattern = new RegExp(`column "?(${mainDataTableName.toLowerCase()}|pt|dr)"?\\."?nam"? does not exist|column "?nam"? of relation "${mainDataTableName.toLowerCase()}" does not exist|column "?nam"? does not exist`, 'i');
-          if (namColumnMissingPattern.test(rpcMessageText) && (rpcMessageText.includes(mainDataTableName.toLowerCase()) || rpcMessageText.includes(' pt.') || rpcMessageText.includes(' dr.'))) {
-             setupErrorDetails += ` Cột 'nam' (INTEGER, dùng cho năm) dường như bị thiếu trong bảng '${mainDataTableName}'.`;
+          // Check for 'nam' column issues in the main data table
+          const namColumnMissingPattern = new RegExp(`column "?(${mainTableLc}|f|pt|dr)"?\\."?nam"? does not exist|column "?nam"? of relation "${mainTableLc}" does not exist|column "?nam"? does not exist`, 'i');
+          if (namColumnMissingPattern.test(rpcMessageText) && (rpcMessageText.includes(mainTableLc) || rpcMessageText.includes(' f.') || rpcMessageText.includes(' pt.') || rpcMessageText.includes(' dr.'))) {
+             setupErrorDetails += ` Cột 'nam' (kiểu số nguyên, dùng cho năm) dường như bị thiếu trong bảng '${mainDataTableName}'.`;
              isCriticalSetupError = true;
           }
           
-          const thangColumnMissingPattern = new RegExp(`column "?(${mainDataTableName.toLowerCase()}|pt|dr)"?\\."?thang"? does not exist|column "?thang"? of relation "${mainDataTableName.toLowerCase()}" does not exist|column "?thang"? does not exist`, 'i');
-          if (thangColumnMissingPattern.test(rpcMessageText) && (rpcMessageText.includes(mainDataTableName.toLowerCase()) || rpcMessageText.includes(' pt.') || rpcMessageText.includes(' dr.'))) {
-             setupErrorDetails += ` Cột 'thang' (TEXT, ví dụ 'Tháng 01') dường như bị thiếu trong bảng '${mainDataTableName}'.`;
+          // Check for 'thang' column issues in the main data table
+          const thangColumnMissingPattern = new RegExp(`column "?(${mainTableLc}|f|pt|dr)"?\\."?thang"? does not exist|column "?thang"? of relation "${mainTableLc}" does not exist|column "?thang"? does not exist`, 'i');
+          if (thangColumnMissingPattern.test(rpcMessageText) && (rpcMessageText.includes(mainTableLc) || rpcMessageText.includes(' f.') || rpcMessageText.includes(' pt.') || rpcMessageText.includes(' dr.'))) {
+             setupErrorDetails += ` Cột 'thang' (TEXT, ví dụ 'Tháng 01', dùng để nối với Time."Thang_x") dường như bị thiếu trong bảng '${mainDataTableName}'.`;
              isCriticalSetupError = true;
           }
+          
+          // Check for specific data column issues (tong_thu_nhap, "Tong tien", "Kỳ báo cáo")
+          const dataColLc = salaryColumnName.toLowerCase();
+          const dataColPattern = new RegExp(`column "?(${mainTableLc}|f|pt|dr)"?\\."?${dataColLc.replace(' ', '\\s')}"? does not exist|column "?${dataColLc.replace(' ', '\\s')}"? of relation "${mainTableLc}" does not exist|column "?${dataColLc.replace(' ', '\\s')}"? does not exist`, 'i');
+          if (dataColPattern.test(rpcMessageText) && (rpcMessageText.includes(mainTableLc) || rpcMessageText.includes(' f.') || rpcMessageText.includes(' pt.') || rpcMessageText.includes(' dr.'))) {
+             setupErrorDetails += ` Cột dữ liệu '${salaryColumnName}' dường như bị thiếu trong bảng '${mainDataTableName}'.`;
+             isCriticalSetupError = true;
+          }
+
 
           if (isCriticalSetupError) {
             let detailedGuidance = `${CRITICAL_SETUP_ERROR_PREFIX} Lỗi với hàm RPC '${functionName}' hoặc các bảng phụ thuộc. Chi tiết:${setupErrorDetails.trim()}`;
             detailedGuidance += `\n\nVui lòng kiểm tra và đảm bảo các mục sau theo README.md:`;
             detailedGuidance += `\n1. Hàm RPC '${functionName}' được tạo đúng trong Supabase.`;
-            detailedGuidance += `\n2. Bảng 'Time' (viết hoa T) tồn tại với các cột: "Năm" (INTEGER), "thangpro" (INTEGER, 1-12), và "Thang_x" (TEXT).`;
-            detailedGuidance += `\n3. Bảng '${mainDataTableName}' tồn tại với cột 'nam' (INTEGER) cho năm và cột 'thang' (TEXT, ví dụ 'Tháng 01') cho tháng.`;
+            detailedGuidance += `\n2. Bảng 'Time' (viết hoa T) tồn tại với các cột: "Năm" (kiểu số nguyên), "thangpro" (TEXT, ví dụ: '01', '12', dùng để sắp xếp tháng), và "Thang_x" (TEXT, ví dụ: 'Tháng 01', dùng cho trục X và nối với cột 'thang' của các bảng dữ liệu).`;
+            detailedGuidance += `\n3. Bảng '${mainDataTableName}' tồn tại với cột 'nam' (kiểu số nguyên) cho năm và cột 'thang' (TEXT, ví dụ 'Tháng 01') cho tháng.`;
             
             if (mainDataTableName === 'Doanh_thu') {
                 detailedGuidance += `\n4. Bảng 'Doanh_thu' cũng cần cột "Kỳ báo cáo" (số liệu) và "Tên đơn vị" (TEXT).`;
-            } else if (mainDataTableName === 'Fulltime' || mainDataTableName === 'Parttime') {
-                detailedGuidance += `\n4. Bảng '${mainDataTableName}' cũng cần cột 'tong_thu_nhap' (số liệu).`;
+            } else { // Fulltime or Parttime
+                detailedGuidance += `\n4. Bảng '${mainDataTableName}' cũng cần cột '${salaryColumnName}' (số liệu).`;
             }
             return { data: [], error: detailedGuidance };
           }
@@ -156,17 +172,17 @@ export default function CombinedMonthlyTrendChart({ selectedYear }: CombinedMont
         }
       };
       
-      const ftSalaryResult = processResponse(ftSalaryRes, "lương full-time", 'get_monthly_salary_trend_fulltime', 'Fulltime');
+      const ftSalaryResult = processResponse(ftSalaryRes, "lương full-time", 'get_monthly_salary_trend_fulltime', 'Fulltime', 'tong_thu_nhap');
       if (ftSalaryResult.error) errorsOccurred.push(ftSalaryResult.error);
 
-      const ptSalaryResult = processResponse(ptSalaryRes, "lương part-time", 'get_monthly_salary_trend_parttime', 'Parttime');
+      const ptSalaryResult = processResponse(ptSalaryRes, "lương part-time", 'get_monthly_salary_trend_parttime', 'Parttime', '"Tong tien"'); // Note: "Tong tien"
       if (ptSalaryResult.error) errorsOccurred.push(ptSalaryResult.error);
       
-      const revenueResult = processResponse(revenueRes, "doanh thu", 'get_monthly_revenue_trend', 'Doanh_thu');
+      const revenueResult = processResponse(revenueRes, "doanh thu", 'get_monthly_revenue_trend', 'Doanh_thu', '"Kỳ báo cáo"'); // Note: "Kỳ báo cáo"
       if (revenueResult.error) errorsOccurred.push(revenueResult.error);
 
       if (errorsOccurred.length > 0) {
-        setError(errorsOccurred.join('\n\n---\n\n')); // Separate multiple critical errors clearly
+        setError(errorsOccurred.join('\n\n---\n\n'));
         setIsLoading(false);
         return;
       }
@@ -175,20 +191,18 @@ export default function CombinedMonthlyTrendChart({ selectedYear }: CombinedMont
 
       const addToMap = (data: MonthlyTrendDataEntry[], type: 'ft_salary' | 'pt_salary' | 'revenue') => {
         data.forEach(item => {
-          const key = `${item.year_val}-${item.month_label}`;
+          const key = `${item.year_val}-${item.month_label}`; // month_label is Time."Thang_x"
           const existing = mergedDataMap.get(key) || {
             month_label: item.month_label,
             year_val: item.year_val,
-            name: item.month_label, // This is Time."Thang_x"
+            name: item.month_label, // For XAxis dataKey
             totalRevenue: 0,
             totalCombinedSalary: 0,
           };
 
           if (type === 'revenue' && item.total_revenue !== undefined) {
             existing.totalRevenue = (existing.totalRevenue || 0) + (Number(item.total_revenue) || 0);
-          } else if (type === 'ft_salary' && item.total_salary !== undefined) {
-            existing.totalCombinedSalary = (existing.totalCombinedSalary || 0) + (Number(item.total_salary) || 0);
-          } else if (type === 'pt_salary' && item.total_salary !== undefined) {
+          } else if ((type === 'ft_salary' || type === 'pt_salary') && item.total_salary !== undefined) {
             existing.totalCombinedSalary = (existing.totalCombinedSalary || 0) + (Number(item.total_salary) || 0);
           }
           mergedDataMap.set(key, existing);
@@ -204,13 +218,16 @@ export default function CombinedMonthlyTrendChart({ selectedYear }: CombinedMont
           ...item,
           salaryRevenueRatio: (item.totalRevenue && item.totalRevenue !== 0) ? (item.totalCombinedSalary || 0) / item.totalRevenue : undefined,
         }))
-        .sort((a, b) => {
+        .sort((a, b) => { // Sorting logic relies on Time.thangpro being parsable to number after cleaning
           if (a.year_val !== b.year_val) return a.year_val - b.year_val;
+          // The month_label is Time."Thang_x". For sorting, we conceptually rely on how the SQL sorted it (using Time.thangpro).
+          // If month_label itself (e.g., "Tháng 01") is consistent and can be parsed for sorting:
           const monthANum = parseInt(String(a.month_label).replace(/\D/g, ''), 10);
           const monthBNum = parseInt(String(b.month_label).replace(/\D/g, ''), 10);
           if (!isNaN(monthANum) && !isNaN(monthBNum)) {
             return monthANum - monthBNum;
           }
+          // Fallback to string sort if parsing fails, though SQL order should dominate
           return String(a.month_label).localeCompare(String(b.month_label));
         });
 
@@ -245,7 +262,6 @@ export default function CombinedMonthlyTrendChart({ selectedYear }: CombinedMont
   }
 
   if (error) {
-    // Split error messages by the separator for better display if multiple critical errors occurred
     const errorMessages = error.split('\n\n---\n\n');
     return (
       <Card className="border-destructive/50 h-full">
@@ -263,6 +279,7 @@ export default function CombinedMonthlyTrendChart({ selectedYear }: CombinedMont
                 <p className="text-xs text-muted-foreground mt-1 whitespace-pre-line">
                   Đây là một lỗi cấu hình quan trọng. Vui lòng kiểm tra kỹ các mục đã liệt kê ở trên trong cơ sở dữ liệu Supabase và tệp README.md.
                   Đảm bảo rằng tất cả các bảng và hàm RPC được đặt tên chính xác (có phân biệt chữ hoa chữ thường cho tên bảng như 'Time', 'Fulltime', 'Parttime', 'Doanh_thu') và có đúng các cột được yêu cầu.
+                  Đặc biệt, kiểm tra cột 'nam' (năm) và 'thang' (tháng) trong các bảng dữ liệu, và cấu trúc bảng 'Time' ('Năm', 'thangpro', 'Thang_x').
                 </p>
               )}
             </div>
@@ -297,7 +314,7 @@ export default function CombinedMonthlyTrendChart({ selectedYear }: CombinedMont
       <CardContent className="pt-2">
         <ChartContainer config={chartConfig} className="aspect-auto h-[280px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}> {/* Adjusted margins */}
+            <ComposedChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} className="text-xs" />
               <YAxis
@@ -334,7 +351,7 @@ export default function CombinedMonthlyTrendChart({ selectedYear }: CombinedMont
                         return String(value); 
                     }}
                     labelFormatter={(label, payload) => (payload && payload.length > 0 && payload[0].payload) ? `${label}, ${payload[0].payload.year_val}` : label}
-                    itemSorter={(item) => { // Ensure consistent legend/tooltip order
+                    itemSorter={(item) => {
                         if (item.dataKey === 'totalRevenue') return 0;
                         if (item.dataKey === 'totalCombinedSalary') return 1;
                         if (item.dataKey === 'salaryRevenueRatio') return 2;
@@ -348,8 +365,8 @@ export default function CombinedMonthlyTrendChart({ selectedYear }: CombinedMont
                 wrapperStyle={{paddingBottom: "10px"}}
                 content={({ payload }) => (
                     <div className="flex items-center justify-center gap-2 mb-1 flex-wrap">
-                      {payload?.filter(p => chartConfig[p.dataKey as keyof typeof chartConfig]) // Filter out items not in config
-                        .sort((a,b) => { // Sort legend items to match itemSorter in tooltip
+                      {payload?.filter(p => chartConfig[p.dataKey as keyof typeof chartConfig])
+                        .sort((a,b) => {
                             const orderA = chartConfig[a.dataKey as keyof typeof chartConfig] ? (a.dataKey === 'totalRevenue' ? 0 : a.dataKey === 'totalCombinedSalary' ? 1 : 2) : 3;
                             const orderB = chartConfig[b.dataKey as keyof typeof chartConfig] ? (b.dataKey === 'totalRevenue' ? 0 : b.dataKey === 'totalCombinedSalary' ? 1 : 2) : 3;
                             return orderA - orderB;
