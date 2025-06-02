@@ -18,6 +18,7 @@ import TotalSalaryParttimeCard from '@/components/dashboard/TotalSalaryParttimeC
 import RevenueCard from '@/components/dashboard/RevenueCard';
 import SalaryToRevenueRatioCard from '@/components/dashboard/SalaryToRevenueRatioCard';
 import CombinedMonthlyTrendChart from '@/components/charts/MonthlySalaryTrendChart';
+import SalaryProportionPieChart from '@/components/charts/SalaryProportionPieChart';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -90,13 +91,15 @@ export default function WorkspaceContent() {
     try {
       let yearsData: (number | string)[] = [];
       const tablesToQuery = ['Fulltime', 'Parttime', 'Doanh_thu'];
+      const yearColumns = {
+        'Fulltime': 'nam',
+        'Parttime': 'Nam',
+        'Doanh_thu': 'Năm'
+      };
+
 
       for (const tableName of tablesToQuery) {
-        // Try to select "Nam" or "Năm"
-        let yearColumn = 'nam'; // Default
-        if (tableName === 'Parttime') yearColumn = 'Nam';
-        if (tableName === 'Doanh_thu') yearColumn = 'Năm';
-
+        const yearColumn = yearColumns[tableName as keyof typeof yearColumns];
         const { data, error } = await supabase.from(tableName).select(yearColumn);
         
         if (error && !String(error.message).toLowerCase().includes(`relation "${tableName.toLowerCase()}" does not exist`)) {
@@ -543,6 +546,7 @@ export default function WorkspaceContent() {
                 </div>
                 <div className="grid grid-cols-1 gap-3">
                     <CombinedMonthlyTrendChart selectedYear={selectedYear} />
+                    <SalaryProportionPieChart selectedMonths={selectedMonths} selectedYear={selectedYear} />
                 </div>
               </CardContent>
             </Card>
@@ -552,6 +556,3 @@ export default function WorkspaceContent() {
     </SidebarProvider>
   );
 }
-
-
-    
