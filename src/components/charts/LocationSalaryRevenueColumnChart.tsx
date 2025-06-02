@@ -8,7 +8,7 @@ import {
   BarChart,
   Bar,
   XAxis,
-  YAxis, // Import YAxis
+  YAxis, 
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
@@ -33,7 +33,7 @@ interface LocationRatioData {
   location_name: string;
   ft_salary_ratio_component: number;
   pt_salary_ratio_component: number;
-  total_ratio: number; // Helper for sorting and top label
+  total_ratio: number; 
 }
 
 interface LocationSalaryRevenueColumnChartProps {
@@ -142,14 +142,18 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
         throw rpcError;
       }
       
-      const processedData = (rpcData || []).map((item: any) => ({
+      const allProcessedData = (rpcData || []).map((item: any) => ({
         location_name: item.location_name,
         ft_salary_ratio_component: Number(item.ft_salary_ratio_component) || 0,
         pt_salary_ratio_component: Number(item.pt_salary_ratio_component) || 0,
         total_ratio: (Number(item.ft_salary_ratio_component) || 0) + (Number(item.pt_salary_ratio_component) || 0),
-      })).sort((a,b) => b.total_ratio - a.total_ratio); 
+      }));
 
-      setChartData(processedData);
+      const filteredData = allProcessedData
+        .filter(item => item.total_ratio >= 0.02 && item.total_ratio <= 1.5)
+        .sort((a,b) => b.total_ratio - a.total_ratio); 
+
+      setChartData(filteredData);
 
     } catch (err: any) {
       setError(err.message || 'Không thể tải dữ liệu tỷ lệ theo địa điểm.');
@@ -171,13 +175,11 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
 
   const yAxisDomainMax = useMemo(() => {
     if (!chartData || chartData.length === 0) {
-      return 0.1; // Default to a small positive value if no data, e.g., 10%
+      return 0.1; 
     }
     const maxRatio = Math.max(...chartData.map(item => item.total_ratio));
-    // Ensure the domain is at least, say, 0.1 (10%) or slightly above the max ratio
-    // Add some padding (e.g., 10% of maxRatio or a fixed 0.05)
     const paddedMax = maxRatio * 1.1;
-    return Math.max(0.1, Math.ceil(paddedMax * 20) / 20); // Round up to nearest 0.05, ensure at least 0.1
+    return Math.max(0.1, Math.ceil(paddedMax * 20) / 20); 
   }, [chartData]);
 
 
@@ -222,10 +224,10 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
      <Card className="h-[350px] flex flex-col">
        <CardHeader className="pb-2 pt-3">
           <CardTitle className="text-base font-semibold text-muted-foreground flex items-center gap-1.5"><BarChart3 className="h-4 w-4" />Quỹ Lương/Doanh Thu theo Địa Điểm</CardTitle>
-          <CardDescription className="text-xs">Cho: {filterDescription}</CardDescription>
+          <CardDescription className="text-xs">Cho: {filterDescription}. Chỉ hiển thị các đơn vị có tỷ lệ từ 2% đến 150%.</CardDescription>
        </CardHeader>
        <CardContent className="pt-2 flex items-center justify-center flex-grow">
-         <p className="text-sm text-muted-foreground">Không có dữ liệu cho kỳ đã chọn.</p>
+         <p className="text-sm text-muted-foreground">Không có dữ liệu cho kỳ đã chọn hoặc theo bộ lọc tỷ lệ.</p>
        </CardContent>
      </Card>
    );
@@ -236,7 +238,7 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
       <CardHeader className="pb-2 pt-3">
         <CardTitle className="text-base font-semibold flex items-center gap-1.5"><BarChart3 className="h-4 w-4" />Quỹ Lương/Doanh Thu theo Địa Điểm</CardTitle>
         <CardDescription className="text-xs">
-          Tỷ lệ (Lương FT + Lương PT) / Doanh thu cho mỗi địa điểm. Sắp xếp từ cao đến thấp. Cho: {filterDescription}.
+          Tỷ lệ (Lương FT + Lương PT) / Doanh thu cho mỗi địa điểm (2% - 150%). Sắp xếp từ cao đến thấp. Cho: {filterDescription}.
         </CardDescription>
       </CardHeader>
       <CardContent className="pt-2 flex-grow overflow-hidden">
