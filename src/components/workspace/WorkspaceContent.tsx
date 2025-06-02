@@ -44,8 +44,10 @@ import {
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useTheme } from "@/contexts/ThemeContext";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type WorkspaceView = 'dbManagement' | 'dashboard';
+type DashboardTab = 'payrollOverview' | 'anotherTab'; // Example for future tabs
 
 interface NavItem {
   id: WorkspaceView;
@@ -78,6 +80,7 @@ export default function WorkspaceContent() {
   const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [isLoadingYears, setIsLoadingYears] = useState<boolean>(true);
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
+  const [activeDashboardTab, setActiveDashboardTab] = useState<DashboardTab>('payrollOverview');
 
 
   const navItems: NavItem[] = [
@@ -472,11 +475,8 @@ export default function WorkspaceContent() {
                   <div className="flex-1">
                     <CardTitle className="text-lg font-semibold text-primary flex items-center gap-1.5">
                       <LayoutDashboard className="h-5 w-5" />
-                      Bảng Điều Khiển Lương & Doanh Thu
+                       Phân Tích Lương & Doanh Thu Tổng Hợp
                     </CardTitle>
-                    <CardDescription className="text-xs text-muted-foreground mt-0.5">
-                      Phân tích và tổng quan dữ liệu từ các bảng 'Fulltime', 'Parttime', và 'Doanh_thu'.
-                    </CardDescription>
                   </div>
                   <div className="flex items-center gap-2 mt-2 sm:mt-0">
                     <DropdownMenu>
@@ -537,20 +537,29 @@ export default function WorkspaceContent() {
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="pt-3 px-3 md:px-4 pb-3 flex-grow overflow-y-auto space-y-3">
-                <div className="grid gap-3 md:grid-cols-4">
-                    <TotalSalaryCard selectedMonths={selectedMonths} selectedYear={selectedYear} />
-                    <TotalSalaryParttimeCard selectedMonths={selectedMonths} selectedYear={selectedYear} />
-                    <RevenueCard selectedMonths={selectedMonths} selectedYear={selectedYear} />
-                    <SalaryToRevenueRatioCard selectedMonths={selectedMonths} selectedYear={selectedYear} /> 
-                </div>
-                <div className="grid grid-cols-1 gap-3">
-                    <CombinedMonthlyTrendChart selectedYear={selectedYear} />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <SalaryProportionPieChart selectedMonths={selectedMonths} selectedYear={selectedYear} />
-                    {/* Placeholder for another half-width chart can go here */}
-                </div>
+              <CardContent className="pt-3 px-3 md:px-4 pb-3 flex-grow flex flex-col overflow-hidden space-y-3">
+                <Tabs value={activeDashboardTab} onValueChange={(value) => setActiveDashboardTab(value as DashboardTab)} className="flex-grow flex flex-col overflow-hidden">
+                  <TabsList className="shrink-0">
+                    <TabsTrigger value="payrollOverview" className="text-xs px-2.5 py-1.5">Tổng Quan Lương & Doanh Thu</TabsTrigger>
+                    {/* Add more TabsTrigger components here for future dashboard pages */}
+                  </TabsList>
+                  <TabsContent value="payrollOverview" className="flex-grow overflow-y-auto space-y-3 mt-2">
+                    <div className="grid gap-3 md:grid-cols-4">
+                        <TotalSalaryCard selectedMonths={selectedMonths} selectedYear={selectedYear} />
+                        <TotalSalaryParttimeCard selectedMonths={selectedMonths} selectedYear={selectedYear} />
+                        <RevenueCard selectedMonths={selectedMonths} selectedYear={selectedYear} />
+                        <SalaryToRevenueRatioCard selectedMonths={selectedMonths} selectedYear={selectedYear} /> 
+                    </div>
+                    <div className="grid grid-cols-1 gap-3">
+                        <CombinedMonthlyTrendChart selectedYear={selectedYear} />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <SalaryProportionPieChart selectedMonths={selectedMonths} selectedYear={selectedYear} />
+                        {/* Placeholder for another half-width chart can go here */}
+                    </div>
+                  </TabsContent>
+                  {/* Add more TabsContent components here */}
+                </Tabs>
               </CardContent>
             </Card>
           )}
@@ -560,3 +569,5 @@ export default function WorkspaceContent() {
   );
 }
 
+
+    
