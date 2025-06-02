@@ -8,7 +8,7 @@ import {
   BarChart,
   Bar,
   XAxis,
-  YAxis,
+  // YAxis, // Y-axis will be removed
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
@@ -38,22 +38,60 @@ interface ChartDataEntry {
   location_name: string;
   ft_salary_ratio_component: number;
   pt_salary_ratio_component: number;
-  total_ratio: number; // For tooltip and potentially labels
+  total_ratio: number;
 }
 
 const chartConfig = {
   ft_salary_ratio_component: {
     label: 'Lương FT / Doanh Thu',
-    color: 'hsl(var(--chart-4))', 
+    color: 'hsl(var(--chart-4))',
   },
   pt_salary_ratio_component: {
     label: 'Lương PT / Doanh Thu',
-    color: 'hsl(var(--chart-5))', 
+    color: 'hsl(var(--chart-5))',
   },
 } satisfies ChartConfig;
 
 const CRITICAL_SETUP_ERROR_PREFIX = "LỖI CÀI ĐẶT QUAN TRỌNG:";
-const MIN_CATEGORY_WIDTH = 80; // Minimum width per category on X-axis for readability
+const MIN_CATEGORY_WIDTH = 80;
+
+const percentageFormatter = (value: number | null | undefined): string => {
+  if (value === null || value === undefined || Number.isNaN(value) || value === 0) return '';
+  return `${(value * 100).toFixed(0)}%`;
+};
+
+// Custom label component for total_ratio
+const CustomTotalLabel = (props: any) => {
+  const { x, y, width, index, chartData } = props; // y is the y-coordinate of the top of the bar segment it's attached to
+
+  // Access the specific data point from chartData using the index
+  // This requires chartData to be passed into CustomTotalLabel or accessed from context/closure
+  const dataPoint = chartData[index];
+  if (!dataPoint) return null;
+
+  const totalValue = dataPoint.total_ratio;
+
+  if (totalValue === null || totalValue === undefined || Number.isNaN(totalValue) ) {
+      return null;
+  }
+   // Even if totalValue is 0, we might want to show "0%"
+  const formattedTotal = (totalValue * 100).toFixed(0) + '%';
+
+
+  return (
+    <text
+      x={(x as number) + (width as number) / 2}
+      y={(y as number) - 6} // Position 6px above the top of the bar
+      fill="hsl(var(--foreground))"
+      textAnchor="middle"
+      dominantBaseline="auto"
+      className="text-xs font-medium"
+    >
+      {formattedTotal}
+    </text>
+  );
+};
+
 
 export default function LocationSalaryRevenueRatioStackedBarChart({ selectedMonths, selectedYear }: LocationRatioStackedBarChartProps) {
   const [chartData, setChartData] = useState<ChartDataEntry[]>([]);
@@ -131,7 +169,9 @@ export default function LocationSalaryRevenueRatioStackedBarChart({ selectedMont
           ft_salary_ratio_component: Number(item.ft_salary_ratio_component) || 0,
           pt_salary_ratio_component: Number(item.pt_salary_ratio_component) || 0,
           total_ratio: (Number(item.ft_salary_ratio_component) || 0) + (Number(item.pt_salary_ratio_component) || 0),
-        })).filter(item => item.total_ratio > 0); 
+        })).filter(item => item.total_ratio > 0);
+
+        processedData.sort((a, b) => b.total_ratio - a.total_ratio);
         setChartData(processedData);
       }
 
@@ -147,12 +187,6 @@ export default function LocationSalaryRevenueRatioStackedBarChart({ selectedMont
     fetchData();
   }, [fetchData]);
 
-  const percentageFormatter = (value: number) => {
-    if (value === null || value === undefined || Number.isNaN(value) || value === 0) return ''; // Don't show label for 0
-    return `${(value * 100).toFixed(0)}%`;
-  };
-  
-  const yAxisTickFormatter = (value: number) => `${(value * 100).toFixed(0)}%`;
   const chartWidth = Math.max(300, chartData.length * MIN_CATEGORY_WIDTH);
 
 
@@ -210,27 +244,26 @@ export default function LocationSalaryRevenueRatioStackedBarChart({ selectedMont
       <CardHeader className="pb-2 pt-3">
         <CardTitle className="text-base font-semibold flex items-center gap-1.5"><BarChart3 className="h-4 w-4" />Quỹ lương/Doanh thu theo Địa điểm</CardTitle>
         <CardDescription className="text-xs">
-          Tỷ trọng QL/DT (Lương FT + Lương PT so với Doanh thu) cho {filterDescription}.
+          Tỷ trọng QL/DT (Lương FT + Lương PT so với Doanh thu) cho {filterDescription}. Sắp xếp từ cao đến thấp.
         </CardDescription>
       </CardHeader>
       <CardContent className="pt-2 flex-grow overflow-hidden">
-        <ScrollArea className="h-full w-full pb-4">
-          <ChartContainer config={chartConfig} className="h-[260px]" style={{ width: `${chartWidth}px` }}>
+        <ScrollArea className="h-full w-full pb-4" orientation="horizontal">
+          <ChartContainer config={chartConfig} className="h-[280px]" style={{ width: `${chartWidth}px` }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 20 }}>
+              <BarChart data={chartData} margin={{ top: 25, right: 10, left: 0, bottom: 20 }} barCategoryGap="20%">
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis 
-                  dataKey="location_name" 
-                  type="category" 
-                  className="text-xs" 
-                  interval={0} 
+                <XAxis
+                  dataKey="location_name"
+                  type="category"
+                  className="text-xs"
+                  interval={0}
                   angle={chartData.length > 5 ? -30 : 0}
                   textAnchor={chartData.length > 5 ? "end" : "middle"}
-                  height={chartData.length > 5 ? 50 : 30} // Adjust height for angled labels
+                  height={chartData.length > 5 ? 50 : 30}
                   dy={chartData.length > 5 ? 5 : 0}
                 />
-                <YAxis type="number" tickFormatter={yAxisTickFormatter} domain={[0, 'auto']} className="text-xs" />
-                
+                {/* YAxis removed as per request */}
                 <Tooltip
                   content={<ChartTooltipContent
                     formatter={(value, name, props) => {
@@ -259,7 +292,7 @@ export default function LocationSalaryRevenueRatioStackedBarChart({ selectedMont
                         return label;
                     }}
                     cursor={{fill: 'hsl(var(--muted))', opacity: 0.5}}
-                    itemSorter={(itemA, itemB) => { 
+                    itemSorter={(itemA, itemB) => {
                         if (itemA.dataKey === 'ft_salary_ratio_component') return -1;
                         if (itemB.dataKey === 'ft_salary_ratio_component') return 1;
                         return 0;
@@ -300,6 +333,8 @@ export default function LocationSalaryRevenueRatioStackedBarChart({ selectedMont
                     formatter={percentageFormatter}
                     className="text-xs fill-primary-foreground"
                   />
+                  {/* Total Label on top of the stack */}
+                  <LabelList content={<CustomTotalLabel chartData={chartData} />} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
