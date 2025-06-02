@@ -7,11 +7,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, ChevronDown, Filter as FilterIcon, GanttChartSquare, BarChartHorizontal, Circle } from "lucide-react";
+import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, ChevronDown, Filter as FilterIcon, GanttChartSquare, BarChartHorizontal, Circle, Settings2 } from "lucide-react";
 import type { PayrollEntry } from '@/types';
 import { supabase } from '@/lib/supabaseClient';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import SupabaseTableList from './SupabaseTableList';
+import AiToolsViewer from './AiToolsViewer'; // Import the new component
 import { Separator } from '@/components/ui/separator';
 import TotalSalaryCard from '@/components/dashboard/TotalSalaryCard';
 import TotalSalaryParttimeCard from '@/components/dashboard/TotalSalaryParttimeCard';
@@ -48,7 +49,7 @@ import { Switch } from "@/components/ui/switch";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-type WorkspaceView = 'dbManagement' | 'dashboard';
+type WorkspaceView = 'dbManagement' | 'dashboard' | 'aiTools'; // Added 'aiTools'
 type DashboardTab = 'payrollOverview' | 'comparison';
 
 interface NavItem {
@@ -87,7 +88,8 @@ export default function WorkspaceContent() {
 
   const navItems: NavItem[] = [
     { id: 'dashboard', label: 'Bảng Điều Khiển', icon: LayoutDashboard },
-    { id: 'dbManagement', label: 'Quản Lý Cơ Sở Dữ Liệu', icon: Database },
+    { id: 'dbManagement', label: 'Quản Lý CSDL', icon: Database },
+    { id: 'aiTools', label: 'Công Cụ AI', icon: Settings2 }, // New navigation item
   ];
 
   const fetchDistinctYears = useCallback(async () => {
@@ -325,7 +327,7 @@ export default function WorkspaceContent() {
   };
 
   const handleAllMonthsSelection = (yearForContext: number | null, checked: boolean) => {
-    setSelectedYear(yearForContext);
+    setSelectedYear(yearForContext); // Set year context first
     if (checked) {
       setSelectedMonths(staticMonths.map(m => m.value));
     } else {
@@ -403,7 +405,7 @@ export default function WorkspaceContent() {
       <SidebarInset className="flex-grow overflow-y-auto p-0.5 md:p-1">
         <div className="space-y-1 h-full">
           {activeView === 'dbManagement' && (
-            <>
+            <div className="flex flex-col gap-1 h-full">
               <Card className="w-full flex flex-col shadow-md rounded-lg">
                 <CardHeader className="items-center border-b pb-2 pt-3">
                   <FileText className="h-5 w-5 mb-0.5 text-primary" />
@@ -484,11 +486,14 @@ export default function WorkspaceContent() {
                   </Button>
                 </CardContent>
               </Card>
-
               <Separator className="my-1"/>
-
-              <SupabaseTableList />
-            </>
+              <div className="flex-grow">
+                <SupabaseTableList />
+              </div>
+            </div>
+          )}
+          {activeView === 'aiTools' && (
+            <AiToolsViewer />
           )}
           {activeView === 'dashboard' && (
              <Card className="shadow-md rounded-lg h-full flex flex-col">
