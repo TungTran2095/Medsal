@@ -64,7 +64,7 @@ function getSchemaRepresentation(schema: z.ZodTypeAny | undefined): string | und
 const listAvailableToolsFlow = ai.defineFlow(
   {
     name: 'listAvailableToolsFlow',
-    inputSchema: z.undefined(), // No input needed for this flow
+    inputSchema: z.void(), // Changed from z.undefined()
     outputSchema: ListAvailableToolsOutputSchema,
   },
   async () => {
@@ -83,3 +83,4 @@ const listAvailableToolsFlow = ai.defineFlow(
     return { tools: registeredTools };
   }
 );
+
