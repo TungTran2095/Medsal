@@ -63,6 +63,31 @@ AS $$
 $$;
 ```
 
+#### `get_total_salary_parttime`
+
+This function is used by the Payroll Dashboard to calculate the total sum of `tong_thu_nhap` from the `Parttime` table, with optional filters for a selected year and an array of months. It correctly parses text-based month columns (e.g., "Tháng 01") into integers.
+
+**SQL Code:**
+```sql
+CREATE OR REPLACE FUNCTION get_total_salary_parttime(
+    filter_year INTEGER DEFAULT NULL,
+    filter_months INTEGER[] DEFAULT NULL
+)
+RETURNS DOUBLE PRECISION
+LANGUAGE SQL
+AS $$
+  SELECT SUM(CAST(REPLACE(tong_thu_nhap::text, ',', '') AS DOUBLE PRECISION))
+  FROM "Parttime"  -- Querying the Parttime table
+  WHERE (filter_year IS NULL OR nam::INTEGER = filter_year)
+    AND (
+        filter_months IS NULL OR
+        array_length(filter_months, 1) IS NULL OR
+        array_length(filter_months, 1) = 0 OR
+        regexp_replace(thang, '\D', '', 'g')::INTEGER = ANY(filter_months)
+    );
+$$;
+```
+
 #### `get_employee_count_fulltime`
 
 This function is used by the Payroll Dashboard to count the number of unique employees from the `Fulltime` table, with optional filters for a selected year and an array of months. It correctly parses text-based month columns (e.g., "Tháng 01") into integers.
@@ -138,3 +163,4 @@ $$;
 
 Once these functions are successfully created (or updated) in your Supabase SQL Editor, the application should be able to correctly filter and aggregate data. If you continue to encounter "unterminated dollar-quoted string" errors, please double-check for any invisible characters or ensure the entire function block is being processed correctly by the SQL editor, especially ensuring no comments are between `END;` and the final `$$;`.
 Additionally, for the `get_monthly_salary_trend_fulltime` function, ensure you have a `time` table with appropriate columns (`year_numeric`, `month_numeric`, `Thang_x`) as described in the function's comments.
+
