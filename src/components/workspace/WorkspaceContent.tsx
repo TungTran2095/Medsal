@@ -546,7 +546,10 @@ export default function WorkspaceContent() {
                 </div>
                 <div className="grid grid-cols-1 gap-3">
                     <CombinedMonthlyTrendChart selectedYear={selectedYear} />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <SalaryProportionPieChart selectedMonths={selectedMonths} selectedYear={selectedYear} />
+                    {/* Placeholder for another half-width chart can go here */}
                 </div>
               </CardContent>
             </Card>
@@ -556,3 +559,4 @@ export default function WorkspaceContent() {
     </SidebarProvider>
   );
 }
+
