@@ -53,7 +53,7 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 const CRITICAL_SETUP_ERROR_PREFIX = "LỖI CÀI ĐẶT QUAN TRỌNG:";
-const MIN_CATEGORY_WIDTH = 80;
+const MIN_CATEGORY_WIDTH = 50; // Adjusted from 80
 
 const percentageFormatter = (value: number | null | undefined): string => {
   if (value === null || value === undefined || Number.isNaN(value) || value === 0) return '';
@@ -253,7 +253,7 @@ export default function LocationSalaryRevenueRatioStackedBarChart({ selectedMont
               <BarChart 
                 data={chartData} 
                 margin={{ top: 25, right: 10, left: 0, bottom: barChartMarginBottom }} 
-                barCategoryGap="20%"
+                barCategoryGap="10%" // Adjusted from 20%
               >
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis
@@ -345,4 +345,6 @@ export default function LocationSalaryRevenueRatioStackedBarChart({ selectedMont
     </Card>
   );
 }
+    
+
     
