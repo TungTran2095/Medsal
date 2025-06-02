@@ -181,8 +181,8 @@ export default function SalaryToRevenueRatioCard({ selectedMonths, selectedYear 
           </div>
         ) : error ? (
           <>
-            <div className="text-2xl font-bold text-destructive flex items-center">
-              <AlertTriangle className="h-6 w-6 mr-2" /> Lỗi
+            <div className="text-xl font-bold text-destructive flex items-center">
+              <AlertTriangle className="h-5 w-5 mr-2" /> Lỗi
             </div>
             <p className="text-xs text-destructive mt-0.5">{error.message}</p>
             {(error.type === 'rpcMissing' || error.message.includes('Bảng') || error.message.includes('Cột')) && (
@@ -198,7 +198,7 @@ export default function SalaryToRevenueRatioCard({ selectedMonths, selectedYear 
           </>
         ) : (
           <>
-            <div className={`text-2xl font-bold ${cardState === 'warning' || cardState === 'noData' ? 'text-muted-foreground' : 'text-primary'}`}>
+            <div className={`text-xl font-bold ${cardState === 'warning' || cardState === 'noData' ? 'text-muted-foreground' : 'text-primary'}`}>
               {displayValue}
             </div>
             <p className="text-xs text-muted-foreground">

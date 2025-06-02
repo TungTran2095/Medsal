@@ -177,14 +177,11 @@ export default function RevenueCard({ selectedMonths, selectedYear }: RevenueCar
            <TrendingUp className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent className="pt-2">
-           <div className="text-2xl font-bold text-muted-foreground">
+           <div className="text-xl font-bold text-muted-foreground">
             0 VND
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">
             Không có dữ liệu doanh thu cho: {filterDescription}.
-          </p>
-           <p className="text-xs text-muted-foreground mt-0.5">
-            (Lưu ý: Một số 'Tên đơn vị' như Medcom, Medon,... bị loại trừ.)
           </p>
         </CardContent>
       </Card>
@@ -205,14 +202,11 @@ export default function RevenueCard({ selectedMonths, selectedYear }: RevenueCar
         <TrendingUp className="h-4 w-4 text-muted-foreground" />
       </CardHeader>
       <CardContent className="pt-2">
-         <div className="text-2xl font-bold text-primary">
+         <div className="text-xl font-bold text-primary">
             {formattedTotalRevenue}
           </div>
           <p className="text-xs text-muted-foreground">
             Cho: {filterDescription}
-          </p>
-           <p className="text-xs text-muted-foreground mt-0.5">
-            (Lưu ý: Một số 'Tên đơn vị' như Medcom, Medon,... bị loại trừ.)
           </p>
       </CardContent>
     </Card>

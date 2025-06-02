@@ -167,7 +167,7 @@ export default function TotalSalaryCard({ selectedMonths, selectedYear }: TotalS
            <Banknote className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent className="pt-2">
-           <div className="text-2xl font-bold text-muted-foreground">
+           <div className="text-xl font-bold text-muted-foreground">
             0 VND
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">
@@ -192,7 +192,7 @@ export default function TotalSalaryCard({ selectedMonths, selectedYear }: TotalS
         <Banknote className="h-4 w-4 text-muted-foreground" />
       </CardHeader>
       <CardContent className="pt-2">
-         <div className="text-2xl font-bold text-primary">
+         <div className="text-xl font-bold text-primary">
             {formattedTotalSalary}
           </div>
           <p className="text-xs text-muted-foreground">
