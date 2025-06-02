@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, ChevronDown, Filter as FilterIcon, GanttChartSquare, BarChart3 } from "lucide-react";
+import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, ChevronDown, Filter as FilterIcon, GanttChartSquare, BarChartHorizontal } from "lucide-react"; // Updated icon
 import type { PayrollEntry } from '@/types';
 import { supabase } from '@/lib/supabaseClient';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -19,7 +19,7 @@ import RevenueCard from '@/components/dashboard/RevenueCard';
 import SalaryToRevenueRatioCard from '@/components/dashboard/SalaryToRevenueRatioCard';
 import CombinedMonthlyTrendChart from '@/components/charts/MonthlySalaryTrendChart';
 import SalaryProportionPieChart from '@/components/charts/SalaryProportionPieChart';
-import LocationSalaryRevenueColumnChart from '@/components/charts/LocationSalaryRevenueColumnChart';
+import LocationSalaryRevenueChart from '@/components/charts/LocationSalaryRevenueColumnChart'; // Updated import name for clarity
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -565,7 +565,7 @@ export default function WorkspaceContent() {
                            <SalaryProportionPieChart selectedMonths={selectedMonths} selectedYear={selectedYear} />
                         </div>
                         <div className="md:col-span-2">
-                           <LocationSalaryRevenueColumnChart selectedMonths={selectedMonths} selectedYear={selectedYear} />
+                           <LocationSalaryRevenueChart selectedMonths={selectedMonths} selectedYear={selectedYear} />
                         </div>
                     </div>
                   </TabsContent>

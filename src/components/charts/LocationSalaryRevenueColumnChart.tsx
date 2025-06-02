@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { Loader2, AlertTriangle, BarChart3, TrendingUp, Percent } from 'lucide-react';
+import { Loader2, AlertTriangle, BarChartHorizontal, TrendingUp, Percent } from 'lucide-react'; // Changed icon
 import {
   BarChart,
   Bar,
@@ -36,7 +36,7 @@ interface LocationRatioData {
   total_ratio: number; 
 }
 
-interface LocationSalaryRevenueColumnChartProps {
+interface LocationSalaryRevenueChartProps { // Renamed for clarity, was ...ColumnChartProps
   selectedYear?: number | null;
   selectedMonths?: number[];
 }
@@ -54,7 +54,7 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-const MIN_CATEGORY_WIDTH = 50; 
+const MIN_CATEGORY_HEIGHT = 40; 
 const CRITICAL_SETUP_ERROR_PREFIX = "LỖI CÀI ĐẶT QUAN TRỌNG:";
 
 
@@ -63,8 +63,8 @@ const CustomSegmentLabel = (props: any) => {
   if (value === 0 || value === null || value === undefined) return null;
 
   const formattedValue = `${(value * 100).toFixed(0)}%`;
-  const textHeight = 10; 
-  if (height < textHeight + 4) return null;
+  const textWidth = formattedValue.length * 5; // Estimate text width
+  if (width < textWidth + 4) return null; // Check if text fits in bar segment width
 
   return (
     <text x={x + width / 2} y={y + height / 2} fill="hsl(var(--primary-foreground))" textAnchor="middle" dominantBaseline="middle" fontSize="9">
@@ -74,7 +74,7 @@ const CustomSegmentLabel = (props: any) => {
 };
 
 const CustomTotalLabel = (props: any) => {
-  const { x, y, width, value, index, chartData } = props; 
+  const { x, y, width, height, index, chartData } = props; 
   
   const currentDataPoint = chartData[index];
   if (!currentDataPoint || currentDataPoint.total_ratio === null || currentDataPoint.total_ratio === undefined) return null;
@@ -82,15 +82,16 @@ const CustomTotalLabel = (props: any) => {
   const totalValue = currentDataPoint.total_ratio;
   if (totalValue === 0 && currentDataPoint.ft_salary_ratio_component === 0 && currentDataPoint.pt_salary_ratio_component === 0) return null;
 
+  // For layout="vertical", x is end of bar, y is middle of bar height
   return (
-    <text x={x + width / 2} y={y - 5} fill="hsl(var(--foreground))" textAnchor="middle" dominantBaseline="auto" fontSize="10" fontWeight="500">
+    <text x={x + width + 5} y={y + height / 2} fill="hsl(var(--foreground))" textAnchor="start" dominantBaseline="middle" fontSize="10" fontWeight="500">
       {`${(totalValue * 100).toFixed(0)}%`}
     </text>
   );
 };
 
 
-export default function LocationSalaryRevenueColumnChart({ selectedYear, selectedMonths }: LocationSalaryRevenueColumnChartProps) {
+export default function LocationSalaryRevenueChart({ selectedYear, selectedMonths }: LocationSalaryRevenueChartProps) {
   const [chartData, setChartData] = useState<LocationRatioData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -167,18 +168,16 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
     fetchData();
   }, [fetchData]);
 
-  const chartContainerWidth = useMemo(() => {
-    return Math.max(300, chartData.length * MIN_CATEGORY_WIDTH); 
+  const chartContainerHeight = useMemo(() => {
+    return Math.max(250, chartData.length * MIN_CATEGORY_HEIGHT); 
   }, [chartData.length]);
 
-  const barChartMarginBottom = chartData.length > 7 ? 35 : 25;
-
-  const yAxisDomainMax = useMemo(() => {
+  const xAxisDomainMax = useMemo(() => {
     if (!chartData || chartData.length === 0) {
       return 0.1; 
     }
     const maxRatio = Math.max(...chartData.map(item => item.total_ratio));
-    const paddedMax = maxRatio * 1.1;
+    const paddedMax = maxRatio * 1.15; // Increased padding for total label
     return Math.max(0.1, Math.ceil(paddedMax * 20) / 20); 
   }, [chartData]);
 
@@ -187,7 +186,7 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
     return (
       <Card className="h-[350px] flex flex-col">
         <CardHeader className="pb-2 pt-3">
-          <CardTitle className="text-base font-semibold flex items-center gap-1.5"><BarChart3 className="h-4 w-4" />Quỹ Lương/Doanh Thu theo Địa Điểm</CardTitle>
+          <CardTitle className="text-base font-semibold flex items-center gap-1.5"><BarChartHorizontal className="h-4 w-4" />Quỹ Lương/Doanh Thu theo Địa Điểm</CardTitle>
           <CardDescription className="text-xs">Đang tải dữ liệu...</CardDescription>
         </CardHeader>
         <CardContent className="flex items-center justify-center flex-grow pt-2">
@@ -223,7 +222,7 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
     return (
      <Card className="h-[350px] flex flex-col">
        <CardHeader className="pb-2 pt-3">
-          <CardTitle className="text-base font-semibold text-muted-foreground flex items-center gap-1.5"><BarChart3 className="h-4 w-4" />Quỹ Lương/Doanh Thu theo Địa Điểm</CardTitle>
+          <CardTitle className="text-base font-semibold text-muted-foreground flex items-center gap-1.5"><BarChartHorizontal className="h-4 w-4" />Quỹ Lương/Doanh Thu theo Địa Điểm</CardTitle>
           <CardDescription className="text-xs">Cho: {filterDescription}. Chỉ hiển thị các đơn vị có tỷ lệ từ 2% đến 150%.</CardDescription>
        </CardHeader>
        <CardContent className="pt-2 flex items-center justify-center flex-grow">
@@ -236,32 +235,42 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
   return (
     <Card className="h-[350px] flex flex-col">
       <CardHeader className="pb-2 pt-3">
-        <CardTitle className="text-base font-semibold flex items-center gap-1.5"><BarChart3 className="h-4 w-4" />Quỹ Lương/Doanh Thu theo Địa Điểm</CardTitle>
+        <CardTitle className="text-base font-semibold flex items-center gap-1.5"><BarChartHorizontal className="h-4 w-4" />Quỹ Lương/Doanh Thu theo Địa Điểm</CardTitle>
         <CardDescription className="text-xs">
           Tỷ lệ (Lương FT + Lương PT) / Doanh thu cho mỗi địa điểm (2% - 150%). Sắp xếp từ cao đến thấp. Cho: {filterDescription}.
         </CardDescription>
       </CardHeader>
       <CardContent className="pt-2 flex-grow overflow-hidden">
          <ScrollArea className="h-full w-full">
-            <ChartContainer config={chartConfig} className="h-full" style={{ width: `${chartContainerWidth}px`}}>
+            <ChartContainer config={chartConfig} className="w-full" style={{ height: `${chartContainerHeight}px`}}>
                 <ResponsiveContainer width="100%" height="100%">
                 <BarChart 
+                    layout="vertical"
                     data={chartData} 
-                    margin={{ top: 15, right: 10, left: 0, bottom: barChartMarginBottom }}
-                    barCategoryGap="10%"
+                    margin={{ top: 5, right: 30, left: 10, bottom: 5 }} // Adjusted margins
+                    barCategoryGap="20%" // Can adjust for bar thickness relative to gap
+                    barGap={4} // Space between bars of the same category (not relevant for single stack)
                 >
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                     <XAxis 
+                        type="number"
+                        domain={[0, xAxisDomainMax]}
+                        tickFormatter={(value) => `${(value * 100).toFixed(0)}%`}
+                        axisLine={false}
+                        tickLine={false}
+                        tickMargin={8}
+                        className="text-xs"
+                    />
+                    <YAxis 
+                        type="category"
                         dataKey="location_name" 
+                        width={100} // Adjust width for location names
                         tickLine={false} 
                         axisLine={false} 
-                        tickMargin={8} 
+                        tickMargin={5} 
                         className="text-xs"
-                        angle={chartData.length > 7 ? -35 : 0}
-                        textAnchor={chartData.length > 7 ? "end" : "middle"}
                         interval={0} 
                     />
-                    <YAxis hide={true} domain={[0, yAxisDomainMax]} />
                     <Tooltip
                     content={<ChartTooltipContent
                         formatter={(value, name, props) => {
@@ -285,6 +294,7 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
                     />
                     <Legend
                         verticalAlign="top"
+                        align="center"
                         height={30}
                         wrapperStyle={{paddingBottom: "5px"}}
                         content={({ payload }) => (
@@ -308,7 +318,8 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
                         stackId="a" 
                         fill="var(--color-ft_salary_ratio_component)" 
                         name={chartConfig.ft_salary_ratio_component.label}
-                        radius={[0, 0, 4, 4]}
+                        radius={[4, 0, 0, 4]} // top-left, top-right, bottom-right, bottom-left
+                        barSize={Math.max(15, MIN_CATEGORY_HEIGHT * 0.6)} // Control bar thickness
                     >
                         <LabelList 
                             dataKey="ft_salary_ratio_component" 
@@ -321,7 +332,8 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
                         stackId="a" 
                         fill="var(--color-pt_salary_ratio_component)" 
                         name={chartConfig.pt_salary_ratio_component.label}
-                        radius={[4, 4, 0, 0]}
+                        radius={[0, 4, 4, 0]}
+                        barSize={Math.max(15, MIN_CATEGORY_HEIGHT * 0.6)}
                     >
                         <LabelList 
                             dataKey="pt_salary_ratio_component" 
@@ -330,7 +342,7 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
                         />
                         <LabelList 
                             dataKey="total_ratio" 
-                            position="top"
+                            position="right" // For horizontal bars, "right" is outside end
                             content={<CustomTotalLabel chartData={chartData}/>}
                         />
                     </Bar>
