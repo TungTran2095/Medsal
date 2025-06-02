@@ -236,6 +236,8 @@ export default function LocationSalaryRevenueRatioStackedBarChart({ selectedMont
    );
  }
 
+  const barChartMarginBottom = chartData.length > 5 ? 30 : 20;
+
   return (
     <Card className="h-[350px] flex flex-col">
       <CardHeader className="pb-2 pt-3">
@@ -246,9 +248,13 @@ export default function LocationSalaryRevenueRatioStackedBarChart({ selectedMont
       </CardHeader>
       <CardContent className="pt-2 flex-grow overflow-hidden">
         <ScrollArea className="h-full w-full overflow-y-hidden" orientation="horizontal">
-          <ChartContainer config={chartConfig} className="h-[280px]" style={{ width: `${chartWidth}px` }}>
+          <ChartContainer config={chartConfig} className="h-[270px]" style={{ width: `${chartWidth}px` }}> {/* Reduced height */}
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 25, right: 10, left: 0, bottom: 20 }} barCategoryGap="20%">
+              <BarChart 
+                data={chartData} 
+                margin={{ top: 25, right: 10, left: 0, bottom: barChartMarginBottom }} 
+                barCategoryGap="20%"
+              >
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis
                   dataKey="location_name"
