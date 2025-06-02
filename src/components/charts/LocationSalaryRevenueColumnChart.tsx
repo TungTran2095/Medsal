@@ -56,6 +56,7 @@ const chartConfig = {
 
 const MIN_CATEGORY_HEIGHT = 40; 
 const CRITICAL_SETUP_ERROR_PREFIX = "LỖI CÀI ĐẶT QUAN TRỌNG:";
+const Y_AXIS_WIDTH = 110;
 
 
 const CustomSegmentLabel = (props: any) => {
@@ -63,10 +64,8 @@ const CustomSegmentLabel = (props: any) => {
   if (value === 0 || value === null || value === undefined) return null;
 
   const formattedValue = `${(value * 100).toFixed(0)}%`;
-  // Estimate text width (very rough, depends on font and actual characters)
-  // For small font size 9, average char width might be around 5-6px.
   const textWidth = formattedValue.length * 5; 
-  if (width < textWidth + 4) return null; // Check if text fits in bar segment width
+  if (width < textWidth + 4) return null; 
 
   return (
     <text x={x + width / 2} y={y + height / 2} fill="hsl(var(--primary-foreground))" textAnchor="middle" dominantBaseline="middle" fontSize="9">
@@ -82,10 +81,8 @@ const CustomTotalLabel = (props: any) => {
   if (!currentDataPoint || currentDataPoint.total_ratio === null || currentDataPoint.total_ratio === undefined) return null;
 
   const totalValue = currentDataPoint.total_ratio;
-  // Only show total label if there's a meaningful total (not all zero segments)
   if (totalValue === 0 && currentDataPoint.ft_salary_ratio_component === 0 && currentDataPoint.pt_salary_ratio_component === 0) return null;
 
-  // For layout="vertical" (horizontal bars), x is end of bar, y is middle of bar height
   return (
     <text x={x + width + 5} y={y + height / 2} fill="hsl(var(--foreground))" textAnchor="start" dominantBaseline="middle" fontSize="10" fontWeight="500">
       {`${(totalValue * 100).toFixed(0)}%`}
@@ -177,14 +174,17 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
 
   const xAxisDomainMax = useMemo(() => {
     if (!chartData || chartData.length === 0) {
-      return 0.1; // Default small domain if no data
+      return 0.1; 
     }
-    // Calculate max based on the actual data for the bars themselves
-    const maxRatio = Math.max(...chartData.map(item => item.total_ratio));
-    // Round up to the next 0.05 or 0.1 for a cleaner axis
-    const domainEnd = Math.max(0.1, Math.ceil(maxRatio * 20) / 20); 
-    return domainEnd;
+    const maxRatioInData = Math.max(0.01, ...chartData.map(item => item.total_ratio));
+    // Round up to the next 0.05 for a clean tick where data ends
+    const dataEndTick = Math.max(0.1, Math.ceil(maxRatioInData * 20) / 20);
+    // Add padding to this data end tick for labels. Add 15% of dataEndTick, or at least 0.05. Cap at 1.6 (for 150% data max + 10% padding).
+    const finalDomain = Math.min(1.6, dataEndTick + Math.max(0.05, dataEndTick * 0.15));
+    return finalDomain;
   }, [chartData]);
+
+  const barChartMarginBottom = chartData.length > 5 ? 20 : 10;
 
 
   if (isLoading) {
@@ -246,24 +246,24 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
         </CardDescription>
       </CardHeader>
       <CardContent className="pt-2 flex-grow overflow-hidden">
-         <ScrollArea className="h-full w-full"> {/* ScrollArea will manage vertical scroll if chartContainerHeight is larger */}
+         <ScrollArea className="h-full w-full"> 
             <ChartContainer 
               config={chartConfig} 
-              className="w-full" // ChartContainer takes full width of ScrollArea viewport
-              style={{ height: `${chartContainerHeight}px`}} // Dynamic height based on data items
+              className="h-full w-full" 
+              style={{ height: `${chartContainerHeight}px`}} 
             >
                 <ResponsiveContainer width="100%" height="100%">
                 <BarChart 
                     layout="vertical"
                     data={chartData} 
-                    margin={{ top: 5, right: 60, left: 10, bottom: 5 }} // Increased right margin for labels
+                    margin={{ top: 15, right: 60, left: 20, bottom: barChartMarginBottom }} 
                     barCategoryGap="20%" 
                     barGap={4} 
                 >
                     <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                     <XAxis 
                         type="number"
-                        domain={[0, xAxisDomainMax]} // Domain ensures bars fit
+                        domain={[0, xAxisDomainMax]} 
                         tickFormatter={(value) => `${(value * 100).toFixed(0)}%`}
                         axisLine={false}
                         tickLine={false}
@@ -273,12 +273,12 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
                     <YAxis 
                         type="category"
                         dataKey="location_name" 
-                        width={110} // Adjusted width for location names, ensures single line via truncation if too long
+                        width={Y_AXIS_WIDTH} 
                         tickLine={false} 
                         axisLine={false} 
                         tickMargin={5} 
                         className="text-xs"
-                        interval={0} // Show all location names
+                        interval={0} 
                     />
                     <Tooltip
                     content={<ChartTooltipContent
