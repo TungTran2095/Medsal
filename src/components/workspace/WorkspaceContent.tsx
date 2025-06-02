@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, ChevronDown, Filter as FilterIcon, GanttChartSquare } from "lucide-react";
+import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, ChevronDown, Filter as FilterIcon, GanttChartSquare, BarChart3 } from "lucide-react";
 import type { PayrollEntry } from '@/types';
 import { supabase } from '@/lib/supabaseClient';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -19,6 +19,7 @@ import RevenueCard from '@/components/dashboard/RevenueCard';
 import SalaryToRevenueRatioCard from '@/components/dashboard/SalaryToRevenueRatioCard';
 import CombinedMonthlyTrendChart from '@/components/charts/MonthlySalaryTrendChart';
 import SalaryProportionPieChart from '@/components/charts/SalaryProportionPieChart';
+import LocationSalaryRevenueRatioStackedBarChart from '@/components/charts/LocationSalaryRevenueRatioStackedBarChart';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -96,8 +97,8 @@ export default function WorkspaceContent() {
       const tablesToQuery = ['Fulltime', 'Parttime', 'Doanh_thu'];
       const yearColumns = {
         'Fulltime': 'nam',
-        'Parttime': 'Nam',
-        'Doanh_thu': 'Năm'
+        'Parttime': 'Nam', // Corrected as per earlier instruction
+        'Doanh_thu': 'Năm' // Corrected as per earlier instruction
       };
 
 
@@ -561,7 +562,7 @@ export default function WorkspaceContent() {
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <SalaryProportionPieChart selectedMonths={selectedMonths} selectedYear={selectedYear} />
-                        {/* Placeholder for another half-width chart can go here */}
+                        <LocationSalaryRevenueRatioStackedBarChart selectedMonths={selectedMonths} selectedYear={selectedYear} />
                     </div>
                   </TabsContent>
                   <TabsContent value="comparison" className="flex-grow overflow-y-auto space-y-3 mt-2">
@@ -580,3 +581,4 @@ export default function WorkspaceContent() {
     </SidebarProvider>
   );
 }
+
