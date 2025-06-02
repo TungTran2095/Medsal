@@ -57,6 +57,12 @@ interface MonthOption {
   label: string;
 }
 
+const staticMonths: MonthOption[] = Array.from({ length: 12 }, (_, i) => ({
+  value: i + 1,
+  label: `Tháng ${String(i + 1).padStart(2, '0')}`,
+}));
+
+
 export default function WorkspaceContent() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<PayrollEntry[]>([]);
@@ -66,8 +72,6 @@ export default function WorkspaceContent() {
   const [activeView, setActiveView] = useState<WorkspaceView>('dashboard');
   const { theme, toggleTheme } = useTheme();
 
-  const [availableMonths, setAvailableMonths] = useState<MonthOption[]>([]);
-  const [isLoadingMonths, setIsLoadingMonths] = useState<boolean>(true);
   const [selectedMonths, setSelectedMonths] = useState<number[]>([]);
 
   const [availableYears, setAvailableYears] = useState<number[]>([]);
@@ -80,55 +84,6 @@ export default function WorkspaceContent() {
     { id: 'dbManagement', label: 'Quản Lý Cơ Sở Dữ Liệu', icon: Database },
   ];
 
-  const fetchDistinctMonths = useCallback(async () => {
-    if (activeView !== 'dashboard') return;
-    setIsLoadingMonths(true);
-    try {
-      let monthsData: string[] = [];
-      const tablesToQuery = ['Fulltime', 'Parttime', 'Doanh_thu']; 
-
-      for (const tableName of tablesToQuery) {
-        const { data, error } = await supabase.from(tableName).select('thang'); // Assuming 'thang' column exists and stores month info like "Tháng 01"
-        if (error && !String(error.message).toLowerCase().includes(`relation "${tableName.toLowerCase()}" does not exist`)) {
-           console.warn(`Error fetching months from ${tableName}:`, error);
-        }
-        if (data && data.length > 0) {
-          monthsData.push(...data.map(item => item.thang).filter(thang => thang !== null && thang !== undefined) as string[]);
-        }
-      }
-      
-      if (monthsData.length > 0) {
-        const monthSet = new Set<number>();
-        monthsData.forEach(thangValue => {
-          const monthStr = String(thangValue).trim();
-          const numericPart = monthStr.replace(/\D/g, ''); 
-          if (numericPart) {
-            const monthNum = parseInt(numericPart, 10);
-            if (!isNaN(monthNum) && monthNum >= 1 && monthNum <= 12) {
-              monthSet.add(monthNum);
-            }
-          }
-        });
-        const sortedMonths = Array.from(monthSet).sort((a, b) => a - b);
-        setAvailableMonths(
-          sortedMonths.map(m => ({ value: m, label: `Tháng ${String(m).padStart(2, '0')}` }))
-        );
-      } else {
-         setAvailableMonths([]);
-      }
-    } catch (error: any) {
-      console.error("Error fetching distinct months:", error);
-      toast({
-        title: "Lỗi Tải Dữ Liệu Tháng",
-        description: "Không thể tải danh sách tháng từ cơ sở dữ liệu.",
-        variant: "destructive",
-      });
-      setAvailableMonths([]);
-    } finally {
-      setIsLoadingMonths(false);
-    }
-  }, [activeView, toast]);
-
   const fetchDistinctYears = useCallback(async () => {
     if (activeView !== 'dashboard') return;
     setIsLoadingYears(true);
@@ -137,12 +92,18 @@ export default function WorkspaceContent() {
       const tablesToQuery = ['Fulltime', 'Parttime', 'Doanh_thu'];
 
       for (const tableName of tablesToQuery) {
-        const { data, error } = await supabase.from(tableName).select('nam'); // Assuming 'nam' column exists for year
+        // Try to select "Nam" or "Năm"
+        let yearColumn = 'nam'; // Default
+        if (tableName === 'Parttime') yearColumn = 'Nam';
+        if (tableName === 'Doanh_thu') yearColumn = 'Năm';
+
+        const { data, error } = await supabase.from(tableName).select(yearColumn);
+        
         if (error && !String(error.message).toLowerCase().includes(`relation "${tableName.toLowerCase()}" does not exist`)) {
-           console.warn(`Error fetching years from ${tableName}:`, error);
+           console.warn(`Error fetching years from ${tableName} using column ${yearColumn}:`, error);
         }
         if (data && data.length > 0) {
-          yearsData.push(...data.map(item => item.nam).filter(nam => nam !== null && nam !== undefined));
+          yearsData.push(...data.map(item => item[yearColumn]).filter(nam => nam !== null && nam !== undefined));
         }
       }
 
@@ -177,10 +138,9 @@ export default function WorkspaceContent() {
 
   useEffect(() => {
     if (activeView === 'dashboard') {
-      fetchDistinctMonths();
       fetchDistinctYears();
     }
-  }, [activeView, fetchDistinctMonths, fetchDistinctYears]);
+  }, [activeView, fetchDistinctYears]);
 
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -275,7 +235,6 @@ export default function WorkspaceContent() {
           } else if (datePartsMDY) { // Assuming M/D/YYYY or MM/DD/YYYY
             payDateObj = new Date(parseInt(datePartsMDY[3]), parseInt(datePartsMDY[1]) - 1, parseInt(datePartsMDY[2]));
           } else {
-             // Try parsing directly, might work for some unambiguous formats or ISO-like without full dashes
              payDateObj = new Date(entry.pay_date);
           }
 
@@ -285,7 +244,7 @@ export default function WorkspaceContent() {
             nam = payDateObj.getFullYear();
           } else {
             console.warn(`Invalid date format for pay_date: ${entry.pay_date}. Setting thang and nam to null.`);
-            payDateObj = null; // Ensure payDateObj is null if parsing fails
+            payDateObj = null; 
             thang = null;
             nam = null;
           }
@@ -295,7 +254,7 @@ export default function WorkspaceContent() {
           employee_id: entry.employee_id,
           employee_name: entry.employee_name,
           tong_thu_nhap: entry.salary, 
-          pay_date: payDateObj ? payDateObj.toISOString().split('T')[0] : null, // Store as YYYY-MM-DD or null
+          pay_date: payDateObj ? payDateObj.toISOString().split('T')[0] : null,
           thang: thang,
           nam: nam,
         };
@@ -319,9 +278,7 @@ export default function WorkspaceContent() {
       const fileInput = document.getElementById('payroll-csv-input') as HTMLInputElement;
       if (fileInput) fileInput.value = '';
       
-      // Refresh dashboard filters if on dashboard view
       if (activeView === 'dashboard') {
-          fetchDistinctMonths();
           fetchDistinctYears();
       }
 
@@ -353,14 +310,10 @@ export default function WorkspaceContent() {
     const yearText = selectedYear ? `Năm ${selectedYear}` : "Tất cả năm";
     
     let monthText;
-    if (isLoadingMonths && !availableMonths.length) {
-      monthText = "Đang tải tháng...";
-    } else if (!availableMonths.length) {
-      monthText = "Không có tháng";
-    } else if (selectedMonths.length === 0 || selectedMonths.length === availableMonths.length) {
+    if (selectedMonths.length === 0 || selectedMonths.length === staticMonths.length) {
       monthText = "Tất cả tháng";
     } else if (selectedMonths.length === 1) {
-      const month = availableMonths.find(m => m.value === selectedMonths[0]);
+      const month = staticMonths.find(m => m.value === selectedMonths[0]);
       monthText = month ? month.label : "1 tháng";
     } else {
       monthText = `${selectedMonths.length} tháng`;
@@ -562,27 +515,20 @@ export default function WorkspaceContent() {
                         <DMSR />
                         <DropdownMenuLabel className="text-sm">Chọn Tháng</DropdownMenuLabel>
                         <DMSR />
-                        {isLoadingMonths && availableMonths.length === 0 ? (
-                          <div className="px-2 py-1.5 text-xs text-muted-foreground">Đang tải tháng...</div>
-                        ) : !isLoadingMonths && availableMonths.length === 0 ? (
-                          <div className="px-2 py-1.5 text-xs text-muted-foreground">Không có dữ liệu tháng.</div>
-                        ) : (
-                          <ScrollArea className="max-h-[200px]">
-                            <div className="p-1">
-                              {availableMonths.map((month) => (
-                                <DropdownMenuCheckboxItem
-                                  key={month.value}
-                                  checked={selectedMonths.includes(month.value)}
-                                  onCheckedChange={(checked) => handleMonthSelection(month.value, checked as boolean)}
-                                  disabled={isLoadingMonths}
-                                  className="text-xs"
-                                >
-                                  {month.label}
-                                </DropdownMenuCheckboxItem>
-                              ))}
-                            </div>
-                          </ScrollArea>
-                        )}
+                        <ScrollArea className="max-h-[200px]">
+                          <div className="p-1">
+                            {staticMonths.map((month) => (
+                              <DropdownMenuCheckboxItem
+                                key={month.value}
+                                checked={selectedMonths.includes(month.value)}
+                                onCheckedChange={(checked) => handleMonthSelection(month.value, checked as boolean)}
+                                className="text-xs"
+                              >
+                                {month.label}
+                              </DropdownMenuCheckboxItem>
+                            ))}
+                          </div>
+                        </ScrollArea>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
@@ -596,7 +542,6 @@ export default function WorkspaceContent() {
                     <SalaryToRevenueRatioCard selectedMonths={selectedMonths} selectedYear={selectedYear} /> 
                 </div>
                 <div className="grid grid-cols-1 gap-3">
-                    {/* Render CombinedMonthlyTrendChart only if activeView is dashboard, and it's not commented out */}
                     <CombinedMonthlyTrendChart selectedYear={selectedYear} />
                 </div>
               </CardContent>
@@ -608,3 +553,5 @@ export default function WorkspaceContent() {
   );
 }
 
+
+    
