@@ -26,6 +26,7 @@ import ComparisonParttimeSalaryCard from '@/components/comparison/ComparisonPart
 import ComparisonCombinedSalaryCard from '@/components/comparison/ComparisonCombinedSalaryCard';
 import ComparisonRevenueCard from '@/components/comparison/ComparisonRevenueCard';
 import ComparisonSalaryRevenueRatioCard from '@/components/comparison/ComparisonSalaryRevenueRatioCard'; 
+import LocationComparisonTable from '@/components/comparison/LocationComparisonTable'; // Added
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -869,11 +870,7 @@ export default function WorkspaceContent() {
                         <ComparisonRevenueCard selectedMonths={selectedMonths} selectedDepartments={selectedDepartments} />
                         <ComparisonSalaryRevenueRatioCard selectedMonths={selectedMonths} selectedDepartments={selectedDepartments} />
                     </div>
-                    <div className="flex flex-col items-center justify-center h-64 text-muted-foreground bg-card rounded-lg border border-dashed">
-                        <GanttChartSquare className="h-12 w-12 mb-4 text-primary/70" />
-                        <p className="text-lg font-medium">Biểu đồ so sánh xu hướng theo tháng</p>
-                        <p className="text-sm">(Chức năng này sẽ được phát triển)</p>
-                    </div>
+                     <LocationComparisonTable selectedMonths={selectedMonths} selectedDepartments={selectedDepartments} />
                   </TabsContent>
                 </Tabs>
               </CardContent>
@@ -885,3 +882,6 @@ export default function WorkspaceContent() {
   );
 }
 
+
+
+    

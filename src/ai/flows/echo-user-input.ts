@@ -21,6 +21,7 @@ import {
   getMonthlySalaryTrendParttimeTool,
   getMonthlyRevenueTrendTool,
   getLocationSalaryRevenueRatiosTool,
+  getLocationComparisonMetricsTool, // Added new tool
 } from '@/ai/tools/dashboardQueryTools';
 
 const EchoUserInputInputSchema = z.object({
@@ -54,6 +55,7 @@ const prompt = ai.definePrompt({
     getMonthlySalaryTrendParttimeTool,
     getMonthlyRevenueTrendTool,
     getLocationSalaryRevenueRatiosTool,
+    getLocationComparisonMetricsTool, // Added new tool
   ],
   prompt: `You are a helpful and friendly AI assistant named Echo.
 Your primary language for responses MUST BE VIETNAMESE. Bạn PHẢI LUÔN LUÔN trả lời bằng tiếng Việt, ngay cả khi người dùng hỏi bằng ngôn ngữ khác.
@@ -63,18 +65,20 @@ Use the previous context to maintain a natural conversation flow.
 You have several tools available:
 1.  'querySupabaseTableTool': For generic queries on any public table. (tableName, selectQuery, limit, filters, orderBy).
 2.  Specific Dashboard Metric Tools:
-    *   'getTotalSalaryFulltimeTool': Get total full-time salary. Input: { filter_year?: number, filter_months?: number[] }.
-    *   'getTotalSalaryParttimeTool': Get total part-time salary. Input: { filter_year?: number, filter_months?: number[] }.
-    *   'getTotalRevenueTool': Get total revenue. Input: { filter_year?: number, filter_months?: number[] }.
-    *   'getMonthlySalaryTrendFulltimeTool': Get monthly full-time salary trend. Input: { p_filter_year?: number }.
-    *   'getMonthlySalaryTrendParttimeTool': Get monthly part-time salary trend. Input: { p_filter_year?: number }.
-    *   'getMonthlyRevenueTrendTool': Get monthly revenue trend. Input: { p_filter_year?: number }.
-    *   'getLocationSalaryRevenueRatiosTool': Get salary/revenue ratios by location. Input: { p_filter_year?: number, p_filter_months?: number[] }.
+    *   'getTotalSalaryFulltimeTool': Get total full-time salary. Input: { filter_year?: number, filter_months?: number[], filter_locations?: string[] }.
+    *   'getTotalSalaryParttimeTool': Get total part-time salary. Input: { filter_year?: number, filter_months?: number[], filter_locations?: string[] }.
+    *   'getTotalRevenueTool': Get total revenue. Input: { filter_year?: number, filter_months?: number[], filter_locations?: string[] }.
+    *   'getMonthlySalaryTrendFulltimeTool': Get monthly full-time salary trend. Input: { p_filter_year?: number, p_filter_locations?: string[] }.
+    *   'getMonthlySalaryTrendParttimeTool': Get monthly part-time salary trend. Input: { p_filter_year?: number, p_filter_locations?: string[] }.
+    *   'getMonthlyRevenueTrendTool': Get monthly revenue trend. Input: { p_filter_year?: number, p_filter_locations?: string[] }.
+    *   'getLocationSalaryRevenueRatiosTool': Get salary/revenue ratios by location. Input: { p_filter_year?: number, p_filter_months?: number[], p_filter_locations?: string[] }.
+    *   'getLocationComparisonMetricsTool': Get detailed salary (FT, PT) and revenue metrics for each location for a specific year. Input: { p_filter_year: number, p_filter_months?: number[], p_filter_locations?: string[] }.
 
 Instructions for using tools:
--   When the user asks for information that clearly matches a specific dashboard metric tool (e.g., "tổng lương full-time năm 2023", "xu hướng doanh thu hàng tháng của năm 2024", "tỷ lệ quỹ lương trên doanh thu theo địa điểm cho quý 1 năm 2023"), PREFER that specific tool over the generic 'querySupabaseTableTool'.
+-   When the user asks for information that clearly matches a specific dashboard metric tool (e.g., "tổng lương full-time năm 2023", "xu hướng doanh thu hàng tháng của năm 2024", "tỷ lệ quỹ lương trên doanh thu theo địa điểm cho quý 1 năm 2023", "chi tiết lương và doanh thu theo địa điểm năm 2024"), PREFER that specific tool over the generic 'querySupabaseTableTool'.
 -   For year and month filters, if the user doesn't specify, you can ask for clarification or omit them if the tool allows. For example, "Cho năm nào?" or "Bạn muốn xem dữ liệu tháng nào?".
 -   For 'querySupabaseTableTool', you MUST provide 'tableName'. Ask clarifying questions if ambiguous.
+-   For 'getLocationComparisonMetricsTool', 'p_filter_year' is required.
 
 Interpreting Tool Results (CRITICAL: ALL RESPONSES IN VIETNAMESE):
 -   When you decide to use a tool, your response to the user MUST clearly state the tool name you are using (e.g., "Sử dụng công cụ 'toolName': ..."), followed by the information derived *directly* from that tool's output.
@@ -82,7 +86,7 @@ Interpreting Tool Results (CRITICAL: ALL RESPONSES IN VIETNAMESE):
     *   Your response MUST directly use this 'value' or 'data'. Format numbers with commas for thousands (e.g., "1.234.500 VND").
     *   If the tool's 'value' or 'data' field is null, you MUST use the 'message' field from the tool's output in your response. DO NOT invent data or say 'Tôi đang kiểm tra lại' if the tool provides a specific message like "Không có dữ liệu...".
     *   For trend data (an array from 'data' field), describe the trend or list key data points. Don't just output the raw array.
-    *   For location ratios, list top locations or summarize based on components.
+    *   For location ratios or comparison metrics, list top locations or summarize based on components/values.
     *   DO NOT output raw JSON. Your response must be a natural language summary.
 -   For 'querySupabaseTableTool': If it returns a JSON array, summarize or list it clearly. If it returns an error or "No records found", inform the user based on the tool's 'result' field.
 
@@ -133,4 +137,6 @@ const echoUserInputFlow = ai.defineFlow(
     return output!;
   }
 );
+    
+
     

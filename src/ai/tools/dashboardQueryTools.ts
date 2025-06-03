@@ -33,6 +33,14 @@ const LocationRatioInputSchema = z.object({
   p_filter_locations: z.array(z.string()).optional().describe('An array of specific location names (department names) to include in the ratio calculation.'),
 });
 
+// Input schema for Location Comparison Metrics Tool
+const LocationComparisonMetricsInputSchema = z.object({
+    p_filter_year: z.number().describe('The year to fetch metrics for (e.g., 2024).'),
+    p_filter_months: z.array(z.number()).optional().describe('An array of months to filter by (1-12).'),
+    p_filter_locations: z.array(z.string()).optional().describe('An array of specific location names (department names) to filter by.'),
+});
+export type LocationComparisonMetricsInput = z.infer<typeof LocationComparisonMetricsInputSchema>;
+
 
 // Generic Output Schema for single value results
 const SingleValueOutputSchema = z.object({
@@ -45,6 +53,18 @@ const TrendDataOutputSchema = z.object({
   data: z.array(z.any()).nullable().describe('An array of data points for the trend, or null.'),
   message: z.string().optional().describe('A message describing the result, success, no data, or error.'),
 });
+
+// Output Schema for Location Comparison Metrics Tool
+const LocationComparisonMetricsOutputSchema = z.object({
+    data: z.array(z.object({
+        location_name: z.string(),
+        ft_salary: z.number(),
+        pt_salary: z.number(),
+        total_revenue: z.number(),
+    })).nullable().describe('An array of metrics per location, or null.'),
+    message: z.string().optional().describe('A message describing the result, success, no data, or error.'),
+});
+export type LocationComparisonMetricsOutput = z.infer<typeof LocationComparisonMetricsOutputSchema>;
 
 
 // Tool for get_total_salary_fulltime
@@ -218,4 +238,38 @@ export const getLocationSalaryRevenueRatiosTool = ai.defineTool(
     }
   }
 );
+
+// Tool for get_location_comparison_metrics
+export const getLocationComparisonMetricsTool = ai.defineTool(
+  {
+    name: 'getLocationComparisonMetricsTool',
+    description: 'Fetches detailed salary (FT, PT) and revenue metrics for each location for a specific year, with optional month and location filters. Used for detailed comparison tables.',
+    inputSchema: LocationComparisonMetricsInputSchema,
+    outputSchema: LocationComparisonMetricsOutputSchema,
+  },
+  async (input) => {
+    try {
+      const { data, error } = await supabase.rpc('get_location_comparison_metrics', {
+        p_filter_year: input.p_filter_year,
+        p_filter_months: input.p_filter_months,
+        p_filter_locations: input.p_filter_locations,
+      });
+      if (error) throw error;
+      if (!data || data.length === 0) return { data: null, message: `Không có dữ liệu chi tiết theo địa điểm cho năm ${input.p_filter_year} và các bộ lọc đã chọn.` };
+      // Ensure numeric types are correct from RPC potentially returning strings
+      const typedData = data.map((item: any) => ({
+        location_name: String(item.location_name),
+        ft_salary: Number(item.ft_salary) || 0,
+        pt_salary: Number(item.pt_salary) || 0,
+        total_revenue: Number(item.total_revenue) || 0,
+      }));
+      return { data: typedData, message: 'Truy vấn dữ liệu chi tiết theo địa điểm thành công.' };
+    } catch (e: any) {
+      console.error('Error in getLocationComparisonMetricsTool:', e);
+      return { data: null, message: `Lỗi khi lấy dữ liệu chi tiết theo địa điểm: ${e.message}` };
+    }
+  }
+);
+    
+
     
