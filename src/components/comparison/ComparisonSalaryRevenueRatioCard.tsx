@@ -156,10 +156,11 @@ export default function ComparisonSalaryRevenueRatioCard({ selectedMonths, selec
     if (percentagePointChange === null) return <span className="text-sm text-muted-foreground">N/A</span>;
     
     const displayPoints = (percentagePointChange * 100).toFixed(1) + ' điểm %';
+    // Inverted color logic for ratio (cost-like): increase is red (bad), decrease is green (good)
     if (percentagePointChange > 0) {
-      return <span className="text-sm text-green-600 dark:text-green-500 flex items-center"><TrendingUp className="mr-1 h-4 w-4" /> +{displayPoints}</span>;
+      return <span className="text-sm text-red-600 dark:text-red-500 flex items-center"><TrendingUp className="mr-1 h-4 w-4" /> +{displayPoints}</span>;
     } else if (percentagePointChange < 0) {
-      return <span className="text-sm text-red-600 dark:text-red-500 flex items-center"><TrendingDown className="mr-1 h-4 w-4" /> {displayPoints}</span>;
+      return <span className="text-sm text-green-600 dark:text-green-500 flex items-center"><TrendingDown className="mr-1 h-4 w-4" /> {displayPoints}</span>;
     } else {
       return <span className="text-sm text-muted-foreground flex items-center"><Minus className="mr-1 h-4 w-4" /> {displayPoints}</span>;
     }
@@ -219,7 +220,7 @@ export default function ComparisonSalaryRevenueRatioCard({ selectedMonths, selec
             <p className="text-xs text-muted-foreground">2024: <span className="font-medium text-foreground">{formatRatio(data2024?.ratio)}</span></p>
             <p className="text-xs text-muted-foreground">2025: <span className="font-medium text-foreground">{formatRatio(data2025?.ratio)}</span></p>
         </div>
-        <div className="text-lg font-bold text-primary">
+        <div className="text-lg font-bold">
           {renderPercentagePointChange()}
         </div>
          {data2024?.error && data2024.error.type === 'dataIssue' && <p className="text-xs text-amber-600 dark:text-amber-500 mt-0.5">{data2024.error.message}</p>}
@@ -228,4 +229,3 @@ export default function ComparisonSalaryRevenueRatioCard({ selectedMonths, selec
     </Card>
   );
 }
-

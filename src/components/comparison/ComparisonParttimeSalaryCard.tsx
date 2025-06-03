@@ -113,13 +113,14 @@ export default function ComparisonParttimeSalaryCard({ selectedMonths, selectedD
 
   const renderPercentageChange = () => {
     if (percentageChange === null) return <span className="text-sm text-muted-foreground">N/A</span>;
-    if (percentageChange === Infinity) return <span className="text-sm text-green-600 dark:text-green-500 flex items-center"><TrendingUp className="mr-1 h-4 w-4" /> Tăng mạnh (từ 0)</span>;
+    if (percentageChange === Infinity) return <span className="text-sm text-red-600 dark:text-red-500 flex items-center"><TrendingUp className="mr-1 h-4 w-4" /> Tăng mạnh (từ 0)</span>;
 
     const displayPercent = (percentageChange * 100).toFixed(1) + '%';
+    // Inverted color logic for costs: increase is red (bad), decrease is green (good)
     if (percentageChange > 0) {
-      return <span className="text-sm text-green-600 dark:text-green-500 flex items-center"><TrendingUp className="mr-1 h-4 w-4" /> +{displayPercent}</span>;
+      return <span className="text-sm text-red-600 dark:text-red-500 flex items-center"><TrendingUp className="mr-1 h-4 w-4" /> +{displayPercent}</span>;
     } else if (percentageChange < 0) {
-      return <span className="text-sm text-red-600 dark:text-red-500 flex items-center"><TrendingDown className="mr-1 h-4 w-4" /> {displayPercent}</span>;
+      return <span className="text-sm text-green-600 dark:text-green-500 flex items-center"><TrendingDown className="mr-1 h-4 w-4" /> {displayPercent}</span>;
     } else {
       return <span className="text-sm text-muted-foreground flex items-center"><Minus className="mr-1 h-4 w-4" /> {displayPercent}</span>;
     }
@@ -174,7 +175,7 @@ export default function ComparisonParttimeSalaryCard({ selectedMonths, selectedD
             <p className="text-xs text-muted-foreground">2024: <span className="font-medium text-foreground">{formatCurrency(value2024)}</span></p>
             <p className="text-xs text-muted-foreground">2025: <span className="font-medium text-foreground">{formatCurrency(value2025)}</span></p>
         </div>
-        <div className="text-lg font-bold text-primary">
+        <div className="text-lg font-bold">
           {renderPercentageChange()}
         </div>
       </CardContent>
