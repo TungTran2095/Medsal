@@ -25,7 +25,7 @@ import ComparisonFulltimeSalaryCard from '@/components/comparison/ComparisonFull
 import ComparisonParttimeSalaryCard from '@/components/comparison/ComparisonParttimeSalaryCard';
 import ComparisonCombinedSalaryCard from '@/components/comparison/ComparisonCombinedSalaryCard';
 import ComparisonRevenueCard from '@/components/comparison/ComparisonRevenueCard';
-import ComparisonSalaryRevenueRatioCard from '@/components/comparison/ComparisonSalaryRevenueRatioCard'; // Added
+import ComparisonSalaryRevenueRatioCard from '@/components/comparison/ComparisonSalaryRevenueRatioCard'; 
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -862,7 +862,7 @@ export default function WorkspaceContent() {
                     </div>
                   </TabsContent>
                   <TabsContent value="comparison" className="flex-grow overflow-y-auto space-y-3 mt-2">
-                    <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5"> {}
+                    <div className="grid gap-3 md:grid-cols-5">
                         <ComparisonFulltimeSalaryCard selectedMonths={selectedMonths} selectedDepartments={selectedDepartments} />
                         <ComparisonParttimeSalaryCard selectedMonths={selectedMonths} selectedDepartments={selectedDepartments} />
                         <ComparisonCombinedSalaryCard selectedMonths={selectedMonths} selectedDepartments={selectedDepartments} />
