@@ -21,6 +21,10 @@ import SalaryToRevenueRatioCard from '@/components/dashboard/SalaryToRevenueRati
 import CombinedMonthlyTrendChart from '@/components/charts/MonthlySalaryTrendChart';
 import SalaryProportionPieChart from '@/components/charts/SalaryProportionPieChart';
 import LocationSalaryRevenueColumnChart from '@/components/charts/LocationSalaryRevenueColumnChart';
+import ComparisonFulltimeSalaryCard from '@/components/comparison/ComparisonFulltimeSalaryCard';
+import ComparisonParttimeSalaryCard from '@/components/comparison/ComparisonParttimeSalaryCard';
+import ComparisonCombinedSalaryCard from '@/components/comparison/ComparisonCombinedSalaryCard';
+import ComparisonRevenueCard from '@/components/comparison/ComparisonRevenueCard';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -645,8 +649,7 @@ export default function WorkspaceContent() {
                               >
                                 <span className="flex items-center gap-2">
                                   {isMounted && selectedYear === null && <Circle className="h-2 w-2 fill-current text-primary" />}
-                                  {!isMounted && <span className="w-2 h-2 block"></span>}
-                                  {isMounted && selectedYear !== null && <span className="w-2 h-2 block"></span>}
+                                  {(!isMounted || (isMounted && selectedYear !== null)) && <span className="w-2 h-2 block ml-0.5 mr-[calc(0.5rem-2px)]"></span>} {/* Placeholder for alignment */}
                                   Tất cả các năm
                                 </span>
                               </DropdownMenuSubTrigger>
@@ -698,8 +701,7 @@ export default function WorkspaceContent() {
                                 >
                                   <span className="flex items-center gap-2">
                                      {isMounted && selectedYear === year && <Circle className="h-2 w-2 fill-current text-primary" />}
-                                     {!isMounted && <span className="w-2 h-2 block"></span>}
-                                     {isMounted && selectedYear !== year && <span className="w-2 h-2 block"></span>}
+                                     {(!isMounted || (isMounted && selectedYear !== year)) && <span className="w-2 h-2 block ml-0.5 mr-[calc(0.5rem-2px)]"></span>} {/* Placeholder for alignment */}
                                     Năm {year}
                                   </span>
                                 </DropdownMenuSubTrigger>
@@ -859,10 +861,16 @@ export default function WorkspaceContent() {
                     </div>
                   </TabsContent>
                   <TabsContent value="comparison" className="flex-grow overflow-y-auto space-y-3 mt-2">
-                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                      <GanttChartSquare className="h-12 w-12 mb-4" />
-                      <p className="text-lg font-medium">Trang So Sánh Cùng Kỳ</p>
-                      <p className="text-sm">Nội dung cho trang này sẽ được phát triển.</p>
+                    <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+                        <ComparisonFulltimeSalaryCard selectedMonths={selectedMonths} selectedDepartments={selectedDepartments} />
+                        <ComparisonParttimeSalaryCard selectedMonths={selectedMonths} selectedDepartments={selectedDepartments} />
+                        <ComparisonCombinedSalaryCard selectedMonths={selectedMonths} selectedDepartments={selectedDepartments} />
+                        <ComparisonRevenueCard selectedMonths={selectedMonths} selectedDepartments={selectedDepartments} />
+                    </div>
+                    <div className="flex flex-col items-center justify-center h-64 text-muted-foreground bg-card rounded-lg border border-dashed">
+                        <GanttChartSquare className="h-12 w-12 mb-4 text-primary/70" />
+                        <p className="text-lg font-medium">Biểu đồ so sánh xu hướng theo tháng</p>
+                        <p className="text-sm">(Chức năng này sẽ được phát triển)</p>
                     </div>
                   </TabsContent>
                 </Tabs>
