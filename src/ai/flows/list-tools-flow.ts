@@ -9,7 +9,7 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {Tool} from 'genkit/internal/registry';
+import type { Tool } from 'genkit/tool'; // Changed import from internal registry
 import {z} from 'genkit';
 
 // Define the schema for the output of a single tool's information
@@ -33,18 +33,12 @@ export async function listAvailableTools(): Promise<ListAvailableToolsOutput> {
 }
 
 // Helper to attempt to stringify a Zod schema, or return its description.
-// This is a simplified approach. For complex schemas, more robust handling might be needed.
 function getSchemaRepresentation(schema: z.ZodTypeAny | undefined): string | undefined {
   if (!schema) return undefined;
   try {
-    // Attempt to get a structural representation. This is not a standard Zod feature for full JSON schema.
-    // A common practice is to use zod-to-json-schema, but for simplicity here,
-    // we'll try to access the description or typeName.
-    // For more detailed schema representation, you'd integrate a library like zod-to-json-schema.
     if (schema.description) {
       return `Description: ${schema.description}`;
     }
-    // Fallback for basic types
     if (schema._def && schema._def.typeName) {
         let representation = `Type: ${schema._def.typeName}`;
         if (schema._def.typeName === z.ZodFirstPartyTypeKind.ZodObject && schema._def.shape) {
@@ -64,20 +58,22 @@ function getSchemaRepresentation(schema: z.ZodTypeAny | undefined): string | und
 const listAvailableToolsFlow = ai.defineFlow(
   {
     name: 'listAvailableToolsFlow',
-    inputSchema: z.void(), // Changed from z.undefined()
+    inputSchema: z.void(),
     outputSchema: ListAvailableToolsOutputSchema,
   },
   async () => {
     const registeredTools: AiToolInfo[] = [];
-    const toolMap = ai.registry.listTools();
+    // Use ai.listActions('tool') which is a more public and stable API
+    const toolActions = ai.listActions('tool');
 
-    for (const tool of toolMap) {
-        const typedTool = tool as Tool<any, any>; // Cast to Genkit's internal Tool type if needed or use specific type
+    for (const action of toolActions) {
+        // Since we filtered by 'tool', each action is a Tool.
+        // The Tool interface extends Action, so properties like name, description, inputSchema are available.
+        const tool = action as Tool<any, any>; // Cast to make TypeScript happy with specific Tool type access if needed, though Action properties are usually sufficient.
         registeredTools.push({
-          name: typedTool.name,
-          description: typedTool.description || 'No description provided.',
-          // @ts-ignore // Accessing _def.inputSchema, might need adjustment based on actual Genkit Tool definition structure
-          inputSchema: getSchemaRepresentation(typedTool.inputSchema),
+          name: tool.name,
+          description: tool.description || 'No description provided.',
+          inputSchema: getSchemaRepresentation(tool.inputSchema),
         });
     }
     return { tools: registeredTools };
