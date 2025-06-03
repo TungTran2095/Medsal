@@ -71,7 +71,7 @@ export default function ComparisonCombinedSalaryCard({ selectedMonths, selectedD
   }, []);
 
 
-  constfetchAllData = useCallback(async () => {
+  const fetchAllData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     setValue2024(null);
@@ -201,3 +201,4 @@ export default function ComparisonCombinedSalaryCard({ selectedMonths, selectedD
     </Card>
   );
 }
+
