@@ -219,7 +219,7 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
       <Card className="h-[350px] flex flex-col">
         <CardHeader className="pb-2 pt-3">
           <CardTitle className="text-base font-semibold flex items-center gap-1.5"><BarChartHorizontal className="h-4 w-4" />Quỹ Lương/Doanh Thu theo Địa Điểm</CardTitle>
-          <CardDescription className="text-xs">Đang tải dữ liệu...</CardDescription>
+          <CardDescription className="text-xs truncate">Đang tải dữ liệu...</CardDescription>
         </CardHeader>
         <CardContent className="flex items-center justify-center flex-grow pt-2">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -254,7 +254,7 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
      <Card className="h-[350px] flex flex-col">
        <CardHeader className="pb-2 pt-3">
           <CardTitle className="text-base font-semibold text-muted-foreground flex items-center gap-1.5"><BarChartHorizontal className="h-4 w-4" />Quỹ Lương/Doanh Thu theo Địa Điểm</CardTitle>
-          <CardDescription className="text-xs">Cho: {filterDescription}. Chỉ hiển thị các đơn vị có tỷ lệ từ 2% đến 150%.</CardDescription>
+          <CardDescription className="text-xs truncate">Cho: {filterDescription}. Chỉ hiển thị các đơn vị có tỷ lệ từ 2% đến 150%.</CardDescription>
        </CardHeader>
        <CardContent className="pt-2 flex items-center justify-center flex-grow">
          <p className="text-sm text-muted-foreground">Không có dữ liệu cho kỳ/địa điểm đã chọn hoặc theo bộ lọc tỷ lệ.</p>
@@ -267,7 +267,7 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
     <Card className="h-[350px] flex flex-col">
       <CardHeader className="pb-2 pt-3">
         <CardTitle className="text-base font-semibold flex items-center gap-1.5"><BarChartHorizontal className="h-4 w-4" />Quỹ Lương/Doanh Thu theo Địa Điểm</CardTitle>
-        <CardDescription className="text-xs">
+        <CardDescription className="text-xs truncate">
           Tỷ lệ cho {filterDescription}. Chỉ hiển thị địa điểm có tỷ lệ 2% - 150%. Sắp xếp từ cao đến thấp.
         </CardDescription>
       </CardHeader>

@@ -328,7 +328,7 @@ export default function CombinedMonthlyTrendChart({ selectedYear, selectedMonths
       <Card className="h-full">
         <CardHeader className="pb-2 pt-3">
           <CardTitle className="text-base font-semibold flex items-center gap-1.5"><LineChartIcon className="h-4 w-4" />Xu Hướng Theo Tháng</CardTitle>
-          <CardDescription className="text-xs">Đang tải dữ liệu xu hướng...</CardDescription>
+          <CardDescription className="text-xs truncate">Đang tải dữ liệu xu hướng...</CardDescription>
         </CardHeader>
         <CardContent className="flex items-center justify-center h-[280px] pt-2">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -369,7 +369,7 @@ export default function CombinedMonthlyTrendChart({ selectedYear, selectedMonths
      <Card className="h-full">
        <CardHeader className="pb-2 pt-3">
           <CardTitle className="text-base font-semibold text-muted-foreground flex items-center gap-1.5"><LineChartIcon className="h-4 w-4" />Xu Hướng Theo Tháng</CardTitle>
-          <CardDescription className="text-xs">Cho: {filterDescription}</CardDescription>
+          <CardDescription className="text-xs truncate">Cho: {filterDescription}</CardDescription>
        </CardHeader>
        <CardContent className="pt-2 flex items-center justify-center h-[280px]">
          <p className="text-sm text-muted-foreground">Không tìm thấy dữ liệu cho kỳ và địa điểm đã chọn.</p>
@@ -382,7 +382,7 @@ export default function CombinedMonthlyTrendChart({ selectedYear, selectedMonths
     <Card className="h-full">
       <CardHeader className="pb-2 pt-3">
         <CardTitle className="text-base font-semibold flex items-center gap-1.5"><LineChartIcon className="h-4 w-4" />Xu Hướng Doanh Thu, Lương & Tỷ Lệ</CardTitle>
-        <CardDescription className="text-xs">
+        <CardDescription className="text-xs truncate">
           Doanh thu, tổng lương và tỷ lệ QL/DT cho {filterDescription}.
         </CardDescription>
       </CardHeader>

@@ -9,6 +9,7 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
+  CardDescription,
 } from "@/components/ui/card";
 
 interface TotalSalaryCardProps {
@@ -192,9 +193,9 @@ export default function TotalSalaryCard({ selectedMonths, selectedYear, selected
            <div className="text-xl font-bold text-muted-foreground">
             0 VND
           </div>
-          <p className="text-xs text-muted-foreground mt-0.5">
+          <CardDescription className="text-xs text-muted-foreground mt-0.5 truncate">
             Không có dữ liệu cho: {filterDescription}.
-          </p>
+          </CardDescription>
         </CardContent>
       </Card>
     );
@@ -217,9 +218,9 @@ export default function TotalSalaryCard({ selectedMonths, selectedYear, selected
          <div className="text-xl font-bold text-primary">
             {formattedTotalSalary}
           </div>
-          <p className="text-xs text-muted-foreground">
+          <CardDescription className="text-xs text-muted-foreground truncate">
             Cho: {filterDescription}
-          </p>
+          </CardDescription>
       </CardContent>
     </Card>
   );

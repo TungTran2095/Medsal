@@ -141,7 +141,7 @@ export default function SalaryProportionPieChart({ selectedMonths, selectedYear,
           if (isFunctionMissingError) return { type: 'rpcMissing' as 'rpcMissing', message: `Hàm RPC '${functionName}' cho Lương ${salaryType} bị thiếu hoặc chưa được cập nhật để nhận filter địa điểm. Kiểm tra README.md.` };
           if (isTableMissingError) return { type: 'rpcMissing' as 'rpcMissing', message: `Bảng '${tableName}' cho Lương ${salaryType} không tồn tại.`};
           if (isColumnMissingError) return { type: 'rpcMissing' as 'rpcMissing', message: `Cột lương ('${columnName}') trong bảng '${tableName}' cho Lương ${salaryType} không tồn tại.`};
-
+          
           return { type: 'generic' as 'generic', message: `Lỗi tải Lương ${salaryType}: ${rpcError.message || 'Lỗi RPC không xác định'}` };
         }
         const rawValue = res.status === 'fulfilled' ? res.value.data : 0;
@@ -200,7 +200,7 @@ export default function SalaryProportionPieChart({ selectedMonths, selectedYear,
       <Card className="h-[350px]">
         <CardHeader className="pb-2 pt-3">
           <CardTitle className="text-base font-semibold flex items-center gap-1.5"><PieChartIcon className="h-4 w-4" />Tỷ Trọng Lương</CardTitle>
-          <CardDescription className="text-xs">Đang tải dữ liệu tỷ trọng lương...</CardDescription>
+          <CardDescription className="text-xs truncate">Đang tải dữ liệu tỷ trọng lương...</CardDescription>
         </CardHeader>
         <CardContent className="flex items-center justify-center h-[280px] pt-2">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -235,7 +235,7 @@ export default function SalaryProportionPieChart({ selectedMonths, selectedYear,
      <Card className="h-[350px]">
        <CardHeader className="pb-2 pt-3">
           <CardTitle className="text-base font-semibold text-muted-foreground flex items-center gap-1.5"><PieChartIcon className="h-4 w-4" />Tỷ Trọng Lương</CardTitle>
-          <CardDescription className="text-xs">Cho: {filterDescription}</CardDescription>
+          <CardDescription className="text-xs truncate">Cho: {filterDescription}</CardDescription>
        </CardHeader>
        <CardContent className="pt-2 flex items-center justify-center h-[280px]">
          <p className="text-sm text-muted-foreground">Không có dữ liệu lương để hiển thị tỷ trọng.</p>
@@ -248,7 +248,7 @@ export default function SalaryProportionPieChart({ selectedMonths, selectedYear,
     <Card className="h-[350px]">
       <CardHeader className="pb-2 pt-3">
         <CardTitle className="text-base font-semibold flex items-center gap-1.5"><PieChartIcon className="h-4 w-4" />Tỷ Trọng Lương Full-time vs Part-time</CardTitle>
-        <CardDescription className="text-xs">
+        <CardDescription className="text-xs truncate">
           Phân bổ tổng quỹ lương cho {filterDescription}.
         </CardDescription>
       </CardHeader>

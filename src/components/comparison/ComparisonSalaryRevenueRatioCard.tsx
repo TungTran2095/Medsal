@@ -213,7 +213,7 @@ export default function ComparisonSalaryRevenueRatioCard({ selectedMonths, selec
             <CardTitle className="text-sm font-semibold text-muted-foreground">Tỷ Lệ Quỹ Lương/Doanh Thu</CardTitle>
             <Percent className="h-4 w-4 text-muted-foreground" />
         </div>
-        <CardDescription className="text-xs">So sánh {filterDescription} (2024 vs 2025)</CardDescription>
+        <CardDescription className="text-xs truncate">So sánh {filterDescription} (2024 vs 2025)</CardDescription>
       </CardHeader>
       <CardContent className="pt-1 space-y-1">
         <div>
@@ -229,3 +229,4 @@ export default function ComparisonSalaryRevenueRatioCard({ selectedMonths, selec
     </Card>
   );
 }
+

@@ -224,7 +224,7 @@ export default function SalaryToRevenueRatioCard({ selectedMonths, selectedYear,
             <div className={`text-xl font-bold ${cardState === 'warning' || cardState === 'noData' ? 'text-muted-foreground' : 'text-primary'}`}>
               {displayValue}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground truncate">
               Cho: {filterDescription}
             </p>
              {(cardState === 'warning' && totalRevenue === 0 && ((fulltimeSalary ?? 0) > 0 || (parttimeSalary ?? 0) > 0)) && (
