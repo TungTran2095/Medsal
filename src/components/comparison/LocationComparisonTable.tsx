@@ -1,13 +1,14 @@
 
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/lib/supabaseClient'; // Direct Supabase client for RPC
-import { Loader2, AlertTriangle, TrendingUp, TrendingDown, Minus, Percent, Banknote, DollarSign, GanttChartSquare } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { supabase } from '@/lib/supabaseClient'; 
+import { Loader2, AlertTriangle, TrendingUp, TrendingDown, Minus, Percent, Banknote, DollarSign, GanttChartSquare, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Button } from '@/components/ui/button'; // For potential future actions like export
+import { Button } from '@/components/ui/button';
+import { cn } from "@/lib/utils";
 
 interface LocationComparisonTableProps {
   selectedMonths?: number[];
@@ -19,10 +20,6 @@ interface LocationMetric {
   ft_salary: number;
   pt_salary: number;
   total_revenue: number;
-}
-
-interface ComparisonDataRow extends LocationMetric {
-  year: number;
 }
 
 interface MergedComparisonData {
@@ -47,11 +44,17 @@ interface FetchError {
 
 const CRITICAL_SETUP_ERROR_PREFIX = "LỖI CÀI ĐẶT QUAN TRỌNG:";
 
+type SortableColumnKey = Exclude<keyof MergedComparisonData, 
+  | 'ft_salary_2024_change' // Example if we had change columns, these are not sortable by default
+>;
+
+
 export default function LocationComparisonTable({ selectedMonths, selectedDepartments }: LocationComparisonTableProps) {
   const [comparisonData, setComparisonData] = useState<MergedComparisonData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<FetchError | null>(null);
   const [filterDescription, setFilterDescription] = useState<string>("kỳ được chọn");
+  const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey | null; direction: 'ascending' | 'descending' }>({ key: 'location_name', direction: 'ascending' });
 
   const fetchDataForYear = useCallback(async (year: number): Promise<LocationMetric[] | FetchError> => {
     const departmentNames = selectedDepartments?.map(depId => depId.split('__')[1]).filter(Boolean) || [];
@@ -163,15 +166,13 @@ export default function LocationComparisonTable({ selectedMonths, selectedDepart
         total_salary_2025: item.total_salary_2025 || 0,
         total_revenue_2024: item.total_revenue_2024 || 0,
         total_revenue_2025: item.total_revenue_2025 || 0,
-        ratio_2024: item.ratio_2024 === undefined ? null : item.ratio_2024, // Keep null if originally null
-        ratio_2025: item.ratio_2025 === undefined ? null : item.ratio_2025, // Keep null if originally null
+        ratio_2024: item.ratio_2024 === undefined ? null : item.ratio_2024,
+        ratio_2025: item.ratio_2025 === undefined ? null : item.ratio_2025,
       })).filter(d => 
         d.ft_salary_2024 !== 0 || d.ft_salary_2025 !== 0 ||
         d.pt_salary_2024 !== 0 || d.pt_salary_2025 !== 0 ||
         d.total_revenue_2024 !== 0 || d.total_revenue_2025 !== 0
-      ).sort((a,b) => (b.total_salary_2025 + b.total_revenue_2025) - (a.total_salary_2024 + a.total_revenue_2024) );
-
-
+      );
       setComparisonData(finalData);
 
     } else {
@@ -186,6 +187,37 @@ export default function LocationComparisonTable({ selectedMonths, selectedDepart
   useEffect(() => {
     fetchAllComparisonData();
   }, [fetchAllComparisonData]);
+
+  const requestSort = (key: SortableColumnKey) => {
+    let direction: 'ascending' | 'descending' = 'ascending';
+    if (sortConfig.key === key && sortConfig.direction === 'ascending') {
+      direction = 'descending';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const sortedComparisonData = useMemo(() => {
+    let sortableItems = [...comparisonData];
+    if (sortConfig.key !== null) {
+      sortableItems.sort((a, b) => {
+        const valA = a[sortConfig.key!];
+        const valB = b[sortConfig.key!];
+
+        if (valA === null && valB === null) return 0;
+        if (valA === null) return sortConfig.direction === 'ascending' ? -1 : 1;
+        if (valB === null) return sortConfig.direction === 'ascending' ? 1 : -1;
+        
+        if (typeof valA === 'number' && typeof valB === 'number') {
+          return sortConfig.direction === 'ascending' ? valA - valB : valB - valA;
+        } else if (typeof valA === 'string' && typeof valB === 'string') {
+          return sortConfig.direction === 'ascending' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+        }
+        return 0;
+      });
+    }
+    return sortableItems;
+  }, [comparisonData, sortConfig]);
+
 
   const formatCurrency = (value: number | null) => {
     if (value === null || value === undefined) return 'N/A';
@@ -235,12 +267,34 @@ export default function LocationComparisonTable({ selectedMonths, selectedDepart
     const displayValue = isRatio ? formatPercentagePoint(change) : formatPercentage(change, true);
 
     return (
-      <TableCell className={`text-center whitespace-nowrap ${colorClass} text-xs py-1.5 px-2`}>
+      <TableCell className={cn("text-center whitespace-nowrap text-xs py-1.5 px-2", colorClass)}>
         <div className="flex items-center justify-center gap-0.5">
           <Icon className="h-3 w-3" />
           {displayValue}
         </div>
       </TableCell>
+    );
+  };
+
+  const renderSortableTableHead = (label: string, columnKey: SortableColumnKey, isSticky: boolean = false, minWidth?: string) => {
+    const isSorted = sortConfig.key === columnKey;
+    const SortIcon = isSorted ? (sortConfig.direction === 'ascending' ? ArrowUp : ArrowDown) : ArrowUpDown;
+    
+    return (
+      <TableHead 
+        className={cn(
+          "py-1.5 px-2 text-xs font-medium text-center whitespace-nowrap cursor-pointer hover:bg-muted/50",
+          isSticky && "sticky left-0 bg-card z-20",
+          minWidth && `min-w-[${minWidth}]`
+        )}
+        style={isSticky ? { minWidth: minWidth || '150px' } : {}}
+        onClick={() => requestSort(columnKey)}
+      >
+        <div className="flex items-center justify-center gap-1">
+          {label}
+          <SortIcon className={cn("h-3 w-3", isSorted ? "opacity-100" : "opacity-50")} />
+        </div>
+      </TableHead>
     );
   };
 
@@ -304,26 +358,26 @@ export default function LocationComparisonTable({ selectedMonths, selectedDepart
           <Table>
             <TableHeader className="sticky top-0 bg-card z-10">
               <TableRow>
-                <TableHead className="py-1.5 px-2 text-xs font-medium whitespace-nowrap sticky left-0 bg-card z-20 min-w-[150px]">Địa Điểm</TableHead>
-                <TableHead className="py-1.5 px-2 text-xs font-medium text-center whitespace-nowrap">Lương FT 24</TableHead>
-                <TableHead className="py-1.5 px-2 text-xs font-medium text-center whitespace-nowrap">Lương FT 25</TableHead>
+                {renderSortableTableHead("Địa Điểm", 'location_name', true, '150px')}
+                {renderSortableTableHead("Lương FT 24", 'ft_salary_2024')}
+                {renderSortableTableHead("Lương FT 25", 'ft_salary_2025')}
                 <TableHead className="py-1.5 px-2 text-xs font-medium text-center whitespace-nowrap">+/- FT (%)</TableHead>
-                <TableHead className="py-1.5 px-2 text-xs font-medium text-center whitespace-nowrap">Lương PT 24</TableHead>
-                <TableHead className="py-1.5 px-2 text-xs font-medium text-center whitespace-nowrap">Lương PT 25</TableHead>
+                {renderSortableTableHead("Lương PT 24", 'pt_salary_2024')}
+                {renderSortableTableHead("Lương PT 25", 'pt_salary_2025')}
                 <TableHead className="py-1.5 px-2 text-xs font-medium text-center whitespace-nowrap">+/- PT (%)</TableHead>
-                <TableHead className="py-1.5 px-2 text-xs font-medium text-center whitespace-nowrap">Tổng Lương 24</TableHead>
-                <TableHead className="py-1.5 px-2 text-xs font-medium text-center whitespace-nowrap">Tổng Lương 25</TableHead>
+                {renderSortableTableHead("Tổng Lương 24", 'total_salary_2024')}
+                {renderSortableTableHead("Tổng Lương 25", 'total_salary_2025')}
                 <TableHead className="py-1.5 px-2 text-xs font-medium text-center whitespace-nowrap">+/- Lương (%)</TableHead>
-                <TableHead className="py-1.5 px-2 text-xs font-medium text-center whitespace-nowrap">Doanh Thu 24</TableHead>
-                <TableHead className="py-1.5 px-2 text-xs font-medium text-center whitespace-nowrap">Doanh Thu 25</TableHead>
+                {renderSortableTableHead("Doanh Thu 24", 'total_revenue_2024')}
+                {renderSortableTableHead("Doanh Thu 25", 'total_revenue_2025')}
                 <TableHead className="py-1.5 px-2 text-xs font-medium text-center whitespace-nowrap">+/- DT (%)</TableHead>
-                <TableHead className="py-1.5 px-2 text-xs font-medium text-center whitespace-nowrap">QL/DT 24 (%)</TableHead>
-                <TableHead className="py-1.5 px-2 text-xs font-medium text-center whitespace-nowrap">QL/DT 25 (%)</TableHead>
+                {renderSortableTableHead("QL/DT 24 (%)", 'ratio_2024')}
+                {renderSortableTableHead("QL/DT 25 (%)", 'ratio_2025')}
                 <TableHead className="py-1.5 px-2 text-xs font-medium text-center whitespace-nowrap">+/- QL/DT (pp)</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {comparisonData.map((row) => {
+              {sortedComparisonData.map((row) => {
                 const ftChange = calculateChange(row.ft_salary_2025, row.ft_salary_2024);
                 const ptChange = calculateChange(row.pt_salary_2025, row.pt_salary_2024);
                 const totalSalaryChange = calculateChange(row.total_salary_2025, row.total_salary_2024);
@@ -332,7 +386,7 @@ export default function LocationComparisonTable({ selectedMonths, selectedDepart
 
                 return (
                   <TableRow key={row.location_name}>
-                    <TableCell className="py-1.5 px-2 text-xs font-medium sticky left-0 bg-card z-10 whitespace-nowrap">{row.location_name}</TableCell>
+                    <TableCell className="py-1.5 px-2 text-xs font-medium sticky left-0 bg-card z-10 whitespace-nowrap min-w-[150px]">{row.location_name}</TableCell>
                     <TableCell className="text-right py-1.5 px-2 text-xs whitespace-nowrap">{formatCurrency(row.ft_salary_2024)}</TableCell>
                     <TableCell className="text-right py-1.5 px-2 text-xs whitespace-nowrap">{formatCurrency(row.ft_salary_2025)}</TableCell>
                     {renderChangeCell(ftChange, true)}
@@ -358,5 +412,6 @@ export default function LocationComparisonTable({ selectedMonths, selectedDepart
     </Card>
   );
 }
+
 
     
