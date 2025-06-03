@@ -7,12 +7,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, ChevronDown, Filter as FilterIcon, GanttChartSquare, BarChartHorizontal, Circle, Settings2 } from "lucide-react";
+import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, ChevronDown, Filter as FilterIcon, GanttChartSquare, MapPin, Settings2, Circle } from "lucide-react";
 import type { PayrollEntry } from '@/types';
 import { supabase } from '@/lib/supabaseClient';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import SupabaseTableList from './SupabaseTableList';
-import AiToolsViewer from './AiToolsViewer'; // Import the new component
+import AiToolsViewer from './AiToolsViewer';
 import { Separator } from '@/components/ui/separator';
 import TotalSalaryCard from '@/components/dashboard/TotalSalaryCard';
 import TotalSalaryParttimeCard from '@/components/dashboard/TotalSalaryParttimeCard';
@@ -48,8 +48,9 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from '@/components/ui/checkbox'; // Not directly used in this change, but for consistency
 
-type WorkspaceView = 'dbManagement' | 'dashboard' | 'aiTools'; // Added 'aiTools'
+type WorkspaceView = 'dbManagement' | 'dashboard' | 'aiTools';
 type DashboardTab = 'payrollOverview' | 'comparison';
 
 interface NavItem {
@@ -78,18 +79,32 @@ export default function WorkspaceContent() {
   const [activeView, setActiveView] = useState<WorkspaceView>('dashboard');
   const { theme, toggleTheme } = useTheme();
 
+  // Time filter state
   const [selectedMonths, setSelectedMonths] = useState<number[]>([]);
-
   const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [isLoadingYears, setIsLoadingYears] = useState<boolean>(true);
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
+  
+  // Location filter state
+  const [availableLocationTypes, setAvailableLocationTypes] = useState<string[]>([]);
+  const [availableDepartmentsByLoai, setAvailableDepartmentsByLoai] = useState<Record<string, string[]>>({});
+  const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]);
+  const [isLoadingLocationFilters, setIsLoadingLocationFilters] = useState<boolean>(false);
+  const [locationFilterError, setLocationFilterError] = useState<string | null>(null);
+
   const [activeDashboardTab, setActiveDashboardTab] = useState<DashboardTab>('payrollOverview');
+
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
 
   const navItems: NavItem[] = [
     { id: 'dashboard', label: 'Bảng Điều Khiển', icon: LayoutDashboard },
     { id: 'dbManagement', label: 'Quản Lý CSDL', icon: Database },
-    { id: 'aiTools', label: 'Công Cụ AI', icon: Settings2 }, // New navigation item
+    { id: 'aiTools', label: 'Công Cụ AI', icon: Settings2 },
   ];
 
   const fetchDistinctYears = useCallback(async () => {
@@ -103,7 +118,6 @@ export default function WorkspaceContent() {
         'Parttime': 'Nam',
         'Doanh_thu': 'Năm'
       };
-
 
       for (const tableName of tablesToQuery) {
         const yearColumn = yearColumns[tableName as keyof typeof yearColumns];
@@ -155,12 +169,60 @@ export default function WorkspaceContent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeView, toast]);
 
+  const fetchLocationFilterOptions = useCallback(async () => {
+    if (activeView !== 'dashboard') return;
+    setIsLoadingLocationFilters(true);
+    setLocationFilterError(null);
+    try {
+      const { data: loaiData, error: loaiError } = await supabase
+        .from('MS_Org_Diadiem')
+        .select('Loại')
+        .eq('Division', 'Company');
+
+      if (loaiError) throw loaiError;
+
+      const distinctLoai = [...new Set(loaiData?.map(item => item.Loại).filter(Boolean) as string[])].sort();
+      setAvailableLocationTypes(distinctLoai);
+
+      const deptsByLoai: Record<string, string[]> = {};
+      for (const loai of distinctLoai) {
+        const { data: deptData, error: deptError } = await supabase
+          .from('MS_Org_Diadiem')
+          .select('Department')
+          .eq('Division', 'Company')
+          .eq('Loại', loai);
+        if (deptError) throw deptError; // Rethrow to be caught by outer catch
+        deptsByLoai[loai] = [...new Set(deptData?.map(item => item.Department).filter(Boolean) as string[])].sort();
+      }
+      setAvailableDepartmentsByLoai(deptsByLoai);
+
+    } catch (err: any) {
+      console.error("Error fetching location filter options:", err);
+      const errorMessage = err.message || "Không thể tải tùy chọn lọc địa điểm.";
+      setLocationFilterError(errorMessage);
+      // Do not toast here if it's a common "table not found" type error, let the UI display it.
+      // Only toast for unexpected issues.
+      if (!errorMessage.toLowerCase().includes("relation \"ms_org_diadiem\" does not exist")) {
+        toast({
+          title: "Lỗi Tải Lọc Địa Điểm",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      }
+      setAvailableLocationTypes([]);
+      setAvailableDepartmentsByLoai({});
+    } finally {
+      setIsLoadingLocationFilters(false);
+    }
+  }, [activeView, toast]);
+
 
   useEffect(() => {
     if (activeView === 'dashboard') {
       fetchDistinctYears();
+      fetchLocationFilterOptions();
     }
-  }, [activeView, fetchDistinctYears]);
+  }, [activeView, fetchDistinctYears, fetchLocationFilterOptions]);
 
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -279,7 +341,6 @@ export default function WorkspaceContent() {
         };
       });
 
-
       const { error } = await supabase
         .from('Fulltime') 
         .insert(dataToUpload);
@@ -314,6 +375,7 @@ export default function WorkspaceContent() {
     }
   };
 
+  // Time Filter Handlers
   const handleMonthSelection = (monthValue: number, checked: boolean) => {
     setSelectedMonths(prev => {
       const newSelectedMonths = new Set(prev);
@@ -327,7 +389,7 @@ export default function WorkspaceContent() {
   };
 
   const handleAllMonthsSelection = (yearForContext: number | null, checked: boolean) => {
-    setSelectedYear(yearForContext); // Set year context first
+    setSelectedYear(yearForContext); 
     if (checked) {
       setSelectedMonths(staticMonths.map(m => m.value));
     } else {
@@ -335,9 +397,8 @@ export default function WorkspaceContent() {
     }
   };
 
-  const getFilterButtonLabel = () => {
+  const getTimeFilterButtonLabel = () => {
     const yearText = selectedYear === null ? "Tất cả năm" : `Năm ${selectedYear}`;
-
     let monthText;
     if (selectedMonths.length === 0) {
         monthText = "Không chọn tháng";
@@ -351,6 +412,67 @@ export default function WorkspaceContent() {
     }
     return `${yearText} - ${monthText}`;
   };
+
+  // Location Filter Handlers
+  const handleDepartmentSelection = (loai: string, department: string, checked: boolean) => {
+    const departmentIdentifier = `${loai}__${department}`; // Use a unique identifier if depts can be same across loai
+    setSelectedDepartments(prev => {
+      const newSelected = new Set(prev);
+      if (checked) {
+        newSelected.add(departmentIdentifier);
+      } else {
+        newSelected.delete(departmentIdentifier);
+      }
+      return Array.from(newSelected);
+    });
+  };
+
+  const handleSelectAllDepartmentsForLoai = (loai: string, checked: boolean) => {
+    const departmentsInLoai = availableDepartmentsByLoai[loai] || [];
+    const departmentIdentifiersInLoai = departmentsInLoai.map(dept => `${loai}__${dept}`);
+    
+    setSelectedDepartments(prev => {
+      const newSelected = new Set(prev);
+      if (checked) {
+        departmentIdentifiersInLoai.forEach(id => newSelected.add(id));
+      } else {
+        departmentIdentifiersInLoai.forEach(id => newSelected.delete(id));
+      }
+      return Array.from(newSelected);
+    });
+  };
+  
+  const areAllDepartmentsSelectedForLoai = (loai: string): boolean => {
+    const departmentsInLoai = availableDepartmentsByLoai[loai] || [];
+    if (departmentsInLoai.length === 0) return false; // Or true if no departments means "all of none" are selected
+    return departmentsInLoai.every(dept => selectedDepartments.includes(`${loai}__${dept}`));
+  };
+
+  const getLocationFilterButtonLabel = () => {
+    if (selectedDepartments.length === 0) {
+      return "Tất cả địa điểm";
+    }
+  
+    const activeLoai = new Set<string>();
+    selectedDepartments.forEach(deptId => {
+      const [loai] = deptId.split('__');
+      activeLoai.add(loai);
+    });
+  
+    const loaiCount = activeLoai.size;
+    const deptCount = selectedDepartments.length;
+  
+    let label = "";
+    if (loaiCount > 0) {
+      label += `${loaiCount} Loại`;
+    }
+    if (deptCount > 0) {
+      if (label) label += ", ";
+      label += `${deptCount} P.ban`;
+    }
+    return label || "Chọn địa điểm";
+  };
+
 
   return (
     <SidebarProvider defaultOpen={false} >
@@ -505,13 +627,14 @@ export default function WorkspaceContent() {
                        Phân Tích Lương & Doanh Thu Tổng Hợp
                     </CardTitle>
                   </div>
-                  <div className="flex items-center gap-2 mt-2 sm:mt-0">
+                  <div className="flex items-center gap-2 mt-2 sm:mt-0 flex-wrap">
+                    {/* Time Filter */}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="outline" className="h-9 text-sm min-w-[200px] justify-between px-3">
                           <div className="flex items-center gap-1.5 truncate">
                             <FilterIcon className="h-3.5 w-3.5 opacity-80 shrink-0" />
-                            <span className="truncate" title={getFilterButtonLabel()}>{getFilterButtonLabel()}</span>
+                            <span className="truncate" title={getTimeFilterButtonLabel()}>{getTimeFilterButtonLabel()}</span>
                           </div>
                           <ChevronDown className="ml-1 h-4 w-4 opacity-50 shrink-0" />
                         </Button>
@@ -521,13 +644,13 @@ export default function WorkspaceContent() {
                         <DMSR />
                         <ScrollArea className="max-h-[380px]">
                           <div className="p-1">
-                            <DropdownMenuSub key="all-years-sub">
+                            <DropdownMenuSub key="all-years-sub-time">
                               <DropdownMenuSubTrigger
                                 onSelect={(e) => e.preventDefault()}
                                 className="text-xs pl-2 pr-1 py-1.5 w-full justify-start relative hover:bg-accent"
                               >
                                 <span className="flex items-center gap-2">
-                                  {selectedYear === null ? (
+                                  {isMounted && selectedYear === null ? (
                                     <Circle className="h-2 w-2 fill-current text-primary" />
                                   ) : (
                                     <span className="w-2 h-2 block"></span>
@@ -541,7 +664,7 @@ export default function WorkspaceContent() {
                                 <ScrollArea className="max-h-[380px]">
                                   <div className="p-1">
                                      <DropdownMenuCheckboxItem
-                                        key="all-years-all-months"
+                                        key="all-years-all-months-time"
                                         checked={selectedMonths.length === staticMonths.length}
                                         onCheckedChange={(checked) => handleAllMonthsSelection(null, checked as boolean)}
                                         onSelect={(e) => e.preventDefault()}
@@ -552,7 +675,7 @@ export default function WorkspaceContent() {
                                       <DMSR />
                                     {staticMonths.map((month) => (
                                       <DropdownMenuCheckboxItem
-                                        key={`all-years-${month.value}`}
+                                        key={`all-years-${month.value}-time`}
                                         checked={selectedMonths.includes(month.value)}
                                         onCheckedChange={(checked) => {
                                           setSelectedYear(null);
@@ -576,13 +699,13 @@ export default function WorkspaceContent() {
                                <div className="px-2 py-1.5 text-xs text-muted-foreground">Không có dữ liệu năm.</div>
                             )}
                             {availableYears.map((year) => (
-                              <DropdownMenuSub key={year}>
+                              <DropdownMenuSub key={`${year}-time`}>
                                 <DropdownMenuSubTrigger
                                   onSelect={(e) => e.preventDefault()}
                                   className="text-xs pl-2 pr-1 py-1.5 w-full justify-start relative hover:bg-accent"
                                 >
                                   <span className="flex items-center gap-2">
-                                     {selectedYear === year ? (
+                                     {isMounted && selectedYear === year ? (
                                       <Circle className="h-2 w-2 fill-current text-primary" />
                                     ) : (
                                       <span className="w-2 h-2 block"></span>
@@ -596,7 +719,7 @@ export default function WorkspaceContent() {
                                   <ScrollArea className="max-h-[380px]">
                                     <div className="p-1">
                                        <DropdownMenuCheckboxItem
-                                        key={`${year}-all-months`}
+                                        key={`${year}-all-months-time`}
                                         checked={selectedMonths.length === staticMonths.length}
                                         onCheckedChange={(checked) => handleAllMonthsSelection(year, checked as boolean)}
                                         onSelect={(e) => e.preventDefault()}
@@ -607,7 +730,7 @@ export default function WorkspaceContent() {
                                       <DMSR />
                                       {staticMonths.map((month) => (
                                         <DropdownMenuCheckboxItem
-                                          key={`${year}-${month.value}`}
+                                          key={`${year}-${month.value}-time`}
                                           checked={selectedMonths.includes(month.value)}
                                           onCheckedChange={(checked) => {
                                             setSelectedYear(year);
@@ -627,6 +750,92 @@ export default function WorkspaceContent() {
                           </div>
                         </ScrollArea>
                       </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    {/* Location Filter */}
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                        <Button variant="outline" className="h-9 text-sm min-w-[180px] justify-between px-3">
+                            <div className="flex items-center gap-1.5 truncate">
+                                <MapPin className="h-3.5 w-3.5 opacity-80 shrink-0" />
+                                <span className="truncate" title={getLocationFilterButtonLabel()}>{getLocationFilterButtonLabel()}</span>
+                            </div>
+                            <ChevronDown className="ml-1 h-4 w-4 opacity-50 shrink-0" />
+                        </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="w-[320px]" align="end">
+                        <DropdownMenuLabel className="text-sm">Lọc theo Địa Điểm</DropdownMenuLabel>
+                        <DMSR />
+                        {isLoadingLocationFilters && (
+                            <div className="px-2 py-4 text-center text-xs text-muted-foreground">
+                                <Loader2 className="h-4 w-4 animate-spin inline mr-1" /> Đang tải địa điểm...
+                            </div>
+                        )}
+                        {locationFilterError && !isLoadingLocationFilters && (
+                             <div className="px-2 py-2 text-xs text-destructive bg-destructive/10 m-1 rounded-md">
+                                <p className="font-medium">Lỗi tải địa điểm:</p>
+                                <p>{locationFilterError}</p>
+                                {locationFilterError.toLowerCase().includes("ms_org_diadiem") && (
+                                    <p className="mt-1 text-muted-foreground">Vui lòng đảm bảo bảng `MS_Org_Diadiem` tồn tại và có cột `Division`, `Loại`, `Department`.</p>
+                                )}
+                            </div>
+                        )}
+                        {!isLoadingLocationFilters && !locationFilterError && availableLocationTypes.length === 0 && (
+                            <div className="px-2 py-4 text-center text-xs text-muted-foreground">
+                                Không có "Loại" địa điểm nào (với Division='Company').
+                            </div>
+                        )}
+                        {!isLoadingLocationFilters && !locationFilterError && availableLocationTypes.length > 0 && (
+                            <ScrollArea className="max-h-[380px]">
+                            <div className="p-1 space-y-0.5">
+                                {availableLocationTypes.map((loai) => (
+                                <DropdownMenuSub key={loai}>
+                                    <DropdownMenuSubTrigger className="text-xs pl-2 pr-1 py-1.5 w-full justify-start hover:bg-accent">
+                                    {/* Consider adding an indicator if any department under this 'loai' is selected */}
+                                    {/* Example: {isMounted && selectedDepartments.some(d => d.startsWith(loai + '__')) && <Circle className="h-2 w-2 fill-current text-primary mr-2" />} */}
+                                    {loai}
+                                    </DropdownMenuSubTrigger>
+                                    <DropdownMenuSubContent className="w-[250px]">
+                                    <DropdownMenuLabel className="text-xs">Phòng ban cho: {loai}</DropdownMenuLabel>
+                                    <DMSR />
+                                    <ScrollArea className="max-h-[300px]">
+                                    <div className="p-1">
+                                    {(availableDepartmentsByLoai[loai] || []).length > 0 ? (
+                                        <>
+                                        <DropdownMenuCheckboxItem
+                                            key={`all-departments-${loai}`}
+                                            checked={areAllDepartmentsSelectedForLoai(loai)}
+                                            onCheckedChange={(checked) => handleSelectAllDepartmentsForLoai(loai, checked as boolean)}
+                                            onSelect={(e) => e.preventDefault()}
+                                            className="text-xs font-medium"
+                                        >
+                                            Tất cả phòng ban ({loai})
+                                        </DropdownMenuCheckboxItem>
+                                        <DMSR />
+                                        {(availableDepartmentsByLoai[loai] || []).map((dept) => (
+                                            <DropdownMenuCheckboxItem
+                                            key={`${loai}-${dept}`}
+                                            checked={selectedDepartments.includes(`${loai}__${dept}`)}
+                                            onCheckedChange={(checked) => handleDepartmentSelection(loai, dept, checked as boolean)}
+                                            onSelect={(e) => e.preventDefault()}
+                                            className="text-xs"
+                                            >
+                                            {dept}
+                                            </DropdownMenuCheckboxItem>
+                                        ))}
+                                        </>
+                                    ) : (
+                                        <div className="px-2 py-2 text-xs text-muted-foreground">Không có phòng ban cho loại này.</div>
+                                    )}
+                                    </div>
+                                    </ScrollArea>
+                                    </DropdownMenuSubContent>
+                                </DropdownMenuSub>
+                                ))}
+                            </div>
+                            </ScrollArea>
+                        )}
+                        </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
                 </div>
@@ -678,3 +887,4 @@ export default function WorkspaceContent() {
     </SidebarProvider>
   );
 }
+
