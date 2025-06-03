@@ -3,11 +3,12 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabaseClient'; 
-import { Loader2, AlertTriangle, TrendingUp, TrendingDown, Minus, Percent, Banknote, DollarSign, GanttChartSquare, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Loader2, AlertTriangle, TrendingUp, TrendingDown, Minus, Percent, Banknote, DollarSign, GanttChartSquare, ArrowUpDown, ArrowUp, ArrowDown, Filter } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Button } from '@/components/ui/button';
+// Button is not used here, but kept for potential future use like export.
+// import { Button } from '@/components/ui/button';
 import { cn } from "@/lib/utils";
 
 interface LocationComparisonTableProps {
@@ -34,6 +35,12 @@ interface MergedComparisonData {
   total_revenue_2025: number;
   ratio_2024: number | null;
   ratio_2025: number | null;
+  // Calculated fields for sorting by change
+  ft_salary_change_val: number | null;
+  pt_salary_change_val: number | null;
+  total_salary_change_val: number | null;
+  revenue_change_val: number | null;
+  ratio_change_pp_val: number | null;
 }
 
 interface FetchError {
@@ -44,9 +51,39 @@ interface FetchError {
 
 const CRITICAL_SETUP_ERROR_PREFIX = "LỖI CÀI ĐẶT QUAN TRỌNG:";
 
-type SortableColumnKey = Exclude<keyof MergedComparisonData, 
-  | 'ft_salary_2024_change' // Example if we had change columns, these are not sortable by default
->;
+type SortableColumnKey =
+  | 'location_name'
+  | 'ft_salary_2024' | 'ft_salary_2025' | 'ft_salary_change_val'
+  | 'pt_salary_2024' | 'pt_salary_2025' | 'pt_salary_change_val'
+  | 'total_salary_2024' | 'total_salary_2025' | 'total_salary_change_val'
+  | 'total_revenue_2024' | 'total_revenue_2025' | 'revenue_change_val'
+  | 'ratio_2024' | 'ratio_2025' | 'ratio_change_pp_val';
+
+
+// Helper function to calculate change, handling division by zero
+const calculateChange = (valNew: number, valOld: number): number | null => {
+    if (valOld === 0 && valNew === 0) return 0;
+    if (valOld === 0) return valNew > 0 ? Infinity : (valNew < 0 ? -Infinity : 0); // Or simply Infinity if valNew is not 0
+    if (valNew === null || valOld === null) return null;
+    return (valNew - valOld) / valOld;
+};
+
+
+// Placeholder function for filtering specific medical units in North/South
+// Adjust keywords and logic as per your actual data structure/naming conventions
+const isMedicalUnitNorthSouth = (locationName: string): boolean => {
+  const nameLower = locationName.toLowerCase();
+  
+  const medicalKeywords = ["y tế", "phòng khám", "bệnh viện", "trung tâm y tế", "ytế", "pkđk"];
+  const northKeywords = ["bắc", "hà nội", "hn", "miền bắc", "phía bắc", "thái nguyên", "hải phòng", "quảng ninh"];
+  const southKeywords = ["nam", "hcm", "hồ chí minh", "sài gòn", "miền nam", "phía nam", "cần thơ", "đồng nai", "bình dương"];
+
+  const isMedical = medicalKeywords.some(kw => nameLower.includes(kw));
+  const isNorth = northKeywords.some(kw => nameLower.includes(kw));
+  const isSouth = southKeywords.some(kw => nameLower.includes(kw));
+
+  return isMedical && (isNorth || isSouth);
+};
 
 
 export default function LocationComparisonTable({ selectedMonths, selectedDepartments }: LocationComparisonTableProps) {
@@ -123,7 +160,7 @@ export default function LocationComparisonTable({ selectedMonths, selectedDepart
     } else {
         locationSegment = "tất cả địa điểm";
     }
-    setFilterDescription(`So sánh ${monthSegment} tại ${locationSegment}`);
+    setFilterDescription(`${monthSegment} tại ${locationSegment}`);
 
     const [data2024, data2025] = await Promise.all([
       fetchDataForYear(2024),
@@ -156,24 +193,45 @@ export default function LocationComparisonTable({ selectedMonths, selectedDepart
         });
       });
       
-      const finalData = Array.from(mergedMap.values()).map(item => ({
-        location_name: item.location_name!,
-        ft_salary_2024: item.ft_salary_2024 || 0,
-        ft_salary_2025: item.ft_salary_2025 || 0,
-        pt_salary_2024: item.pt_salary_2024 || 0,
-        pt_salary_2025: item.pt_salary_2025 || 0,
-        total_salary_2024: item.total_salary_2024 || 0,
-        total_salary_2025: item.total_salary_2025 || 0,
-        total_revenue_2024: item.total_revenue_2024 || 0,
-        total_revenue_2025: item.total_revenue_2025 || 0,
-        ratio_2024: item.ratio_2024 === undefined ? null : item.ratio_2024,
-        ratio_2025: item.ratio_2025 === undefined ? null : item.ratio_2025,
-      })).filter(d => 
+      const rawFinalData = Array.from(mergedMap.values()).map(item => {
+        const ft_s_2024 = item.ft_salary_2024 || 0;
+        const ft_s_2025 = item.ft_salary_2025 || 0;
+        const pt_s_2024 = item.pt_salary_2024 || 0;
+        const pt_s_2025 = item.pt_salary_2025 || 0;
+        const total_s_2024 = item.total_salary_2024 || 0;
+        const total_s_2025 = item.total_salary_2025 || 0;
+        const total_r_2024 = item.total_revenue_2024 || 0;
+        const total_r_2025 = item.total_revenue_2025 || 0;
+        const r_2024 = item.ratio_2024 === undefined ? null : item.ratio_2024;
+        const r_2025 = item.ratio_2025 === undefined ? null : item.ratio_2025;
+
+        return {
+            location_name: item.location_name!,
+            ft_salary_2024: ft_s_2024,
+            ft_salary_2025: ft_s_2025,
+            pt_salary_2024: pt_s_2024,
+            pt_salary_2025: pt_s_2025,
+            total_salary_2024: total_s_2024,
+            total_salary_2025: total_s_2025,
+            total_revenue_2024: total_r_2024,
+            total_revenue_2025: total_r_2025,
+            ratio_2024: r_2024,
+            ratio_2025: r_2025,
+            ft_salary_change_val: calculateChange(ft_s_2025, ft_s_2024),
+            pt_salary_change_val: calculateChange(pt_s_2025, pt_s_2024),
+            total_salary_change_val: calculateChange(total_s_2025, total_s_2024),
+            revenue_change_val: calculateChange(total_r_2025, total_r_2024),
+            ratio_change_pp_val: (r_2025 !== null && r_2024 !== null) ? r_2025 - r_2024 : null,
+        };
+      }).filter(d => 
         d.ft_salary_2024 !== 0 || d.ft_salary_2025 !== 0 ||
         d.pt_salary_2024 !== 0 || d.pt_salary_2025 !== 0 ||
         d.total_revenue_2024 !== 0 || d.total_revenue_2025 !== 0
       );
-      setComparisonData(finalData);
+
+      // Apply specific location filter
+      const filteredLocationData = rawFinalData.filter(item => isMedicalUnitNorthSouth(item.location_name));
+      setComparisonData(filteredLocationData);
 
     } else {
       if (!Array.isArray(data2024)) setError(data2024 as FetchError);
@@ -204,9 +262,14 @@ export default function LocationComparisonTable({ selectedMonths, selectedDepart
         const valB = b[sortConfig.key!];
 
         if (valA === null && valB === null) return 0;
-        if (valA === null) return sortConfig.direction === 'ascending' ? -1 : 1;
-        if (valB === null) return sortConfig.direction === 'ascending' ? 1 : -1;
+        if (valA === null) return sortConfig.direction === 'ascending' ? -1 : 1; // Nulls first on ascending
+        if (valB === null) return sortConfig.direction === 'ascending' ? 1 : -1; // Nulls first on ascending
         
+        if (valA === Infinity) return sortConfig.direction === 'ascending' ? 1 : -1;
+        if (valB === Infinity) return sortConfig.direction === 'ascending' ? -1 : 1;
+        if (valA === -Infinity) return sortConfig.direction === 'ascending' ? -1 : 1;
+        if (valB === -Infinity) return sortConfig.direction === 'ascending' ? 1 : -1;
+
         if (typeof valA === 'number' && typeof valB === 'number') {
           return sortConfig.direction === 'ascending' ? valA - valB : valB - valA;
         } else if (typeof valA === 'string' && typeof valB === 'string') {
@@ -226,8 +289,8 @@ export default function LocationComparisonTable({ selectedMonths, selectedDepart
 
   const formatPercentage = (value: number | null, forceSign = false) => {
     if (value === null || value === undefined) return 'N/A';
-    if (value === Infinity) return 'Tăng mạnh';
-    if (value === -Infinity) return 'Giảm mạnh';
+    if (value === Infinity) return 'Tăng ∞';
+    if (value === -Infinity) return 'Giảm ∞';
     const sign = value > 0 && forceSign ? '+' : '';
     return `${sign}${(value * 100).toFixed(1)}%`;
   };
@@ -237,12 +300,6 @@ export default function LocationComparisonTable({ selectedMonths, selectedDepart
     const sign = value > 0 ? '+' : '';
     return `${sign}${(value * 100).toFixed(1)} pp`;
   }
-
-  const calculateChange = (val2025: number, val2024: number) => {
-    if (val2024 === 0 && val2025 === 0) return 0;
-    if (val2024 === 0) return val2025 > 0 ? Infinity : (val2025 < 0 ? -Infinity : 0);
-    return (val2025 - val2024) / val2024;
-  };
   
   const renderChangeCell = (change: number | null, isCost: boolean, isRatio: boolean = false) => {
     if (change === null || change === undefined) return <TableCell className="text-center text-muted-foreground text-xs py-1.5 px-2">N/A</TableCell>;
@@ -276,23 +333,24 @@ export default function LocationComparisonTable({ selectedMonths, selectedDepart
     );
   };
 
-  const renderSortableTableHead = (label: string, columnKey: SortableColumnKey, isSticky: boolean = false, minWidth?: string) => {
+  const renderSortableTableHead = (label: string, columnKey: SortableColumnKey, isSticky: boolean = false, minWidth?: string, align: 'left' | 'center' | 'right' = 'center') => {
     const isSorted = sortConfig.key === columnKey;
     const SortIcon = isSorted ? (sortConfig.direction === 'ascending' ? ArrowUp : ArrowDown) : ArrowUpDown;
     
     return (
       <TableHead 
         className={cn(
-          "py-1.5 px-2 text-xs font-medium text-center whitespace-nowrap cursor-pointer hover:bg-muted/50",
-          isSticky && "sticky left-0 bg-card z-20",
+          "py-1.5 px-2 text-xs font-medium whitespace-nowrap cursor-pointer hover:bg-muted/50",
+          `text-${align}`,
+          isSticky && "sticky left-0 bg-card z-20", // Ensure z-20 for sticky header over sticky column cells (z-10)
           minWidth && `min-w-[${minWidth}]`
         )}
-        style={isSticky ? { minWidth: minWidth || '150px' } : {}}
+        style={isSticky ? { minWidth: minWidth || '150px' } : {}} // Style for minWidth needed for sticky
         onClick={() => requestSort(columnKey)}
       >
-        <div className="flex items-center justify-center gap-1">
+        <div className={cn("flex items-center gap-1", `justify-${align === 'center' ? 'center' : align === 'left' ? 'start' : 'end'}`)}>
           {label}
-          <SortIcon className={cn("h-3 w-3", isSorted ? "opacity-100" : "opacity-50")} />
+          <SortIcon className={cn("h-3 w-3 shrink-0", isSorted ? "opacity-100" : "opacity-50")} />
         </div>
       </TableHead>
     );
@@ -303,7 +361,7 @@ export default function LocationComparisonTable({ selectedMonths, selectedDepart
     return (
       <Card className="mt-4 flex-grow flex flex-col">
         <CardHeader className="pb-2 pt-3">
-          <CardTitle className="text-base font-semibold flex items-center gap-1.5"><GanttChartSquare className="h-4 w-4 text-primary" />Bảng So Sánh Chi Tiết Theo Địa Điểm</CardTitle>
+          <CardTitle className="text-base font-semibold flex items-center gap-1.5"><GanttChartSquare className="h-4 w-4 text-primary" />Bảng So Sánh Địa Điểm (Y Tế Bắc/Nam)</CardTitle>
           <CardDescription className="text-xs truncate">Đang tải dữ liệu so sánh chi tiết...</CardDescription>
         </CardHeader>
         <CardContent className="pt-2 flex items-center justify-center flex-grow">
@@ -337,74 +395,71 @@ export default function LocationComparisonTable({ selectedMonths, selectedDepart
     return (
        <Card className="mt-4 flex-grow flex flex-col">
         <CardHeader className="pb-2 pt-3">
-            <CardTitle className="text-base font-semibold text-muted-foreground flex items-center gap-1.5"><GanttChartSquare className="h-4 w-4" />Bảng So Sánh Chi Tiết Theo Địa Điểm</CardTitle>
-            <CardDescription className="text-xs truncate">Cho: {filterDescription}</CardDescription>
+            <CardTitle className="text-base font-semibold text-muted-foreground flex items-center gap-1.5"><GanttChartSquare className="h-4 w-4" />Bảng So Sánh Địa Điểm (Y Tế Bắc/Nam)</CardTitle>
+            <CardDescription className="text-xs truncate">
+                {filterDescription}. Chỉ hiển thị ĐVTV Y Tế ở phía Bắc/Nam (kiểm tra từ khóa trong code nếu không đúng).
+            </CardDescription>
         </CardHeader>
          <CardContent className="pt-2 flex items-center justify-center flex-grow">
-           <p className="text-sm text-muted-foreground">Không có dữ liệu chi tiết theo địa điểm cho kỳ đã chọn.</p>
+           <p className="text-sm text-muted-foreground">Không có dữ liệu ĐVTV Y Tế Bắc/Nam cho kỳ đã chọn, hoặc không có đơn vị nào khớp bộ lọc từ khóa.</p>
          </CardContent>
        </Card>
     );
   }
 
   return (
-    <Card className="mt-4 flex-grow flex flex-col h-[600px]">
+    <Card className="mt-4 flex-grow flex flex-col h-[600px]"> {/* Ensure Card has defined height or flex-grow in a flex parent */}
       <CardHeader className="pb-2 pt-3">
-        <CardTitle className="text-base font-semibold flex items-center gap-1.5"><GanttChartSquare className="h-4 w-4 text-primary" />Bảng So Sánh Chi Tiết Theo Địa Điểm (2024 vs 2025)</CardTitle>
-        <CardDescription className="text-xs truncate">{filterDescription}. Chỉ hiển thị các địa điểm có dữ liệu trong một trong hai năm.</CardDescription>
+        <CardTitle className="text-base font-semibold flex items-center gap-1.5"><Filter className="h-4 w-4 text-primary" />Bảng So Sánh Địa Điểm (Y Tế Bắc/Nam)</CardTitle>
+        <CardDescription className="text-xs truncate">
+            {filterDescription}. <span className="italic">Lưu ý: Lọc ĐVTV Y Tế Bắc/Nam dựa trên từ khóa trong tên địa điểm.</span>
+        </CardDescription>
       </CardHeader>
-      <CardContent className="pt-2 flex-grow overflow-hidden flex flex-col">
-        <ScrollArea className="flex-grow border rounded-md">
+      <CardContent className="pt-2 flex-grow overflow-hidden flex flex-col"> {/* Allows ScrollArea to take remaining space */}
+        <ScrollArea className="flex-grow border rounded-md"> {/* flex-grow for ScrollArea */}
           <Table>
-            <TableHeader className="sticky top-0 bg-card z-10">
+            <TableHeader className="sticky top-0 bg-card z-20"> {/* Increased z-index for header over sticky column */}
               <TableRow>
-                {renderSortableTableHead("Địa Điểm", 'location_name', true, '150px')}
-                {renderSortableTableHead("Lương FT 24", 'ft_salary_2024')}
-                {renderSortableTableHead("Lương FT 25", 'ft_salary_2025')}
-                <TableHead className="py-1.5 px-2 text-xs font-medium text-center whitespace-nowrap">+/- FT (%)</TableHead>
-                {renderSortableTableHead("Lương PT 24", 'pt_salary_2024')}
-                {renderSortableTableHead("Lương PT 25", 'pt_salary_2025')}
-                <TableHead className="py-1.5 px-2 text-xs font-medium text-center whitespace-nowrap">+/- PT (%)</TableHead>
-                {renderSortableTableHead("Tổng Lương 24", 'total_salary_2024')}
-                {renderSortableTableHead("Tổng Lương 25", 'total_salary_2025')}
-                <TableHead className="py-1.5 px-2 text-xs font-medium text-center whitespace-nowrap">+/- Lương (%)</TableHead>
-                {renderSortableTableHead("Doanh Thu 24", 'total_revenue_2024')}
-                {renderSortableTableHead("Doanh Thu 25", 'total_revenue_2025')}
-                <TableHead className="py-1.5 px-2 text-xs font-medium text-center whitespace-nowrap">+/- DT (%)</TableHead>
-                {renderSortableTableHead("QL/DT 24 (%)", 'ratio_2024')}
-                {renderSortableTableHead("QL/DT 25 (%)", 'ratio_2025')}
-                <TableHead className="py-1.5 px-2 text-xs font-medium text-center whitespace-nowrap">+/- QL/DT (pp)</TableHead>
+                {renderSortableTableHead("Địa Điểm", 'location_name', true, '180px', 'left')}
+                {renderSortableTableHead("Lương FT 24", 'ft_salary_2024', false, undefined, 'right')}
+                {renderSortableTableHead("Lương FT 25", 'ft_salary_2025', false, undefined, 'right')}
+                {renderSortableTableHead("+/- FT", 'ft_salary_change_val')}
+                {renderSortableTableHead("Lương PT 24", 'pt_salary_2024', false, undefined, 'right')}
+                {renderSortableTableHead("Lương PT 25", 'pt_salary_2025', false, undefined, 'right')}
+                {renderSortableTableHead("+/- PT", 'pt_salary_change_val')}
+                {renderSortableTableHead("Tổng Lương 24", 'total_salary_2024', false, undefined, 'right')}
+                {renderSortableTableHead("Tổng Lương 25", 'total_salary_2025', false, undefined, 'right')}
+                {renderSortableTableHead("+/- Lương", 'total_salary_change_val')}
+                {renderSortableTableHead("Doanh Thu 24", 'total_revenue_2024', false, undefined, 'right')}
+                {renderSortableTableHead("Doanh Thu 25", 'total_revenue_2025', false, undefined, 'right')}
+                {renderSortableTableHead("+/- DT", 'revenue_change_val')}
+                {renderSortableTableHead("QL/DT 24", 'ratio_2024')}
+                {renderSortableTableHead("QL/DT 25", 'ratio_2025')}
+                {renderSortableTableHead("+/- QL/DT", 'ratio_change_pp_val')}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sortedComparisonData.map((row) => {
-                const ftChange = calculateChange(row.ft_salary_2025, row.ft_salary_2024);
-                const ptChange = calculateChange(row.pt_salary_2025, row.pt_salary_2024);
-                const totalSalaryChange = calculateChange(row.total_salary_2025, row.total_salary_2024);
-                const revenueChange = calculateChange(row.total_revenue_2025, row.total_revenue_2024);
-                const ratioPointChange = (row.ratio_2025 === null || row.ratio_2024 === null) ? null : row.ratio_2025 - row.ratio_2024;
-
-                return (
+              {sortedComparisonData.map((row) => (
                   <TableRow key={row.location_name}>
-                    <TableCell className="py-1.5 px-2 text-xs font-medium sticky left-0 bg-card z-10 whitespace-nowrap min-w-[150px]">{row.location_name}</TableCell>
+                    <TableCell className="py-1.5 px-2 text-xs font-medium sticky left-0 bg-card z-10 whitespace-nowrap min-w-[180px] text-left">{row.location_name}</TableCell>
                     <TableCell className="text-right py-1.5 px-2 text-xs whitespace-nowrap">{formatCurrency(row.ft_salary_2024)}</TableCell>
                     <TableCell className="text-right py-1.5 px-2 text-xs whitespace-nowrap">{formatCurrency(row.ft_salary_2025)}</TableCell>
-                    {renderChangeCell(ftChange, true)}
+                    {renderChangeCell(row.ft_salary_change_val, true)}
                     <TableCell className="text-right py-1.5 px-2 text-xs whitespace-nowrap">{formatCurrency(row.pt_salary_2024)}</TableCell>
                     <TableCell className="text-right py-1.5 px-2 text-xs whitespace-nowrap">{formatCurrency(row.pt_salary_2025)}</TableCell>
-                    {renderChangeCell(ptChange, true)}
+                    {renderChangeCell(row.pt_salary_change_val, true)}
                     <TableCell className="text-right py-1.5 px-2 text-xs whitespace-nowrap font-semibold">{formatCurrency(row.total_salary_2024)}</TableCell>
                     <TableCell className="text-right py-1.5 px-2 text-xs whitespace-nowrap font-semibold">{formatCurrency(row.total_salary_2025)}</TableCell>
-                    {renderChangeCell(totalSalaryChange, true)}
+                    {renderChangeCell(row.total_salary_change_val, true)}
                     <TableCell className="text-right py-1.5 px-2 text-xs whitespace-nowrap font-semibold">{formatCurrency(row.total_revenue_2024)}</TableCell>
                     <TableCell className="text-right py-1.5 px-2 text-xs whitespace-nowrap font-semibold">{formatCurrency(row.total_revenue_2025)}</TableCell>
-                    {renderChangeCell(revenueChange, false)}
+                    {renderChangeCell(row.revenue_change_val, false)}
                     <TableCell className="text-center py-1.5 px-2 text-xs whitespace-nowrap">{formatPercentage(row.ratio_2024)}</TableCell>
                     <TableCell className="text-center py-1.5 px-2 text-xs whitespace-nowrap">{formatPercentage(row.ratio_2025)}</TableCell>
-                    {renderChangeCell(ratioPointChange, true, true)}
+                    {renderChangeCell(row.ratio_change_pp_val, true, true)}
                   </TableRow>
-                );
-              })}
+                )
+              )}
             </TableBody>
           </Table>
         </ScrollArea>
@@ -413,5 +468,3 @@ export default function LocationComparisonTable({ selectedMonths, selectedDepart
   );
 }
 
-
-    
