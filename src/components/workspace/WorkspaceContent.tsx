@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, ChevronDown, Filter as FilterIcon, GanttChartSquare, MapPin, Settings2, Circle } from "lucide-react";
+import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, ChevronDown, Filter as FilterIcon, GanttChartSquare, MapPin, Settings2, Circle, Percent } from "lucide-react"; // Added Percent
 import type { PayrollEntry } from '@/types';
 import { supabase } from '@/lib/supabaseClient';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -25,6 +25,7 @@ import ComparisonFulltimeSalaryCard from '@/components/comparison/ComparisonFull
 import ComparisonParttimeSalaryCard from '@/components/comparison/ComparisonParttimeSalaryCard';
 import ComparisonCombinedSalaryCard from '@/components/comparison/ComparisonCombinedSalaryCard';
 import ComparisonRevenueCard from '@/components/comparison/ComparisonRevenueCard';
+import ComparisonSalaryRevenueRatioCard from '@/components/comparison/ComparisonSalaryRevenueRatioCard'; // Added
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -649,7 +650,7 @@ export default function WorkspaceContent() {
                               >
                                 <span className="flex items-center gap-2">
                                   {isMounted && selectedYear === null && <Circle className="h-2 w-2 fill-current text-primary" />}
-                                  {(!isMounted || (isMounted && selectedYear !== null)) && <span className="w-2 h-2 block ml-0.5 mr-[calc(0.5rem-2px)]"></span>} {/* Placeholder for alignment */}
+                                  {(!isMounted || (isMounted && selectedYear !== null)) && <span className="w-2 h-2 block ml-0.5 mr-[calc(0.5rem-2px)]"></span>} {}
                                   Tất cả các năm
                                 </span>
                               </DropdownMenuSubTrigger>
@@ -701,7 +702,7 @@ export default function WorkspaceContent() {
                                 >
                                   <span className="flex items-center gap-2">
                                      {isMounted && selectedYear === year && <Circle className="h-2 w-2 fill-current text-primary" />}
-                                     {(!isMounted || (isMounted && selectedYear !== year)) && <span className="w-2 h-2 block ml-0.5 mr-[calc(0.5rem-2px)]"></span>} {/* Placeholder for alignment */}
+                                     {(!isMounted || (isMounted && selectedYear !== year)) && <span className="w-2 h-2 block ml-0.5 mr-[calc(0.5rem-2px)]"></span>} {}
                                     Năm {year}
                                   </span>
                                 </DropdownMenuSubTrigger>
@@ -861,11 +862,12 @@ export default function WorkspaceContent() {
                     </div>
                   </TabsContent>
                   <TabsContent value="comparison" className="flex-grow overflow-y-auto space-y-3 mt-2">
-                    <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+                    <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5"> {}
                         <ComparisonFulltimeSalaryCard selectedMonths={selectedMonths} selectedDepartments={selectedDepartments} />
                         <ComparisonParttimeSalaryCard selectedMonths={selectedMonths} selectedDepartments={selectedDepartments} />
                         <ComparisonCombinedSalaryCard selectedMonths={selectedMonths} selectedDepartments={selectedDepartments} />
                         <ComparisonRevenueCard selectedMonths={selectedMonths} selectedDepartments={selectedDepartments} />
+                        <ComparisonSalaryRevenueRatioCard selectedMonths={selectedMonths} selectedDepartments={selectedDepartments} />
                     </div>
                     <div className="flex flex-col items-center justify-center h-64 text-muted-foreground bg-card rounded-lg border border-dashed">
                         <GanttChartSquare className="h-12 w-12 mb-4 text-primary/70" />
