@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabaseClient'; 
-import { Loader2, AlertTriangle, TrendingUp, TrendingDown, Minus, Percent, Banknote, DollarSign, GanttChartSquare, ArrowUpDown, ArrowUp, ArrowDown, Filter } from 'lucide-react';
+import { Loader2, AlertTriangle, TrendingUp, TrendingDown, Minus, Percent, Banknote, DollarSign, GanttChartSquare, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -66,23 +66,6 @@ const calculateChange = (valNew: number, valOld: number): number | null => {
     if (valOld === 0) return valNew > 0 ? Infinity : (valNew < 0 ? -Infinity : 0); // Or simply Infinity if valNew is not 0
     if (valNew === null || valOld === null) return null;
     return (valNew - valOld) / valOld;
-};
-
-
-// Placeholder function for filtering specific medical units in North/South
-// Adjust keywords and logic as per your actual data structure/naming conventions
-const isMedicalUnitNorthSouth = (locationName: string): boolean => {
-  const nameLower = locationName.toLowerCase();
-  
-  const medicalKeywords = ["y tế", "phòng khám", "bệnh viện", "trung tâm y tế", "ytế", "pkđk"];
-  const northKeywords = ["bắc", "hà nội", "hn", "miền bắc", "phía bắc", "thái nguyên", "hải phòng", "quảng ninh"];
-  const southKeywords = ["nam", "hcm", "hồ chí minh", "sài gòn", "miền nam", "phía nam", "cần thơ", "đồng nai", "bình dương"];
-
-  const isMedical = medicalKeywords.some(kw => nameLower.includes(kw));
-  const isNorth = northKeywords.some(kw => nameLower.includes(kw));
-  const isSouth = southKeywords.some(kw => nameLower.includes(kw));
-
-  return isMedical && (isNorth || isSouth);
 };
 
 
@@ -229,9 +212,7 @@ export default function LocationComparisonTable({ selectedMonths, selectedDepart
         d.total_revenue_2024 !== 0 || d.total_revenue_2025 !== 0
       );
 
-      // Apply specific location filter
-      const filteredLocationData = rawFinalData.filter(item => isMedicalUnitNorthSouth(item.location_name));
-      setComparisonData(filteredLocationData);
+      setComparisonData(rawFinalData);
 
     } else {
       if (!Array.isArray(data2024)) setError(data2024 as FetchError);
@@ -342,10 +323,10 @@ export default function LocationComparisonTable({ selectedMonths, selectedDepart
         className={cn(
           "py-1.5 px-2 text-xs font-medium whitespace-nowrap cursor-pointer hover:bg-muted/50",
           `text-${align}`,
-          isSticky && "sticky left-0 bg-card z-20", // Ensure z-20 for sticky header over sticky column cells (z-10)
+          isSticky && "sticky left-0 bg-card z-20", 
           minWidth && `min-w-[${minWidth}]`
         )}
-        style={isSticky ? { minWidth: minWidth || '150px' } : {}} // Style for minWidth needed for sticky
+        style={isSticky ? { minWidth: minWidth || '150px' } : {}} 
         onClick={() => requestSort(columnKey)}
       >
         <div className={cn("flex items-center gap-1", `justify-${align === 'center' ? 'center' : align === 'left' ? 'start' : 'end'}`)}>
@@ -361,7 +342,7 @@ export default function LocationComparisonTable({ selectedMonths, selectedDepart
     return (
       <Card className="mt-4 flex-grow flex flex-col">
         <CardHeader className="pb-2 pt-3">
-          <CardTitle className="text-base font-semibold flex items-center gap-1.5"><GanttChartSquare className="h-4 w-4 text-primary" />Bảng So Sánh Địa Điểm (Y Tế Bắc/Nam)</CardTitle>
+          <CardTitle className="text-base font-semibold flex items-center gap-1.5"><GanttChartSquare className="h-4 w-4 text-primary" />Bảng So Sánh Chi Tiết Theo Địa Điểm</CardTitle>
           <CardDescription className="text-xs truncate">Đang tải dữ liệu so sánh chi tiết...</CardDescription>
         </CardHeader>
         <CardContent className="pt-2 flex items-center justify-center flex-grow">
@@ -395,30 +376,30 @@ export default function LocationComparisonTable({ selectedMonths, selectedDepart
     return (
        <Card className="mt-4 flex-grow flex flex-col">
         <CardHeader className="pb-2 pt-3">
-            <CardTitle className="text-base font-semibold text-muted-foreground flex items-center gap-1.5"><GanttChartSquare className="h-4 w-4" />Bảng So Sánh Địa Điểm (Y Tế Bắc/Nam)</CardTitle>
+            <CardTitle className="text-base font-semibold text-muted-foreground flex items-center gap-1.5"><GanttChartSquare className="h-4 w-4" />Bảng So Sánh Chi Tiết Theo Địa Điểm</CardTitle>
             <CardDescription className="text-xs truncate">
-                {filterDescription}. Chỉ hiển thị ĐVTV Y Tế ở phía Bắc/Nam (kiểm tra từ khóa trong code nếu không đúng).
+                {filterDescription}.
             </CardDescription>
         </CardHeader>
          <CardContent className="pt-2 flex items-center justify-center flex-grow">
-           <p className="text-sm text-muted-foreground">Không có dữ liệu ĐVTV Y Tế Bắc/Nam cho kỳ đã chọn, hoặc không có đơn vị nào khớp bộ lọc từ khóa.</p>
+           <p className="text-sm text-muted-foreground">Không có dữ liệu địa điểm nào cho kỳ đã chọn.</p>
          </CardContent>
        </Card>
     );
   }
 
   return (
-    <Card className="mt-4 flex-grow flex flex-col h-[600px]"> {/* Ensure Card has defined height or flex-grow in a flex parent */}
+    <Card className="mt-4 flex-grow flex flex-col h-[600px]">
       <CardHeader className="pb-2 pt-3">
-        <CardTitle className="text-base font-semibold flex items-center gap-1.5"><Filter className="h-4 w-4 text-primary" />Bảng So Sánh Địa Điểm (Y Tế Bắc/Nam)</CardTitle>
+        <CardTitle className="text-base font-semibold flex items-center gap-1.5"><GanttChartSquare className="h-4 w-4 text-primary" />Bảng So Sánh Chi Tiết Theo Địa Điểm</CardTitle>
         <CardDescription className="text-xs truncate">
-            {filterDescription}. <span className="italic">Lưu ý: Lọc ĐVTV Y Tế Bắc/Nam dựa trên từ khóa trong tên địa điểm.</span>
+            {filterDescription}.
         </CardDescription>
       </CardHeader>
-      <CardContent className="pt-2 flex-grow overflow-hidden flex flex-col"> {/* Allows ScrollArea to take remaining space */}
-        <ScrollArea className="flex-grow border rounded-md"> {/* flex-grow for ScrollArea */}
+      <CardContent className="pt-2 flex-grow overflow-hidden flex flex-col">
+        <ScrollArea className="flex-grow border rounded-md">
           <Table>
-            <TableHeader className="sticky top-0 bg-card z-20"> {/* Increased z-index for header over sticky column */}
+            <TableHeader className="sticky top-0 bg-card z-20">
               <TableRow>
                 {renderSortableTableHead("Địa Điểm", 'location_name', true, '180px', 'left')}
                 {renderSortableTableHead("Lương FT 24", 'ft_salary_2024', false, undefined, 'right')}
