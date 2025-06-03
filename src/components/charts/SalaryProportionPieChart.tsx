@@ -5,15 +5,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { supabase } from '@/lib/supabaseClient';
 import { Loader2, AlertTriangle, PieChart as PieChartIcon } from 'lucide-react';
-// PieChart is now dynamically imported
-// import {
-//   PieChart,
-//   Pie,
-//   Cell,
-//   ResponsiveContainer,
-//   Tooltip,
-//   Legend,
-// } from 'recharts';
 import { Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 
 import {
@@ -37,6 +28,7 @@ const DynamicPieChart = dynamic(() => import('recharts').then(mod => mod.PieChar
 interface SalaryProportionPieChartProps {
   selectedMonths?: number[];
   selectedYear?: number | null;
+  selectedDepartments?: string[]; // Added
 }
 
 interface PieDataEntry {
@@ -63,16 +55,18 @@ const pieChartConfig = {
   },
 } satisfies ChartConfig;
 
-export default function SalaryProportionPieChart({ selectedMonths, selectedYear }: SalaryProportionPieChartProps) {
+export default function SalaryProportionPieChart({ selectedMonths, selectedYear, selectedDepartments }: SalaryProportionPieChartProps) {
   const [pieData, setPieData] = useState<PieDataEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<FetchError | null>(null);
-  const [filterDescription, setFilterDescription] = useState<string>("tất cả các kỳ");
+  const [filterDescription, setFilterDescription] = useState<string>("tất cả các kỳ và địa điểm");
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     setPieData([]);
+
+    const departmentNames = selectedDepartments?.map(depId => depId.split('__')[1]).filter(Boolean) || [];
 
     let finalFilterDescription: string;
     const yearSegment = selectedYear ? `Năm ${selectedYear}` : "Tất cả các năm";
@@ -90,13 +84,24 @@ export default function SalaryProportionPieChart({ selectedMonths, selectedYear 
       monthSegment = "tất cả các tháng";
     }
 
+    let locationSegment: string;
+    if (departmentNames.length > 0) {
+      if (departmentNames.length <= 2) {
+        locationSegment = departmentNames.join(' & ');
+      } else {
+        locationSegment = `${departmentNames.length} địa điểm`;
+      }
+    } else {
+      locationSegment = "tất cả địa điểm";
+    }
+
     if (selectedYear) {
-      finalFilterDescription = `${monthSegment} của ${yearSegment}`;
+      finalFilterDescription = `${monthSegment} của ${yearSegment} tại ${locationSegment}`;
     } else {
       if (selectedMonths && selectedMonths.length > 0 && selectedMonths.length < 12) {
-        finalFilterDescription = `${monthSegment} (trong mọi năm)`;
+        finalFilterDescription = `${monthSegment} (mọi năm) tại ${locationSegment}`;
       } else {
-        finalFilterDescription = "tất cả các kỳ";
+        finalFilterDescription = `tất cả các kỳ tại ${locationSegment}`;
       }
     }
     setFilterDescription(finalFilterDescription);
@@ -105,6 +110,7 @@ export default function SalaryProportionPieChart({ selectedMonths, selectedYear 
     const rpcArgs = {
       filter_year: selectedYear,
       filter_months: (selectedMonths && selectedMonths.length > 0) ? selectedMonths : null,
+      filter_locations: (departmentNames.length > 0) ? departmentNames : null, // Added
     };
 
     try {
@@ -117,26 +123,24 @@ export default function SalaryProportionPieChart({ selectedMonths, selectedYear 
       let ptSal = 0;
       let currentError: FetchError | null = null;
 
-      const processResult = (res: PromiseSettledResult<any>, salaryType: 'Full-time' | 'Part-time') => {
+      const processResult = (res: PromiseSettledResult<any>, salaryType: 'Full-time' | 'Part-time', tableName: string, columnName: string) => {
         if (res.status === 'rejected' || (res.status === 'fulfilled' && res.value.error)) {
           const rpcError = res.status === 'fulfilled' ? res.value.error : res.reason;
           const rpcMessageText = rpcError.message ? String(rpcError.message).toLowerCase() : '';
           const functionName = salaryType === 'Full-time' ? 'get_total_salary_fulltime' : 'get_total_salary_parttime';
-          const tableName = salaryType === 'Full-time' ? 'Fulltime' : 'Parttime';
-          const salaryColumn = salaryType === 'Full-time' ? 'tong_thu_nhap' : '"Tong tien"';
-
+          
           const isFunctionMissingError =
             rpcError.code === '42883' ||
             (rpcError.code === 'PGRST202' && rpcMessageText.includes(functionName)) ||
             (rpcMessageText.includes(functionName) && rpcMessageText.includes('does not exist'));
 
           const isTableMissingError = rpcMessageText.includes(`relation "${tableName.toLowerCase()}" does not exist`);
-          const isColumnMissingError = salaryColumn ? rpcMessageText.includes(`column ${salaryColumn.toLowerCase()} does not exist`) || rpcMessageText.includes(`column "${salaryColumn.toLowerCase()}" does not exist`) : false;
+          const isColumnMissingError = rpcMessageText.includes(`column ${columnName.toLowerCase()} does not exist`) || rpcMessageText.includes(`column "${columnName.toLowerCase()}" does not exist`);
 
 
-          if (isFunctionMissingError) return { type: 'rpcMissing' as 'rpcMissing', message: `Hàm RPC '${functionName}' cho Lương ${salaryType} bị thiếu. Kiểm tra README.md.` };
+          if (isFunctionMissingError) return { type: 'rpcMissing' as 'rpcMissing', message: `Hàm RPC '${functionName}' cho Lương ${salaryType} bị thiếu hoặc chưa được cập nhật để nhận filter địa điểm. Kiểm tra README.md.` };
           if (isTableMissingError) return { type: 'rpcMissing' as 'rpcMissing', message: `Bảng '${tableName}' cho Lương ${salaryType} không tồn tại.`};
-          if (isColumnMissingError) return { type: 'rpcMissing' as 'rpcMissing', message: `Cột lương ('${salaryColumn}') trong bảng '${tableName}' cho Lương ${salaryType} không tồn tại.`};
+          if (isColumnMissingError) return { type: 'rpcMissing' as 'rpcMissing', message: `Cột lương ('${columnName}') trong bảng '${tableName}' cho Lương ${salaryType} không tồn tại.`};
 
           return { type: 'generic' as 'generic', message: `Lỗi tải Lương ${salaryType}: ${rpcError.message || 'Lỗi RPC không xác định'}` };
         }
@@ -144,10 +148,10 @@ export default function SalaryProportionPieChart({ selectedMonths, selectedYear 
         return typeof rawValue === 'string' ? parseFloat(rawValue.replace(/,/g, '')) : (typeof rawValue === 'number' ? rawValue : 0);
       };
 
-      const ftSalResult = processResult(ftSalaryRes, 'Full-time');
+      const ftSalResult = processResult(ftSalaryRes, 'Full-time', 'Fulltime', 'tong_thu_nhap');
       if (typeof ftSalResult === 'object') currentError = ftSalResult; else ftSal = ftSalResult;
 
-      const ptSalResult = processResult(ptSalaryRes, 'Part-time');
+      const ptSalResult = processResult(ptSalaryRes, 'Part-time', 'Parttime', '"Tong tien"');
       if (typeof ptSalResult === 'object' && !currentError) currentError = ptSalResult; else ptSal = ptSalResult;
 
       if (currentError) {
@@ -170,7 +174,7 @@ export default function SalaryProportionPieChart({ selectedMonths, selectedYear 
     } finally {
       setIsLoading(false);
     }
-  }, [selectedMonths, selectedYear]);
+  }, [selectedMonths, selectedYear, selectedDepartments]);
 
   useEffect(() => {
     fetchData();
@@ -218,7 +222,7 @@ export default function SalaryProportionPieChart({ selectedMonths, selectedYear 
           <p className="text-xs text-destructive whitespace-pre-line">{error.message}</p>
           {(error.type === 'rpcMissing') && (
             <p className="text-xs text-muted-foreground mt-1 whitespace-pre-line">
-              Vui lòng đảm bảo các hàm RPC (get_total_salary_fulltime, get_total_salary_parttime) và các bảng/cột liên quan ('Fulltime'.'tong_thu_nhap', 'Parttime'."Tong tien") đã được tạo đúng theo README.md.
+              Vui lòng đảm bảo các hàm RPC và các bảng/cột liên quan đã được tạo/cập nhật đúng theo README.md để hỗ trợ filter địa điểm.
             </p>
           )}
         </CardContent>
@@ -245,7 +249,7 @@ export default function SalaryProportionPieChart({ selectedMonths, selectedYear 
       <CardHeader className="pb-2 pt-3">
         <CardTitle className="text-base font-semibold flex items-center gap-1.5"><PieChartIcon className="h-4 w-4" />Tỷ Trọng Lương Full-time vs Part-time</CardTitle>
         <CardDescription className="text-xs">
-          Phân bổ tổng quỹ lương giữa nhân viên full-time và part-time cho {filterDescription}.
+          Phân bổ tổng quỹ lương cho {filterDescription}.
         </CardDescription>
       </CardHeader>
       <CardContent className="pt-0 -mt-2">

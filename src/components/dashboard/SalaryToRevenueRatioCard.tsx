@@ -14,6 +14,7 @@ import {
 interface SalaryToRevenueRatioCardProps {
   selectedMonths?: number[];
   selectedYear?: number | null;
+  selectedDepartments?: string[]; // Added
 }
 
 interface FetchError {
@@ -21,11 +22,11 @@ interface FetchError {
   message: string;
 }
 
-export default function SalaryToRevenueRatioCard({ selectedMonths, selectedYear }: SalaryToRevenueRatioCardProps) {
+export default function SalaryToRevenueRatioCard({ selectedMonths, selectedYear, selectedDepartments }: SalaryToRevenueRatioCardProps) {
   const [ratio, setRatio] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<FetchError | null>(null);
-  const [filterDescription, setFilterDescription] = useState<string>("tất cả các kỳ");
+  const [filterDescription, setFilterDescription] = useState<string>("tất cả các kỳ và địa điểm");
 
   const [fulltimeSalary, setFulltimeSalary] = useState<number | null>(null);
   const [parttimeSalary, setParttimeSalary] = useState<number | null>(null);
@@ -38,6 +39,8 @@ export default function SalaryToRevenueRatioCard({ selectedMonths, selectedYear 
     setFulltimeSalary(null);
     setParttimeSalary(null);
     setTotalRevenue(null);
+
+    const departmentNames = selectedDepartments?.map(depId => depId.split('__')[1]).filter(Boolean) || [];
 
     let finalFilterDescription: string;
     const yearSegment = selectedYear ? `Năm ${selectedYear}` : "Tất cả các năm";
@@ -55,13 +58,24 @@ export default function SalaryToRevenueRatioCard({ selectedMonths, selectedYear 
       monthSegment = "tất cả các tháng";
     }
 
+    let locationSegment: string;
+    if (departmentNames.length > 0) {
+      if (departmentNames.length <= 2) {
+        locationSegment = departmentNames.join(' & ');
+      } else {
+        locationSegment = `${departmentNames.length} địa điểm`;
+      }
+    } else {
+      locationSegment = "tất cả địa điểm";
+    }
+
     if (selectedYear) {
-      finalFilterDescription = `${monthSegment} của ${yearSegment}`;
+      finalFilterDescription = `${monthSegment} của ${yearSegment} tại ${locationSegment}`;
     } else {
       if (selectedMonths && selectedMonths.length > 0 && selectedMonths.length < 12) {
-        finalFilterDescription = `${monthSegment} (trong mọi năm)`;
+        finalFilterDescription = `${monthSegment} (mọi năm) tại ${locationSegment}`;
       } else {
-        finalFilterDescription = "tất cả các kỳ";
+        finalFilterDescription = `tất cả các kỳ tại ${locationSegment}`;
       }
     }
     setFilterDescription(finalFilterDescription);
@@ -69,6 +83,7 @@ export default function SalaryToRevenueRatioCard({ selectedMonths, selectedYear 
     const rpcArgs = {
       filter_year: selectedYear,
       filter_months: (selectedMonths && selectedMonths.length > 0) ? selectedMonths : null,
+      filter_locations: (departmentNames.length > 0) ? departmentNames : null, // Added
     };
 
     try {
@@ -83,21 +98,20 @@ export default function SalaryToRevenueRatioCard({ selectedMonths, selectedYear 
       let rev = 0;
       let currentError: FetchError | null = null;
 
-      const processResult = (res: PromiseSettledResult<any>, name: string, tableName: string, columnName?: string) => {
+      const processResult = (res: PromiseSettledResult<any>, name: string, funcName: string, tableName: string, columnName?: string) => {
         if (res.status === 'rejected' || (res.status === 'fulfilled' && res.value.error)) {
           const rpcError = res.status === 'fulfilled' ? res.value.error : res.reason;
           const rpcMessageText = rpcError.message ? String(rpcError.message).toLowerCase() : '';
-          const functionName = `get_total_${name.toLowerCase().replace(' ', '_')}`;
            const isFunctionMissingError =
             rpcError.code === '42883' ||
-            (rpcError.code === 'PGRST202' && rpcMessageText.includes(functionName)) ||
-            (rpcMessageText.includes(functionName) && rpcMessageText.includes('does not exist'));
+            (rpcError.code === 'PGRST202' && rpcMessageText.includes(funcName.toLowerCase())) ||
+            (rpcMessageText.includes(funcName.toLowerCase()) && rpcMessageText.includes('does not exist'));
           
           const isTableMissingError = rpcMessageText.includes(`relation "${tableName.toLowerCase()}" does not exist`);
           const isColumnMissingError = columnName ? rpcMessageText.includes(`column "${columnName.toLowerCase()}" does not exist`) : false;
 
 
-          if (isFunctionMissingError) return { type: 'rpcMissing' as 'rpcMissing', message: `Hàm RPC '${functionName}' cho ${name} bị thiếu. Kiểm tra README.md.` };
+          if (isFunctionMissingError) return { type: 'rpcMissing' as 'rpcMissing', message: `Hàm RPC '${funcName}' cho ${name} bị thiếu. Kiểm tra README.md.` };
           if (isTableMissingError) return { type: 'rpcMissing' as 'rpcMissing', message: `Bảng '${tableName}' cho ${name} không tồn tại.`};
           if (isColumnMissingError) return { type: 'rpcMissing' as 'rpcMissing', message: `Cột '${columnName}' trong bảng '${tableName}' cho ${name} không tồn tại.`};
           
@@ -107,15 +121,15 @@ export default function SalaryToRevenueRatioCard({ selectedMonths, selectedYear 
         return typeof rawValue === 'string' ? parseFloat(rawValue.replace(/,/g, '')) : (typeof rawValue === 'number' ? rawValue : 0);
       };
 
-      const ftSalResult = processResult(ftSalaryRes, 'Lương Fulltime', 'Fulltime', 'tong_thu_nhap');
+      const ftSalResult = processResult(ftSalaryRes, 'Lương Fulltime', 'get_total_salary_fulltime', 'Fulltime', 'tong_thu_nhap');
       if (typeof ftSalResult === 'object') currentError = ftSalResult; else ftSal = ftSalResult;
       setFulltimeSalary(ftSal);
 
-      const ptSalResult = processResult(ptSalaryRes, 'Lương Part-time', 'Parttime', 'tong_thu_nhap'); // Assuming 'tong_thu_nhap' for part-time as well. Check table schema if different.
+      const ptSalResult = processResult(ptSalaryRes, 'Lương Part-time', 'get_total_salary_parttime', 'Parttime', '"Tong tien"'); 
       if (typeof ptSalResult === 'object' && !currentError) currentError = ptSalResult; else ptSal = ptSalResult;
       setParttimeSalary(ptSal);
       
-      const revResult = processResult(revenueRes, 'Doanh Thu', 'Doanh_thu', 'Kỳ báo cáo');
+      const revResult = processResult(revenueRes, 'Doanh Thu', 'get_total_revenue', 'Doanh_thu', '"Kỳ báo cáo"');
       if (typeof revResult === 'object' && !currentError) currentError = revResult; else rev = revResult;
       setTotalRevenue(rev);
 
@@ -128,7 +142,7 @@ export default function SalaryToRevenueRatioCard({ selectedMonths, selectedYear 
         if (ftSal > 0 || ptSal > 0) {
           setError({ type: 'dataIssue', message: 'Không thể tính tỷ lệ do tổng doanh thu bằng 0.' });
         } else {
-          setRatio(0);
+          setRatio(0); // Both salary and revenue are 0
         }
       } else {
         setRatio((ftSal + ptSal) / rev);
@@ -140,7 +154,7 @@ export default function SalaryToRevenueRatioCard({ selectedMonths, selectedYear 
     } finally {
       setIsLoading(false);
     }
-  }, [selectedMonths, selectedYear]);
+  }, [selectedMonths, selectedYear, selectedDepartments]);
 
   useEffect(() => {
     fetchData();
@@ -168,7 +182,7 @@ export default function SalaryToRevenueRatioCard({ selectedMonths, selectedYear 
   } else if (totalRevenue === 0 && ratio === 0 && (fulltimeSalary ?? 0) === 0 && (parttimeSalary ?? 0) === 0) {
     displayValue = "0.0%"; 
   } else if (totalRevenue === 0) {
-    displayValue = "N/A";
+    displayValue = "N/A"; // Should be caught by error.type === 'dataIssue'
     cardState = "warning";
   }
   else {
@@ -196,7 +210,7 @@ export default function SalaryToRevenueRatioCard({ selectedMonths, selectedYear 
             <p className="text-xs text-destructive mt-0.5">{error.message}</p>
             {(error.type === 'rpcMissing' || error.message.includes('Bảng') || error.message.includes('Cột')) && (
                  <p className="text-xs text-muted-foreground mt-1">
-                   Hãy đảm bảo các hàm RPC (`get_total_salary_fulltime`, `get_total_salary_parttime`, `get_total_revenue`) và các bảng (`Fulltime`, `Parttime`, `Doanh_thu`) tương ứng cùng các cột (`tong_thu_nhap`, `Kỳ báo cáo`) đã tồn tại và được cấu hình đúng theo README.md.
+                   Hãy đảm bảo các hàm RPC và các bảng/cột liên quan đã tồn tại và được cấu hình đúng theo README.md.
                  </p>
             )}
             {error.type === 'dataIssue' && (

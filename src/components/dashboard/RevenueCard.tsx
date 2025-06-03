@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { Loader2, AlertTriangle, TrendingUp } from 'lucide-react'; // Using TrendingUp for Revenue
+import { Loader2, AlertTriangle, TrendingUp } from 'lucide-react';
 import {
   Card,
   CardContent,
@@ -14,6 +14,7 @@ import {
 interface RevenueCardProps {
   selectedMonths?: number[];
   selectedYear?: number | null;
+  selectedDepartments?: string[]; // Added
 }
 
 interface ChartError {
@@ -21,15 +22,17 @@ interface ChartError {
   message: string;
 }
 
-export default function RevenueCard({ selectedMonths, selectedYear }: RevenueCardProps) {
+export default function RevenueCard({ selectedMonths, selectedYear, selectedDepartments }: RevenueCardProps) {
   const [totalRevenue, setTotalRevenue] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<ChartError | null>(null);
-  const [filterDescription, setFilterDescription] = useState<string>("tất cả các kỳ");
+  const [filterDescription, setFilterDescription] = useState<string>("tất cả các kỳ và địa điểm");
 
   const fetchTotalRevenue = useCallback(async () => {
     setIsLoading(true);
     setError(null);
+
+    const departmentNames = selectedDepartments?.map(depId => depId.split('__')[1]).filter(Boolean) || [];
 
     let finalFilterDescription: string;
     const yearSegment = selectedYear ? `Năm ${selectedYear}` : "Tất cả các năm";
@@ -47,19 +50,31 @@ export default function RevenueCard({ selectedMonths, selectedYear }: RevenueCar
       monthSegment = "tất cả các tháng";
     }
 
+    let locationSegment: string;
+    if (departmentNames.length > 0) {
+      if (departmentNames.length <= 2) {
+        locationSegment = departmentNames.join(' & ');
+      } else {
+        locationSegment = `${departmentNames.length} địa điểm`;
+      }
+    } else {
+      locationSegment = "tất cả địa điểm";
+    }
+    
     if (selectedYear) {
-      finalFilterDescription = `${monthSegment} của ${yearSegment}`;
+      finalFilterDescription = `${monthSegment} của ${yearSegment} tại ${locationSegment}`;
     } else {
       if (selectedMonths && selectedMonths.length > 0 && selectedMonths.length < 12) {
-        finalFilterDescription = `${monthSegment} (trong mọi năm)`;
+        finalFilterDescription = `${monthSegment} (mọi năm) tại ${locationSegment}`;
       } else {
-        finalFilterDescription = "tất cả các kỳ";
+        finalFilterDescription = `tất cả các kỳ tại ${locationSegment}`;
       }
     }
     setFilterDescription(finalFilterDescription);
 
+
     try {
-      const rpcArgs: { filter_year?: number; filter_months?: number[] | null } = {};
+      const rpcArgs: { filter_year?: number; filter_months?: number[] | null; filter_locations?: string[] | null } = {}; // Added filter_locations
       if (selectedYear !== null) {
         rpcArgs.filter_year = selectedYear;
       }
@@ -67,6 +82,11 @@ export default function RevenueCard({ selectedMonths, selectedYear }: RevenueCar
         rpcArgs.filter_months = selectedMonths;
       } else {
         rpcArgs.filter_months = null;
+      }
+      if (departmentNames.length > 0) {
+        rpcArgs.filter_locations = departmentNames;
+      } else {
+        rpcArgs.filter_locations = null;
       }
 
       const functionName = 'get_total_revenue';
@@ -78,29 +98,28 @@ export default function RevenueCard({ selectedMonths, selectedYear }: RevenueCar
       if (rpcError) {
         const rpcMessageText = rpcError.message ? String(rpcError.message).toLowerCase() : '';
         const isFunctionMissingError =
-          rpcError.code === '42883' || // undefined_function
+          rpcError.code === '42883' || 
           (rpcError.code === 'PGRST202' && rpcMessageText.includes(functionName.toLowerCase())) ||
           (rpcMessageText.includes(functionName.toLowerCase()) && rpcMessageText.includes('does not exist'));
         
         const isTableMissingError = rpcMessageText.includes('relation "doanh_thu" does not exist');
         const isColumnMissingError = rpcMessageText.includes('column "kỳ báo cáo" does not exist') || rpcMessageText.includes('column "tên đơn vị" does not exist');
 
-
         if (isFunctionMissingError) {
           throw {
             type: 'rpcMissing' as 'rpcMissing',
-            message: `Hàm RPC '${functionName}' bị thiếu. Vui lòng tạo nó trong SQL Editor của Supabase theo script trong README.md.`
+            message: `Hàm RPC '${functionName}' bị thiếu. Vui lòng tạo hoặc cập nhật nó trong SQL Editor của Supabase theo README.md.`
           };
         }
         if (isTableMissingError) {
            throw {
             type: 'rpcMissing' as 'rpcMissing',
-            message: `Bảng 'Doanh_thu' không tồn tại trong cơ sở dữ liệu. Hàm RPC '${functionName}' cần bảng này.`
+            message: `Bảng 'Doanh_thu' không tồn tại. Hàm RPC '${functionName}' cần bảng này.`
           };
         }
          if (isColumnMissingError) {
            throw {
-            type: 'rpcMissing' as 'rpcMissing', // Re-using type for simplicity
+            type: 'rpcMissing' as 'rpcMissing', 
             message: `Một trong các cột 'Kỳ báo cáo' hoặc 'Tên đơn vị' không tồn tại trong bảng 'Doanh_thu'. Hàm RPC '${functionName}' cần các cột này.`
           };
         }
@@ -125,7 +144,7 @@ export default function RevenueCard({ selectedMonths, selectedYear }: RevenueCar
     } finally {
       setIsLoading(false);
     }
-  }, [selectedMonths, selectedYear]);
+  }, [selectedMonths, selectedYear, selectedDepartments]);
 
   useEffect(() => {
     fetchTotalRevenue();
@@ -161,17 +180,12 @@ export default function RevenueCard({ selectedMonths, selectedYear }: RevenueCar
           <p className="text-xs text-destructive">{error.message}</p>
           {error.type === 'rpcMissing' && (
             <p className="text-xs text-muted-foreground mt-1">
-              {error.message.includes("Bảng 'Doanh_thu' không tồn tại") 
-                ? "Vui lòng đảm bảo bảng 'Doanh_thu' tồn tại trong cơ sở dữ liệu của bạn."
-                : error.message.includes("Cột") && error.message.includes("không tồn tại")
-                ? `Vui lòng đảm bảo các cột cần thiết (ví dụ: 'Kỳ báo cáo', 'Tên đơn vị') tồn tại trong bảng 'Doanh_thu'.`
-                : "Vui lòng tạo hàm `get_total_revenue` trong SQL Editor của Supabase. Tham khảo README.md để biết script SQL. Đảm bảo bảng 'Doanh_thu' có cột 'Kỳ báo cáo', 'Tên đơn vị', 'nam', và 'thang'."
-              }
+               Vui lòng tạo/cập nhật hàm `get_total_revenue` trong SQL Editor của Supabase. Tham khảo README.md.
             </p>
           )}
           {error.type === 'generic' && (
             <p className="text-xs text-muted-foreground mt-1">
-              Kiểm tra cấu trúc bảng 'Doanh_thu': cột 'Kỳ báo cáo' (số hoặc văn bản có thể chuyển thành double precision), 'Tên đơn vị' (văn bản), 'thang' (văn bản như 'Tháng 01'), và 'nam' (số).
+              Kiểm tra cấu trúc bảng 'Doanh_thu' và các tham số của hàm RPC.
             </p>
           )}
         </CardContent>
@@ -191,7 +205,7 @@ export default function RevenueCard({ selectedMonths, selectedYear }: RevenueCar
             0 VND
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Không có dữ liệu doanh thu cho: {filterDescription}.
+            Không có dữ liệu cho: {filterDescription}.
           </p>
         </CardContent>
       </Card>

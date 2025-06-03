@@ -5,17 +5,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { supabase } from '@/lib/supabaseClient';
 import { Loader2, TrendingUp, Banknote, Percent, AlertTriangle, LineChart as LineChartIcon } from 'lucide-react';
-// ComposedChart is now dynamically imported
-// import {
-//   ComposedChart,
-//   Line,
-//   XAxis,
-//   YAxis,
-//   CartesianGrid,
-//   Tooltip,
-//   ResponsiveContainer,
-//   Legend,
-// } from 'recharts';
 import { Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import {
   Card,
@@ -73,27 +62,29 @@ interface CombinedMonthlyTrendData {
 interface CombinedMonthlyTrendChartProps {
   selectedYear?: number | null;
   selectedMonths?: number[];
+  selectedDepartments?: string[]; // Added
 }
 
 const CRITICAL_SETUP_ERROR_PREFIX = "LỖI CÀI ĐẶT QUAN TRỌNG:";
 
-export default function CombinedMonthlyTrendChart({ selectedYear, selectedMonths }: CombinedMonthlyTrendChartProps) {
+export default function CombinedMonthlyTrendChart({ selectedYear, selectedMonths, selectedDepartments }: CombinedMonthlyTrendChartProps) {
   const [chartData, setChartData] = useState<CombinedMonthlyTrendData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filterDescription, setFilterDescription] = useState<string>("tất cả các năm có sẵn");
+  const [filterDescription, setFilterDescription] = useState<string>("tất cả các kỳ và địa điểm");
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     setChartData([]);
 
+    const departmentNames = selectedDepartments?.map(depId => depId.split('__')[1]).filter(Boolean) || [];
+
     let description;
     const yearPart = selectedYear ? `Năm ${selectedYear}` : "tất cả các năm có sẵn";
     let monthPart = "tất cả các tháng";
-
     if (selectedMonths && selectedMonths.length > 0) {
-        if (selectedMonths.length === 12) { // Check if all months are selected
+        if (selectedMonths.length === 12) {
             monthPart = "tất cả các tháng";
         } else if (selectedMonths.length === 1) {
             monthPart = `Tháng ${String(selectedMonths[0]).padStart(2, '0')}`;
@@ -101,11 +92,23 @@ export default function CombinedMonthlyTrendChart({ selectedYear, selectedMonths
             monthPart = `các tháng ${selectedMonths.map(m => String(m).padStart(2, '0')).join(', ')}`;
         }
     }
-    description = `${monthPart} của ${yearPart}`;
+    
+    let locationPart = "tất cả địa điểm";
+    if(departmentNames.length > 0) {
+        if(departmentNames.length <=2) {
+            locationPart = departmentNames.join(' & ');
+        } else {
+            locationPart = `${departmentNames.length} địa điểm`;
+        }
+    }
+    description = `${monthPart} của ${yearPart} tại ${locationPart}`;
     setFilterDescription(description);
 
 
-    const rpcArgs = { p_filter_year: selectedYear };
+    const rpcArgs = { 
+      p_filter_year: selectedYear,
+      p_filter_locations: departmentNames.length > 0 ? departmentNames : null,
+    };
     let errorsOccurred: string[] = [];
 
     try {
@@ -161,6 +164,17 @@ export default function CombinedMonthlyTrendChart({ selectedYear, selectedMonths
               setupErrorDetails += ` Bảng '${mainDataTableName}' không tồn tại.`;
               isCriticalSetupError = true;
           }
+          
+          if (rpcMessageText.includes('column f.dia_diem does not exist') && mainDataTableName === 'Fulltime') {
+            setupErrorDetails += ` Cột 'dia_diem' (địa điểm) dường như bị thiếu trong bảng 'Fulltime'.`; isCriticalSetupError = true;
+          }
+          if (rpcMessageText.includes('column pt."don vi" does not exist') && mainDataTableName === 'Parttime') { // Note: "don vi" might be case sensitive in error message
+            setupErrorDetails += ` Cột '"Don vi"' (địa điểm) dường như bị thiếu trong bảng 'Parttime'.`; isCriticalSetupError = true;
+          }
+          if (rpcMessageText.includes('column dr."tên đơn vị" does not exist') && mainDataTableName === 'Doanh_thu') { // Note: "tên đơn vị" might be case sensitive
+            setupErrorDetails += ` Cột '"Tên đơn vị"' (địa điểm) dường như bị thiếu trong bảng 'Doanh_thu'.`; isCriticalSetupError = true;
+          }
+
 
           const namColLcForPattern = expectedNamColumn.replace(/"/g, '').toLowerCase();
           const namColumnMissingPattern = new RegExp(`column "?(${mainTableLc}|f|pt|dr)"?\\."?${namColLcForPattern}"? does not exist|column "?${expectedNamColumn.replace(/"/g, '')}"? of relation "(${mainTableLc}|${mainDataTableName})" does not exist|column "?${expectedNamColumn.replace(/"/g, '')}"? does not exist`, 'i');
@@ -188,18 +202,18 @@ export default function CombinedMonthlyTrendChart({ selectedYear, selectedMonths
           if (isCriticalSetupError) {
             let detailedGuidance = `${CRITICAL_SETUP_ERROR_PREFIX} Lỗi với hàm RPC '${functionName}' hoặc các bảng phụ thuộc. Chi tiết:${setupErrorDetails.trim()}`;
             detailedGuidance += `\n\nVui lòng kiểm tra và đảm bảo các mục sau theo README.md:`;
-            detailedGuidance += `\n1. Hàm RPC '${functionName}' được tạo đúng trong Supabase.`;
+            detailedGuidance += `\n1. Hàm RPC '${functionName}' được tạo đúng và đã được cập nhật để nhận tham số 'p_filter_locations TEXT[]'.`;
             detailedGuidance += `\n2. Bảng 'Time' (viết hoa T) tồn tại với các cột: "Năm" (INT8/INTEGER), "thangpro" (TEXT, ví dụ: '01', '12', dùng để sắp xếp tháng), và "Thang_x" (TEXT, ví dụ: 'Tháng 01', dùng cho trục X và nối với cột tháng của các bảng dữ liệu).`;
 
             if (mainDataTableName === 'Fulltime') {
-                detailedGuidance += `\n3. Bảng 'Fulltime' tồn tại với cột 'nam' (INTEGER) cho năm và cột 'thang' (TEXT, ví dụ 'Tháng 01') cho tháng.`;
+                detailedGuidance += `\n3. Bảng 'Fulltime' tồn tại với cột 'nam' (INTEGER) cho năm, 'thang' (TEXT, ví dụ 'Tháng 01') cho tháng, và 'dia_diem' (TEXT) cho địa điểm.`;
                 detailedGuidance += `\n4. Bảng 'Fulltime' cũng cần cột '${salaryColumnName}' (số liệu).`;
             } else if (mainDataTableName === 'Parttime') {
-                detailedGuidance += `\n3. Bảng 'Parttime' tồn tại với cột '"Nam"' (INTEGER) cho năm và cột '"Thoi gian"' (TEXT, ví dụ 'Tháng 01') cho tháng.`;
+                detailedGuidance += `\n3. Bảng 'Parttime' tồn tại với cột '"Nam"' (INTEGER) cho năm, '"Thoi gian"' (TEXT, ví dụ 'Tháng 01') cho tháng, và '"Don vi"' (TEXT) cho địa điểm.`;
                 detailedGuidance += `\n4. Bảng 'Parttime' cũng cần cột '${salaryColumnName}' (số liệu).`;
             } else if (mainDataTableName === 'Doanh_thu') {
-                detailedGuidance += `\n3. Bảng 'Doanh_thu' tồn tại với cột '"Năm"' (INTEGER) cho năm và cột '"Tháng"' (TEXT, ví dụ 'Tháng 01') cho tháng.`;
-                detailedGuidance += `\n4. Bảng 'Doanh_thu' cũng cần cột '${salaryColumnName}' (số liệu) và "Tên đơn vị" (TEXT).`;
+                detailedGuidance += `\n3. Bảng 'Doanh_thu' tồn tại với cột '"Năm"' (INTEGER) cho năm, '"Tháng"' (TEXT, ví dụ 'Tháng 01') cho tháng, và '"Tên đơn vị"' (TEXT) cho địa điểm.`;
+                detailedGuidance += `\n4. Bảng 'Doanh_thu' cũng cần cột '${salaryColumnName}' (số liệu).`;
             }
             return { data: [], error: detailedGuidance };
           }
@@ -292,7 +306,7 @@ export default function CombinedMonthlyTrendChart({ selectedYear, selectedMonths
     } finally {
       setIsLoading(false);
     }
-  }, [selectedYear, selectedMonths]);
+  }, [selectedYear, selectedMonths, selectedDepartments]);
 
   useEffect(() => {
     fetchData();
@@ -340,8 +354,7 @@ export default function CombinedMonthlyTrendChart({ selectedYear, selectedMonths
               {(msg.includes(CRITICAL_SETUP_ERROR_PREFIX)) && (
                 <p className="text-xs text-muted-foreground mt-1 whitespace-pre-line">
                   Đây là một lỗi cấu hình quan trọng. Vui lòng kiểm tra kỹ các mục đã liệt kê ở trên trong cơ sở dữ liệu Supabase và tệp README.md.
-                  Đảm bảo rằng tất cả các bảng và hàm RPC được đặt tên chính xác (có phân biệt chữ hoa chữ thường cho tên bảng như 'Time', 'Fulltime', 'Parttime', 'Doanh_thu') và có đúng các cột được yêu cầu.
-                  Đặc biệt, kiểm tra cột năm và cột tháng trong các bảng dữ liệu (ví dụ: 'Fulltime' cần 'nam' (năm) và 'thang' (tháng), 'Parttime' cần '"Nam"' và '"Thoi gian"', 'Doanh_thu' cần '"Năm"' và '"Tháng"'), và cấu trúc bảng 'Time' ('"Năm"', 'thangpro', '"Thang_x"').
+                  Đảm bảo rằng tất cả các bảng và hàm RPC đã được cập nhật để hỗ trợ lọc theo địa điểm ('p_filter_locations').
                 </p>
               )}
             </div>
@@ -359,7 +372,7 @@ export default function CombinedMonthlyTrendChart({ selectedYear, selectedMonths
           <CardDescription className="text-xs">Cho: {filterDescription}</CardDescription>
        </CardHeader>
        <CardContent className="pt-2 flex items-center justify-center h-[280px]">
-         <p className="text-sm text-muted-foreground">Không tìm thấy dữ liệu cho kỳ đã chọn.</p>
+         <p className="text-sm text-muted-foreground">Không tìm thấy dữ liệu cho kỳ và địa điểm đã chọn.</p>
        </CardContent>
      </Card>
    );

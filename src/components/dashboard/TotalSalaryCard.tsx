@@ -14,6 +14,7 @@ import {
 interface TotalSalaryCardProps {
   selectedMonths?: number[];
   selectedYear?: number | null;
+  selectedDepartments?: string[]; // Added: Array of "Loại__Department" strings
 }
 
 interface ChartError {
@@ -21,15 +22,17 @@ interface ChartError {
   message: string;
 }
 
-export default function TotalSalaryCard({ selectedMonths, selectedYear }: TotalSalaryCardProps) {
+export default function TotalSalaryCard({ selectedMonths, selectedYear, selectedDepartments }: TotalSalaryCardProps) {
   const [totalSalary, setTotalSalary] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<ChartError | null>(null);
-  const [filterDescription, setFilterDescription] = useState<string>("tất cả các kỳ");
+  const [filterDescription, setFilterDescription] = useState<string>("tất cả các kỳ và địa điểm");
 
   const fetchTotalSalary = useCallback(async () => {
     setIsLoading(true);
     setError(null);
+
+    const departmentNames = selectedDepartments?.map(depId => depId.split('__')[1]).filter(Boolean) || [];
 
     let finalFilterDescription: string;
     const yearSegment = selectedYear ? `Năm ${selectedYear}` : "Tất cả các năm";
@@ -47,20 +50,31 @@ export default function TotalSalaryCard({ selectedMonths, selectedYear }: TotalS
       monthSegment = "tất cả các tháng";
     }
 
+    let locationSegment: string;
+    if (departmentNames.length > 0) {
+      if (departmentNames.length <= 2) {
+        locationSegment = departmentNames.join(' & ');
+      } else {
+        locationSegment = `${departmentNames.length} địa điểm`;
+      }
+    } else {
+      locationSegment = "tất cả địa điểm";
+    }
+
     if (selectedYear) {
-      finalFilterDescription = `${monthSegment} của ${yearSegment}`;
+      finalFilterDescription = `${monthSegment} của ${yearSegment} tại ${locationSegment}`;
     } else {
       if (selectedMonths && selectedMonths.length > 0 && selectedMonths.length < 12) {
-        finalFilterDescription = `${monthSegment} (trong mọi năm)`;
+        finalFilterDescription = `${monthSegment} (mọi năm) tại ${locationSegment}`;
       } else {
-        finalFilterDescription = "tất cả các kỳ";
+        finalFilterDescription = `tất cả các kỳ tại ${locationSegment}`;
       }
     }
     setFilterDescription(finalFilterDescription);
 
 
     try {
-      const rpcArgs: { filter_year?: number; filter_months?: number[] | null } = {};
+      const rpcArgs: { filter_year?: number; filter_months?: number[] | null; filter_locations?: string[] | null } = {};
       if (selectedYear !== null) {
         rpcArgs.filter_year = selectedYear;
       }
@@ -68,6 +82,11 @@ export default function TotalSalaryCard({ selectedMonths, selectedYear }: TotalS
         rpcArgs.filter_months = selectedMonths;
       } else {
         rpcArgs.filter_months = null; 
+      }
+      if (departmentNames.length > 0) {
+        rpcArgs.filter_locations = departmentNames;
+      } else {
+        rpcArgs.filter_locations = null;
       }
 
 
@@ -88,7 +107,7 @@ export default function TotalSalaryCard({ selectedMonths, selectedYear }: TotalS
         if (isFunctionMissingError) {
           throw {
             type: 'rpcMissing' as 'rpcMissing',
-            message: `Hàm RPC '${functionName}' bị thiếu. Vui lòng tạo nó trong SQL Editor của Supabase bằng script trong phần 'Required SQL Functions' của README.md.`
+            message: `Hàm RPC '${functionName}' bị thiếu. Vui lòng tạo hoặc cập nhật nó trong SQL Editor của Supabase theo README.md.`
           };
         }
         throw { type: 'generic' as 'generic', message: rpcError.message || 'Đã xảy ra lỗi RPC không xác định.'};
@@ -108,19 +127,12 @@ export default function TotalSalaryCard({ selectedMonths, selectedYear }: TotalS
         setError({ type: 'generic', message: err.message || 'Không thể tải dữ liệu tổng lương qua RPC.' });
       }
 
-      console.error("Error fetching total salary via RPC. Details:", {
-          type: err.type,
-          message: err.message,
-          name: err.name,
-          code: err.code,
-          stack: err.stack,
-          originalErrorObject: err
-      });
+      console.error("Error fetching total salary via RPC. Details:", err);
       setTotalSalary(null);
     } finally {
       setIsLoading(false);
     }
-  }, [selectedMonths, selectedYear, supabase]);
+  }, [selectedMonths, selectedYear, selectedDepartments, supabase]);
 
   useEffect(() => {
     fetchTotalSalary();
@@ -156,12 +168,12 @@ export default function TotalSalaryCard({ selectedMonths, selectedYear }: TotalS
           <p className="text-xs text-destructive">{error.message}</p>
           {error.type === 'rpcMissing' && (
             <p className="text-xs text-muted-foreground mt-1">
-              Vui lòng tạo hàm `get_total_salary_fulltime` trong SQL Editor của Supabase. Tham khảo README.md để biết script SQL. Đảm bảo các cột `thang` (văn bản dạng 'Tháng XX') và `nam` (số) trong bảng `Fulltime` là đúng.
+              Vui lòng tạo/cập nhật hàm `get_total_salary_fulltime` trong SQL Editor của Supabase. Tham khảo README.md.
             </p>
           )}
           {error.type === 'generic' && (
             <p className="text-xs text-muted-foreground mt-1">
-              Kiểm tra cấu trúc bảng 'Fulltime': cột 'tong_thu_nhap' (số hoặc văn bản có thể chuyển thành double precision), 'thang' (văn bản như 'Tháng 01', sẽ được phân tích thành số), và 'nam' (số). Đảm bảo hàm RPC được cập nhật để phân tích 'thang' dạng văn bản và xử lý năm chính xác.
+              Kiểm tra cấu trúc bảng 'Fulltime' và các tham số của hàm RPC.
             </p>
           )}
         </CardContent>
@@ -181,7 +193,7 @@ export default function TotalSalaryCard({ selectedMonths, selectedYear }: TotalS
             0 VND
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Không có dữ liệu lương cho: {filterDescription}.
+            Không có dữ liệu cho: {filterDescription}.
           </p>
         </CardContent>
       </Card>

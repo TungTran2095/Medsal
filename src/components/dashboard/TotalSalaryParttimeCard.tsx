@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { Loader2, AlertTriangle, DollarSign } from 'lucide-react'; // Using DollarSign for part-time
+import { Loader2, AlertTriangle, DollarSign } from 'lucide-react';
 import {
   Card,
   CardContent,
@@ -14,6 +14,7 @@ import {
 interface TotalSalaryParttimeCardProps {
   selectedMonths?: number[];
   selectedYear?: number | null;
+  selectedDepartments?: string[]; // Added
 }
 
 interface ChartError {
@@ -21,15 +22,17 @@ interface ChartError {
   message: string;
 }
 
-export default function TotalSalaryParttimeCard({ selectedMonths, selectedYear }: TotalSalaryParttimeCardProps) {
+export default function TotalSalaryParttimeCard({ selectedMonths, selectedYear, selectedDepartments }: TotalSalaryParttimeCardProps) {
   const [totalSalary, setTotalSalary] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<ChartError | null>(null);
-  const [filterDescription, setFilterDescription] = useState<string>("tất cả các kỳ");
+  const [filterDescription, setFilterDescription] = useState<string>("tất cả các kỳ và địa điểm");
 
   const fetchTotalSalaryParttime = useCallback(async () => {
     setIsLoading(true);
     setError(null);
+
+    const departmentNames = selectedDepartments?.map(depId => depId.split('__')[1]).filter(Boolean) || [];
 
     let finalFilterDescription: string;
     const yearSegment = selectedYear ? `Năm ${selectedYear}` : "Tất cả các năm";
@@ -47,20 +50,31 @@ export default function TotalSalaryParttimeCard({ selectedMonths, selectedYear }
       monthSegment = "tất cả các tháng";
     }
 
+    let locationSegment: string;
+    if (departmentNames.length > 0) {
+      if (departmentNames.length <= 2) {
+        locationSegment = departmentNames.join(' & ');
+      } else {
+        locationSegment = `${departmentNames.length} địa điểm`;
+      }
+    } else {
+      locationSegment = "tất cả địa điểm";
+    }
+    
     if (selectedYear) {
-      finalFilterDescription = `${monthSegment} của ${yearSegment}`;
+      finalFilterDescription = `${monthSegment} của ${yearSegment} tại ${locationSegment}`;
     } else {
       if (selectedMonths && selectedMonths.length > 0 && selectedMonths.length < 12) {
-        finalFilterDescription = `${monthSegment} (trong mọi năm)`;
+        finalFilterDescription = `${monthSegment} (mọi năm) tại ${locationSegment}`;
       } else {
-        finalFilterDescription = "tất cả các kỳ";
+        finalFilterDescription = `tất cả các kỳ tại ${locationSegment}`;
       }
     }
     setFilterDescription(finalFilterDescription);
 
 
     try {
-      const rpcArgs: { filter_year?: number; filter_months?: number[] | null } = {};
+      const rpcArgs: { filter_year?: number; filter_months?: number[] | null; filter_locations?: string[] | null } = {}; // Added filter_locations
       if (selectedYear !== null) {
         rpcArgs.filter_year = selectedYear;
       }
@@ -69,9 +83,13 @@ export default function TotalSalaryParttimeCard({ selectedMonths, selectedYear }
       } else {
         rpcArgs.filter_months = null;
       }
+      if (departmentNames.length > 0) {
+        rpcArgs.filter_locations = departmentNames;
+      } else {
+        rpcArgs.filter_locations = null;
+      }
 
-
-      const functionName = 'get_total_salary_parttime'; // Calling the new RPC function
+      const functionName = 'get_total_salary_parttime';
       const { data, error: rpcError } = await supabase.rpc(
         functionName,
         rpcArgs
@@ -79,7 +97,6 @@ export default function TotalSalaryParttimeCard({ selectedMonths, selectedYear }
 
       if (rpcError) {
         const rpcMessageText = rpcError.message ? String(rpcError.message).toLowerCase() : '';
-
         const isFunctionMissingError =
           rpcError.code === '42883' ||
           (rpcError.code === 'PGRST202' && rpcMessageText.includes(functionName.toLowerCase())) ||
@@ -87,17 +104,16 @@ export default function TotalSalaryParttimeCard({ selectedMonths, selectedYear }
         
         const isTableMissingError = rpcMessageText.includes('relation "parttime" does not exist');
 
-
         if (isFunctionMissingError) {
           throw {
             type: 'rpcMissing' as 'rpcMissing',
-            message: `Hàm RPC '${functionName}' bị thiếu. Vui lòng tạo nó trong SQL Editor của Supabase bằng script trong phần 'Required SQL Functions' của README.md.`
+            message: `Hàm RPC '${functionName}' bị thiếu. Vui lòng tạo hoặc cập nhật nó trong SQL Editor của Supabase theo README.md.`
           };
         }
         if (isTableMissingError) {
            throw {
-            type: 'rpcMissing' as 'rpcMissing', // Using same type for simplicity, message will differentiate
-            message: `Bảng 'Parttime' không tồn tại trong cơ sở dữ liệu. Hàm RPC '${functionName}' cần bảng này.`
+            type: 'rpcMissing' as 'rpcMissing',
+            message: `Bảng 'Parttime' không tồn tại. Hàm RPC '${functionName}' cần bảng này.`
           };
         }
         throw { type: 'generic' as 'generic', message: rpcError.message || 'Đã xảy ra lỗi RPC không xác định.'};
@@ -116,20 +132,12 @@ export default function TotalSalaryParttimeCard({ selectedMonths, selectedYear }
       } else {
         setError({ type: 'generic', message: err.message || 'Không thể tải dữ liệu tổng lương Part-time qua RPC.' });
       }
-
-      console.error("Error fetching total part-time salary via RPC. Details:", {
-          type: err.type,
-          message: err.message,
-          name: err.name,
-          code: err.code,
-          stack: err.stack,
-          originalErrorObject: err
-      });
+      console.error("Error fetching total part-time salary via RPC. Details:", err);
       setTotalSalary(null);
     } finally {
       setIsLoading(false);
     }
-  }, [selectedMonths, selectedYear]);
+  }, [selectedMonths, selectedYear, selectedDepartments]);
 
   useEffect(() => {
     fetchTotalSalaryParttime();
@@ -165,15 +173,12 @@ export default function TotalSalaryParttimeCard({ selectedMonths, selectedYear }
           <p className="text-xs text-destructive">{error.message}</p>
           {error.type === 'rpcMissing' && (
             <p className="text-xs text-muted-foreground mt-1">
-              {error.message.includes("Bảng 'Parttime' không tồn tại") 
-                ? "Vui lòng đảm bảo bảng 'Parttime' tồn tại trong cơ sở dữ liệu của bạn."
-                : "Vui lòng tạo hàm `get_total_salary_parttime` trong SQL Editor của Supabase. Tham khảo README.md để biết script SQL. Đảm bảo các cột `thang` (văn bản dạng 'Tháng XX') và `nam` (số) trong bảng `Parttime` là đúng."
-              }
+              Vui lòng tạo/cập nhật hàm `get_total_salary_parttime` trong SQL Editor của Supabase. Tham khảo README.md.
             </p>
           )}
           {error.type === 'generic' && (
             <p className="text-xs text-muted-foreground mt-1">
-              Kiểm tra cấu trúc bảng 'Parttime': cột 'tong_thu_nhap' (số hoặc văn bản có thể chuyển thành double precision), 'thang' (văn bản như 'Tháng 01', sẽ được phân tích thành số), và 'nam' (số). Đảm bảo hàm RPC được cập nhật để phân tích 'thang' dạng văn bản và xử lý năm chính xác.
+              Kiểm tra cấu trúc bảng 'Parttime' và các tham số của hàm RPC.
             </p>
           )}
         </CardContent>
@@ -193,7 +198,7 @@ export default function TotalSalaryParttimeCard({ selectedMonths, selectedYear }
             0 VND
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Không có dữ liệu lương cho: {filterDescription}.
+            Không có dữ liệu cho: {filterDescription}.
           </p>
         </CardContent>
       </Card>

@@ -48,7 +48,6 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Checkbox } from '@/components/ui/checkbox'; // Not directly used in this change, but for consistency
 
 type WorkspaceView = 'dbManagement' | 'dashboard' | 'aiTools';
 type DashboardTab = 'payrollOverview' | 'comparison';
@@ -88,7 +87,7 @@ export default function WorkspaceContent() {
   // Location filter state
   const [availableLocationTypes, setAvailableLocationTypes] = useState<string[]>([]);
   const [availableDepartmentsByLoai, setAvailableDepartmentsByLoai] = useState<Record<string, string[]>>({});
-  const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]);
+  const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]); // Stores "Loại__Department"
   const [isLoadingLocationFilters, setIsLoadingLocationFilters] = useState<boolean>(false);
   const [locationFilterError, setLocationFilterError] = useState<string | null>(null);
 
@@ -191,7 +190,7 @@ export default function WorkspaceContent() {
           .select('Department')
           .eq('Division', 'Company')
           .eq('Loại', loai);
-        if (deptError) throw deptError; // Rethrow to be caught by outer catch
+        if (deptError) throw deptError; 
         deptsByLoai[loai] = [...new Set(deptData?.map(item => item.Department).filter(Boolean) as string[])].sort();
       }
       setAvailableDepartmentsByLoai(deptsByLoai);
@@ -200,8 +199,6 @@ export default function WorkspaceContent() {
       console.error("Error fetching location filter options:", err);
       const errorMessage = err.message || "Không thể tải tùy chọn lọc địa điểm.";
       setLocationFilterError(errorMessage);
-      // Do not toast here if it's a common "table not found" type error, let the UI display it.
-      // Only toast for unexpected issues.
       if (!errorMessage.toLowerCase().includes("relation \"ms_org_diadiem\" does not exist")) {
         toast({
           title: "Lỗi Tải Lọc Địa Điểm",
@@ -375,7 +372,6 @@ export default function WorkspaceContent() {
     }
   };
 
-  // Time Filter Handlers
   const handleMonthSelection = (monthValue: number, checked: boolean) => {
     setSelectedMonths(prev => {
       const newSelectedMonths = new Set(prev);
@@ -413,9 +409,8 @@ export default function WorkspaceContent() {
     return `${yearText} - ${monthText}`;
   };
 
-  // Location Filter Handlers
   const handleDepartmentSelection = (loai: string, department: string, checked: boolean) => {
-    const departmentIdentifier = `${loai}__${department}`; // Use a unique identifier if depts can be same across loai
+    const departmentIdentifier = `${loai}__${department}`; 
     setSelectedDepartments(prev => {
       const newSelected = new Set(prev);
       if (checked) {
@@ -444,7 +439,7 @@ export default function WorkspaceContent() {
   
   const areAllDepartmentsSelectedForLoai = (loai: string): boolean => {
     const departmentsInLoai = availableDepartmentsByLoai[loai] || [];
-    if (departmentsInLoai.length === 0) return false; // Or true if no departments means "all of none" are selected
+    if (departmentsInLoai.length === 0) return false; 
     return departmentsInLoai.every(dept => selectedDepartments.includes(`${loai}__${dept}`));
   };
 
@@ -628,7 +623,6 @@ export default function WorkspaceContent() {
                     </CardTitle>
                   </div>
                   <div className="flex items-center gap-2 mt-2 sm:mt-0 flex-wrap">
-                    {/* Time Filter */}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="outline" className="h-9 text-sm min-w-[200px] justify-between px-3">
@@ -650,11 +644,9 @@ export default function WorkspaceContent() {
                                 className="text-xs pl-2 pr-1 py-1.5 w-full justify-start relative hover:bg-accent"
                               >
                                 <span className="flex items-center gap-2">
-                                  {isMounted && selectedYear === null ? (
-                                    <Circle className="h-2 w-2 fill-current text-primary" />
-                                  ) : (
-                                    <span className="w-2 h-2 block"></span>
-                                  )}
+                                  {isMounted && selectedYear === null && <Circle className="h-2 w-2 fill-current text-primary" />}
+                                  {!isMounted && <span className="w-2 h-2 block"></span>}
+                                  {isMounted && selectedYear !== null && <span className="w-2 h-2 block"></span>}
                                   Tất cả các năm
                                 </span>
                               </DropdownMenuSubTrigger>
@@ -705,11 +697,9 @@ export default function WorkspaceContent() {
                                   className="text-xs pl-2 pr-1 py-1.5 w-full justify-start relative hover:bg-accent"
                                 >
                                   <span className="flex items-center gap-2">
-                                     {isMounted && selectedYear === year ? (
-                                      <Circle className="h-2 w-2 fill-current text-primary" />
-                                    ) : (
-                                      <span className="w-2 h-2 block"></span>
-                                    )}
+                                     {isMounted && selectedYear === year && <Circle className="h-2 w-2 fill-current text-primary" />}
+                                     {!isMounted && <span className="w-2 h-2 block"></span>}
+                                     {isMounted && selectedYear !== year && <span className="w-2 h-2 block"></span>}
                                     Năm {year}
                                   </span>
                                 </DropdownMenuSubTrigger>
@@ -752,7 +742,6 @@ export default function WorkspaceContent() {
                       </DropdownMenuContent>
                     </DropdownMenu>
 
-                    {/* Location Filter */}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                         <Button variant="outline" className="h-9 text-sm min-w-[180px] justify-between px-3">
@@ -791,8 +780,6 @@ export default function WorkspaceContent() {
                                 {availableLocationTypes.map((loai) => (
                                 <DropdownMenuSub key={loai}>
                                     <DropdownMenuSubTrigger className="text-xs pl-2 pr-1 py-1.5 w-full justify-start hover:bg-accent">
-                                    {/* Consider adding an indicator if any department under this 'loai' is selected */}
-                                    {/* Example: {isMounted && selectedDepartments.some(d => d.startsWith(loai + '__')) && <Circle className="h-2 w-2 fill-current text-primary mr-2" />} */}
                                     {loai}
                                     </DropdownMenuSubTrigger>
                                     <DropdownMenuSubContent className="w-[250px]">
@@ -854,20 +841,20 @@ export default function WorkspaceContent() {
                   </div>
                   <TabsContent value="payrollOverview" className="flex-grow overflow-y-auto space-y-3 mt-2">
                     <div className="grid gap-3 md:grid-cols-4">
-                        <TotalSalaryCard selectedMonths={selectedMonths} selectedYear={selectedYear} />
-                        <TotalSalaryParttimeCard selectedMonths={selectedMonths} selectedYear={selectedYear} />
-                        <RevenueCard selectedMonths={selectedMonths} selectedYear={selectedYear} />
-                        <SalaryToRevenueRatioCard selectedMonths={selectedMonths} selectedYear={selectedYear} />
+                        <TotalSalaryCard selectedMonths={selectedMonths} selectedYear={selectedYear} selectedDepartments={selectedDepartments} />
+                        <TotalSalaryParttimeCard selectedMonths={selectedMonths} selectedYear={selectedYear} selectedDepartments={selectedDepartments} />
+                        <RevenueCard selectedMonths={selectedMonths} selectedYear={selectedYear} selectedDepartments={selectedDepartments} />
+                        <SalaryToRevenueRatioCard selectedMonths={selectedMonths} selectedYear={selectedYear} selectedDepartments={selectedDepartments} />
                     </div>
                     <div className="grid grid-cols-1 gap-3">
-                        <CombinedMonthlyTrendChart selectedYear={selectedYear} selectedMonths={selectedMonths} />
+                        <CombinedMonthlyTrendChart selectedYear={selectedYear} selectedMonths={selectedMonths} selectedDepartments={selectedDepartments} />
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <div className="md:col-span-1">
-                           <SalaryProportionPieChart selectedMonths={selectedMonths} selectedYear={selectedYear} />
+                           <SalaryProportionPieChart selectedMonths={selectedMonths} selectedYear={selectedYear} selectedDepartments={selectedDepartments} />
                         </div>
                         <div className="md:col-span-2">
-                           <LocationSalaryRevenueColumnChart selectedMonths={selectedMonths} selectedYear={selectedYear} />
+                           <LocationSalaryRevenueColumnChart selectedMonths={selectedMonths} selectedYear={selectedYear} selectedDepartments={selectedDepartments} />
                         </div>
                     </div>
                   </TabsContent>

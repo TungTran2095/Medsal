@@ -5,18 +5,6 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { supabase } from '@/lib/supabaseClient';
 import { Loader2, AlertTriangle, BarChartHorizontal, TrendingUp, Percent } from 'lucide-react';
-// BarChart is now dynamically imported
-// import {
-//   BarChart,
-//   Bar,
-//   XAxis,
-//   YAxis,
-//   CartesianGrid,
-//   Tooltip,
-//   ResponsiveContainer,
-//   Legend,
-//   LabelList,
-// } from 'recharts';
 import { Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LabelList } from 'recharts';
 import {
   Card,
@@ -47,17 +35,18 @@ interface LocationRatioData {
 interface LocationSalaryRevenueChartProps {
   selectedYear?: number | null;
   selectedMonths?: number[];
+  selectedDepartments?: string[]; // Added: Array of "Loại__Department" strings
 }
 
 const chartConfig = {
   ft_salary_ratio_component: {
     label: 'Lương FT / Doanh Thu',
-    color: 'hsl(var(--chart-1))',
+    color: 'hsl(var(--chart-1))', // Purple
     icon: TrendingUp,
   },
   pt_salary_ratio_component: {
     label: 'Lương PT / Doanh Thu',
-    color: 'hsl(var(--chart-2))',
+    color: 'hsl(var(--chart-2))', // Orange
     icon: Percent,
   },
 } satisfies ChartConfig;
@@ -99,16 +88,18 @@ const CustomTotalLabel = (props: any) => {
 };
 
 
-export default function LocationSalaryRevenueColumnChart({ selectedYear, selectedMonths }: LocationSalaryRevenueChartProps) {
+export default function LocationSalaryRevenueColumnChart({ selectedYear, selectedMonths, selectedDepartments }: LocationSalaryRevenueChartProps) {
   const [chartData, setChartData] = useState<LocationRatioData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filterDescription, setFilterDescription] = useState<string>("tất cả các kỳ");
+  const [filterDescription, setFilterDescription] = useState<string>("tất cả các kỳ và địa điểm");
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
+    const departmentNames = selectedDepartments?.map(depId => depId.split('__')[1]).filter(Boolean) || [];
+    
     let finalFilterDescription: string;
     const yearSegment = selectedYear ? `Năm ${selectedYear}` : "Tất cả các năm";
 
@@ -124,14 +115,25 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
     } else {
       monthSegment = "tất cả các tháng";
     }
+    
+    let locationSegment: string;
+    if (departmentNames.length > 0) {
+      if (departmentNames.length <= 2) {
+        locationSegment = departmentNames.join(' & ');
+      } else {
+        locationSegment = `${departmentNames.length} địa điểm`;
+      }
+    } else {
+      locationSegment = "tất cả địa điểm";
+    }
 
     if (selectedYear) {
-      finalFilterDescription = `${monthSegment} của ${yearSegment}`;
+      finalFilterDescription = `${monthSegment} của ${yearSegment} tại ${locationSegment}`;
     } else {
       if (selectedMonths && selectedMonths.length > 0 && selectedMonths.length < 12) {
-        finalFilterDescription = `${monthSegment} (trong mọi năm)`;
+        finalFilterDescription = `${monthSegment} (mọi năm) tại ${locationSegment}`;
       } else {
-        finalFilterDescription = "tất cả các kỳ";
+        finalFilterDescription = `tất cả các kỳ tại ${locationSegment}`;
       }
     }
     setFilterDescription(finalFilterDescription);
@@ -139,6 +141,7 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
     const rpcArgs = {
       p_filter_year: selectedYear,
       p_filter_months: (selectedMonths && selectedMonths.length > 0) ? selectedMonths : null,
+      p_filter_locations: (departmentNames.length > 0) ? departmentNames : null, // Added
     };
 
     try {
@@ -156,12 +159,14 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
         if (rpcMessageText.includes('relation "fulltime" does not exist')) { setupErrorDetails += " Bảng 'Fulltime' không tồn tại."; isCriticalSetupError = true; }
         if (rpcMessageText.includes('relation "parttime" does not exist')) { setupErrorDetails += " Bảng 'Parttime' không tồn tại."; isCriticalSetupError = true; }
         if (rpcMessageText.includes('relation "doanh_thu" does not exist')) { setupErrorDetails += " Bảng 'Doanh_thu' không tồn tại."; isCriticalSetupError = true; }
+        if (rpcMessageText.includes('p_filter_locations')) { setupErrorDetails += " Hàm RPC có thể chưa được cập nhật để nhận 'p_filter_locations'."; isCriticalSetupError = true;}
+
 
         if (isCriticalSetupError) {
           let detailedGuidance = `${CRITICAL_SETUP_ERROR_PREFIX} Lỗi với hàm RPC '${functionName}' hoặc các bảng/cột phụ thuộc. Chi tiết:${setupErrorDetails.trim()}`;
             detailedGuidance += `\n\nVui lòng kiểm tra và đảm bảo các mục sau theo README.md:`;
-            detailedGuidance += `\n1. Hàm RPC '${functionName}' được tạo đúng trong Supabase.`;
-            detailedGuidance += `\n2. Các bảng 'Fulltime', 'Parttime', 'Doanh_thu' tồn tại với đúng tên (phân biệt chữ hoa chữ thường) và các cột cần thiết (ví dụ: 'dia_diem', 'Don vi', 'Tên đơn vị', 'tong_thu_nhap', 'Tong tien', 'Kỳ báo cáo', các cột năm/tháng).`;
+            detailedGuidance += `\n1. Hàm RPC '${functionName}' được tạo đúng trong Supabase và đã được cập nhật để nhận tham số 'p_filter_locations TEXT[]'.`;
+            detailedGuidance += `\n2. Các bảng 'Fulltime', 'Parttime', 'Doanh_thu' tồn tại với đúng tên và các cột cần thiết.`;
            throw new Error(detailedGuidance);
         }
         throw rpcError;
@@ -186,7 +191,7 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
     } finally {
       setIsLoading(false);
     }
-  }, [selectedYear, selectedMonths]);
+  }, [selectedYear, selectedMonths, selectedDepartments]);
 
   useEffect(() => {
     fetchData();
@@ -237,7 +242,6 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
             {(error.includes(CRITICAL_SETUP_ERROR_PREFIX)) && (
                 <p className="text-xs text-muted-foreground mt-1 whitespace-pre-line">
                   Đây là một lỗi cấu hình quan trọng. Vui lòng kiểm tra kỹ các mục đã liệt kê ở trên trong cơ sở dữ liệu Supabase và tệp README.md.
-                  Đảm bảo rằng hàm RPC \`get_salary_revenue_ratio_components_by_location\` và các bảng/cột liên quan được tạo và đặt tên chính xác.
                 </p>
             )}
         </CardContent>
@@ -253,7 +257,7 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
           <CardDescription className="text-xs">Cho: {filterDescription}. Chỉ hiển thị các đơn vị có tỷ lệ từ 2% đến 150%.</CardDescription>
        </CardHeader>
        <CardContent className="pt-2 flex items-center justify-center flex-grow">
-         <p className="text-sm text-muted-foreground">Không có dữ liệu cho kỳ đã chọn hoặc theo bộ lọc tỷ lệ.</p>
+         <p className="text-sm text-muted-foreground">Không có dữ liệu cho kỳ/địa điểm đã chọn hoặc theo bộ lọc tỷ lệ.</p>
        </CardContent>
      </Card>
    );
@@ -264,7 +268,7 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
       <CardHeader className="pb-2 pt-3">
         <CardTitle className="text-base font-semibold flex items-center gap-1.5"><BarChartHorizontal className="h-4 w-4" />Quỹ Lương/Doanh Thu theo Địa Điểm</CardTitle>
         <CardDescription className="text-xs">
-          Tỷ lệ (Lương FT + Lương PT) / Doanh thu cho mỗi địa điểm (2% - 150%). Sắp xếp từ cao đến thấp. Cho: {filterDescription}.
+          Tỷ lệ cho {filterDescription}. Chỉ hiển thị địa điểm có tỷ lệ 2% - 150%. Sắp xếp từ cao đến thấp.
         </CardDescription>
       </CardHeader>
       <CardContent className="pt-2 flex-grow overflow-hidden">
