@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, ChevronDown, FilterIcon, GanttChartSquare, MapPin, Settings2, Circle, Percent, Target, FolderKanban } from "lucide-react"; // Added Target and FolderKanban
+import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, ChevronDown, FilterIcon, GanttChartSquare, MapPin, Settings2, Circle, Percent, Target, FolderKanban, BarChart3 } from "lucide-react";
 import type { PayrollEntry } from '@/types';
 import { supabase } from '@/lib/supabaseClient';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -27,6 +27,7 @@ import ComparisonCombinedSalaryCard from '@/components/comparison/ComparisonComb
 import ComparisonRevenueCard from '@/components/comparison/ComparisonRevenueCard';
 import ComparisonSalaryRevenueRatioCard from '@/components/comparison/ComparisonSalaryRevenueRatioCard';
 import LocationComparisonTable from '@/components/comparison/LocationComparisonTable';
+import NganhDocComparisonTable from '@/components/comparison/NganhDocComparisonTable'; // Added
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -56,7 +57,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type WorkspaceView = 'dbManagement' | 'dashboard' | 'aiTools';
-type DashboardTab = 'payrollOverview' | 'comparison' | 'kpiComparison' | 'detailedSalary'; // Added detailedSalary
+type DashboardTab = 'payrollOverview' | 'comparison' | 'kpiComparison' | 'detailedSalary'; 
 
 interface NavItem {
   id: WorkspaceView;
@@ -84,16 +85,14 @@ export default function WorkspaceContent() {
   const [activeView, setActiveView] = useState<WorkspaceView>('dashboard');
   const { theme, toggleTheme } = useTheme();
 
-  // Time filter state
   const [selectedMonths, setSelectedMonths] = useState<number[]>([]);
   const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [isLoadingYears, setIsLoadingYears] = useState<boolean>(true);
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
 
-  // Location filter state
   const [availableLocationTypes, setAvailableLocationTypes] = useState<string[]>([]);
   const [availableDepartmentsByLoai, setAvailableDepartmentsByLoai] = useState<Record<string, string[]>>({});
-  const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]); // Stores "Loại__Department"
+  const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]); 
   const [isLoadingLocationFilters, setIsLoadingLocationFilters] = useState<boolean>(false);
   const [locationFilterError, setLocationFilterError] = useState<string | null>(null);
 
@@ -876,7 +875,8 @@ export default function WorkspaceContent() {
                         <ComparisonRevenueCard selectedMonths={selectedMonths} selectedDepartments={selectedDepartments} />
                         <ComparisonSalaryRevenueRatioCard selectedMonths={selectedMonths} selectedDepartments={selectedDepartments} />
                     </div>
-                     <LocationComparisonTable selectedMonths={selectedMonths} selectedDepartments={selectedDepartments} />
+                    <NganhDocComparisonTable selectedMonths={selectedMonths} />
+                    <LocationComparisonTable selectedMonths={selectedMonths} selectedDepartments={selectedDepartments} />
                   </TabsContent>
                    <TabsContent value="kpiComparison" className="flex-grow overflow-y-auto space-y-3 mt-2">
                     <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-6">
@@ -903,5 +903,7 @@ export default function WorkspaceContent() {
     </SidebarProvider>
   );
 }
+
+    
 
     

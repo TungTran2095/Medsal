@@ -21,7 +21,9 @@ import {
   getMonthlySalaryTrendParttimeTool,
   getMonthlyRevenueTrendTool,
   getLocationSalaryRevenueRatiosTool,
-  getLocationComparisonMetricsTool, // Added new tool
+  getLocationComparisonMetricsTool,
+  getNganhDocFTSalaryHanoiTool, // Added new tool
+  getDonVi2PTSalaryTool, // Added new tool
 } from '@/ai/tools/dashboardQueryTools';
 
 const EchoUserInputInputSchema = z.object({
@@ -55,7 +57,9 @@ const prompt = ai.definePrompt({
     getMonthlySalaryTrendParttimeTool,
     getMonthlyRevenueTrendTool,
     getLocationSalaryRevenueRatiosTool,
-    getLocationComparisonMetricsTool, // Added new tool
+    getLocationComparisonMetricsTool,
+    getNganhDocFTSalaryHanoiTool, // Added new tool
+    getDonVi2PTSalaryTool, // Added new tool
   ],
   prompt: `You are a helpful and friendly AI assistant named Echo.
 Your primary language for responses MUST BE VIETNAMESE. Bạn PHẢI LUÔN LUÔN trả lời bằng tiếng Việt, ngay cả khi người dùng hỏi bằng ngôn ngữ khác.
@@ -73,12 +77,15 @@ You have several tools available:
     *   'getMonthlyRevenueTrendTool': Get monthly revenue trend. Input: { p_filter_year?: number, p_filter_locations?: string[] }.
     *   'getLocationSalaryRevenueRatiosTool': Get salary/revenue ratios by location. Input: { p_filter_year?: number, p_filter_months?: number[], p_filter_locations?: string[] }.
     *   'getLocationComparisonMetricsTool': Get detailed salary (FT, PT) and revenue metrics for each location for a specific year. Input: { p_filter_year: number, p_filter_months?: number[], p_filter_locations?: string[] }.
+    *   'getNganhDocFTSalaryHanoiTool': Get Full-time salary by "nganh_doc" in Hanoi. Input: { p_filter_year: number, p_filter_months?: number[] }.
+    *   'getDonVi2PTSalaryTool': Get Part-time salary by "Don_vi_2". Input: { p_filter_year: number, p_filter_months?: number[] }.
+
 
 Instructions for using tools:
 -   When the user asks for information that clearly matches a specific dashboard metric tool (e.g., "tổng lương full-time năm 2023", "xu hướng doanh thu hàng tháng của năm 2024", "tỷ lệ quỹ lương trên doanh thu theo địa điểm cho quý 1 năm 2023", "chi tiết lương và doanh thu theo địa điểm năm 2024"), PREFER that specific tool over the generic 'querySupabaseTableTool'.
 -   For year and month filters, if the user doesn't specify, you can ask for clarification or omit them if the tool allows. For example, "Cho năm nào?" or "Bạn muốn xem dữ liệu tháng nào?".
 -   For 'querySupabaseTableTool', you MUST provide 'tableName'. Ask clarifying questions if ambiguous.
--   For 'getLocationComparisonMetricsTool', 'p_filter_year' is required.
+-   For 'getLocationComparisonMetricsTool', 'getNganhDocFTSalaryHanoiTool', 'getDonVi2PTSalaryTool', 'p_filter_year' is required.
 
 Interpreting Tool Results (CRITICAL: ALL RESPONSES IN VIETNAMESE):
 -   When you decide to use a tool, your response to the user MUST clearly state the tool name you are using (e.g., "Sử dụng công cụ 'toolName': ..."), followed by the information derived *directly* from that tool's output.
@@ -137,6 +144,8 @@ const echoUserInputFlow = ai.defineFlow(
     return output!;
   }
 );
+    
+
     
 
     

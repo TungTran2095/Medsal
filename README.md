@@ -21,7 +21,7 @@ To create these functions:
         *   Ensure your selection is exact.
         *   **Before clicking RUN, visually inspect the pasted code in the Supabase SQL Editor. If the editor has automatically added any comments (lines starting with `--`, like `-- source: dashboard...`) at the very end of the function block (especially after the `END;` line but before the final `$$;`), you MUST manually delete those comments from the editor before running the SQL. Otherwise, you will get an "unterminated dollar-quoted string" error.**
 5.  Click **Run** for each function.
-    *   **For `get_monthly_salary_trend_fulltime`, `get_monthly_salary_trend_parttime`, `get_monthly_revenue_trend`, `get_salary_revenue_ratio_components_by_location`, or `get_location_comparison_metrics`**: If you encounter an error like "cannot change return type of existing function", you MUST first run `DROP FUNCTION function_name(parameters);` (e.g., `DROP FUNCTION get_monthly_salary_trend_fulltime(integer, text[]);` or `DROP FUNCTION get_location_comparison_metrics(integer, integer[], text[]);`) and then run the `CREATE OR REPLACE FUNCTION` script for it.
+    *   **For `get_monthly_salary_trend_fulltime`, `get_monthly_salary_trend_parttime`, `get_monthly_revenue_trend`, `get_salary_revenue_ratio_components_by_location`, `get_location_comparison_metrics`, `get_nganhdoc_ft_salary_hanoi`, or `get_donvi2_pt_salary`**: If you encounter an error like "cannot change return type of existing function", you MUST first run `DROP FUNCTION function_name(parameters);` (e.g., `DROP FUNCTION get_monthly_salary_trend_fulltime(integer, text[]);` or `DROP FUNCTION get_location_comparison_metrics(integer, integer[], text[]);` or `DROP FUNCTION get_nganhdoc_ft_salary_hanoi(INTEGER, INTEGER[]);`) and then run the `CREATE OR REPLACE FUNCTION` script for it.
 
 #### `get_public_tables`
 
@@ -500,9 +500,87 @@ END;
 $$;
 ```
 
+#### `get_nganhdoc_ft_salary_hanoi`
+
+This function fetches aggregated full-time salary by `nganh_doc` for entities located in 'Hà Nội' (based on `hn_or_note` column in `Fulltime` table), for a specified year and optional months.
+
+**SQL Code:**
+```sql
+-- Function: get_nganhdoc_ft_salary_hanoi
+DROP FUNCTION IF EXISTS get_nganhdoc_ft_salary_hanoi(INTEGER, INTEGER[]);
+CREATE OR REPLACE FUNCTION get_nganhdoc_ft_salary_hanoi(
+    p_filter_year INTEGER,
+    p_filter_months INTEGER[] DEFAULT NULL
+)
+RETURNS TABLE(
+    nganh_doc_key TEXT,
+    ft_salary NUMERIC
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        COALESCE(f.nganh_doc, 'Chưa phân loại') AS nganh_doc_key,
+        SUM(CAST(REPLACE(f.tong_thu_nhap::text, ',', '') AS NUMERIC)) AS ft_salary
+    FROM "Fulltime" f
+    WHERE
+        (p_filter_year IS NULL OR f.nam::INTEGER = p_filter_year)
+        AND (
+            p_filter_months IS NULL OR
+            array_length(p_filter_months, 1) IS NULL OR
+            array_length(p_filter_months, 1) = 0 OR
+            regexp_replace(f.thang, '\D', '', 'g')::INTEGER = ANY(p_filter_months)
+        )
+        AND f.hn_or_note = 'Hà Nội' -- Specific filter for Hanoi
+    GROUP BY COALESCE(f.nganh_doc, 'Chưa phân loại')
+    ORDER BY nganh_doc_key;
+END;
+$$;
+```
+
+#### `get_donvi2_pt_salary`
+
+This function fetches aggregated part-time salary by `Don_vi_2` (from `Parttime` table), for a specified year and optional months.
+
+**SQL Code:**
+```sql
+-- Function: get_donvi2_pt_salary
+DROP FUNCTION IF EXISTS get_donvi2_pt_salary(INTEGER, INTEGER[]);
+CREATE OR REPLACE FUNCTION get_donvi2_pt_salary(
+    p_filter_year INTEGER,
+    p_filter_months INTEGER[] DEFAULT NULL
+)
+RETURNS TABLE(
+    don_vi_2_key TEXT,
+    pt_salary NUMERIC
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        COALESCE(pt."Don_vi_2", 'Chưa phân loại') AS don_vi_2_key,
+        SUM(CAST(REPLACE(pt."Tong tien"::text, ',', '') AS NUMERIC)) AS pt_salary
+    FROM "Parttime" pt
+    WHERE
+        (p_filter_year IS NULL OR pt."Nam"::INTEGER = p_filter_year)
+        AND (
+            p_filter_months IS NULL OR
+            array_length(p_filter_months, 1) IS NULL OR
+            array_length(p_filter_months, 1) = 0 OR
+            regexp_replace(pt."Thoi gian", '\D', '', 'g')::INTEGER = ANY(p_filter_months)
+        )
+    GROUP BY COALESCE(pt."Don_vi_2", 'Chưa phân loại')
+    ORDER BY don_vi_2_key;
+END;
+$$;
+```
+
 
 Once these functions are successfully created (or updated) in your Supabase SQL Editor, the application should be able to correctly filter and aggregate data. If you continue to encounter "unterminated dollar-quoted string" errors, please double-check for any invisible characters or ensure the entire function block is being processed correctly by the SQL editor, especially ensuring no comments are between `END;` and the final `$$;`.
 Additionally, for the `get_monthly_salary_trend_fulltime`, `get_monthly_salary_trend_parttime`, and `get_monthly_revenue_trend` functions, ensure you have a `Time` table (capital T) with appropriate columns (`"Năm"`, `thangpro` (TEXT), `"Thang_x"` (TEXT)) as described in the function's comments.
+    
 
     
 

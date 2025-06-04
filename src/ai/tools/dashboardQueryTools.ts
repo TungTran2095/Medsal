@@ -41,6 +41,13 @@ const LocationComparisonMetricsInputSchema = z.object({
 });
 export type LocationComparisonMetricsInput = z.infer<typeof LocationComparisonMetricsInputSchema>;
 
+// Schema for input for Nganh Doc and DonVi2 queries (year, months)
+const NganhDocDonVi2QueryFilterSchema = z.object({
+  p_filter_year: z.number().describe('The year to filter by (e.g., 2024).'),
+  p_filter_months: z.array(z.number()).optional().describe('An array of months to filter by (1-12).'),
+});
+export type NganhDocDonVi2QueryFilterInput = z.infer<typeof NganhDocDonVi2QueryFilterSchema>;
+
 
 // Generic Output Schema for single value results
 const SingleValueOutputSchema = z.object({
@@ -65,6 +72,26 @@ const LocationComparisonMetricsOutputSchema = z.object({
     message: z.string().optional().describe('A message describing the result, success, no data, or error.'),
 });
 export type LocationComparisonMetricsOutput = z.infer<typeof LocationComparisonMetricsOutputSchema>;
+
+// Output Schema for Nganh Doc FT Salary (Hanoi) Tool
+const NganhDocFTSalaryHanoiOutputSchema = z.object({
+    data: z.array(z.object({
+        nganh_doc_key: z.string(),
+        ft_salary: z.number(),
+    })).nullable().describe('An array of FT salaries by "nganh_doc" for Hanoi, or null.'),
+    message: z.string().optional().describe('A message describing the result, success, no data, or error.'),
+});
+export type NganhDocFTSalaryHanoiOutput = z.infer<typeof NganhDocFTSalaryHanoiOutputSchema>;
+
+// Output Schema for DonVi2 PT Salary Tool
+const DonVi2PTSalaryOutputSchema = z.object({
+    data: z.array(z.object({
+        don_vi_2_key: z.string(),
+        pt_salary: z.number(),
+    })).nullable().describe('An array of PT salaries by "Don_vi_2", or null.'),
+    message: z.string().optional().describe('A message describing the result, success, no data, or error.'),
+});
+export type DonVi2PTSalaryOutput = z.infer<typeof DonVi2PTSalaryOutputSchema>;
 
 
 // Tool for get_total_salary_fulltime
@@ -219,7 +246,7 @@ export const getLocationSalaryRevenueRatiosTool = ai.defineTool(
   {
     name: 'getLocationSalaryRevenueRatiosTool',
     description: 'Fetches salary-to-revenue ratio components for each location, based on optional year, month, and specific location filters. Use for "tỷ lệ quỹ lương trên doanh thu theo địa điểm".',
-    inputSchema: LocationRatioInputSchema, // Uses its specific schema
+    inputSchema: LocationRatioInputSchema, 
     outputSchema: TrendDataOutputSchema, 
   },
   async (input) => {
@@ -256,7 +283,6 @@ export const getLocationComparisonMetricsTool = ai.defineTool(
       });
       if (error) throw error;
       if (!data || data.length === 0) return { data: null, message: `Không có dữ liệu chi tiết theo địa điểm cho năm ${input.p_filter_year} và các bộ lọc đã chọn.` };
-      // Ensure numeric types are correct from RPC potentially returning strings
       const typedData = data.map((item: any) => ({
         location_name: String(item.location_name),
         ft_salary: Number(item.ft_salary) || 0,
@@ -270,6 +296,63 @@ export const getLocationComparisonMetricsTool = ai.defineTool(
     }
   }
 );
+
+// Tool for get_nganhdoc_ft_salary_hanoi
+export const getNganhDocFTSalaryHanoiTool = ai.defineTool(
+  {
+    name: 'getNganhDocFTSalaryHanoiTool',
+    description: 'Fetches Full-time salary aggregated by "nganh_doc" for units in Hanoi, for a given year and optional months. Assumes Fulltime table has "nganh_doc" and "hn_or_note" columns.',
+    inputSchema: NganhDocDonVi2QueryFilterSchema,
+    outputSchema: NganhDocFTSalaryHanoiOutputSchema,
+  },
+  async (input) => {
+    try {
+      const { data, error } = await supabase.rpc('get_nganhdoc_ft_salary_hanoi', {
+        p_filter_year: input.p_filter_year,
+        p_filter_months: input.p_filter_months,
+      });
+      if (error) throw error;
+      if (!data || data.length === 0) return { data: null, message: `Không có dữ liệu lương FT theo ngành dọc (Hà Nội) cho năm ${input.p_filter_year}.` };
+      const typedData = data.map((item: any) => ({
+        nganh_doc_key: String(item.nganh_doc_key),
+        ft_salary: Number(item.ft_salary) || 0,
+      }));
+      return { data: typedData, message: 'Truy vấn lương FT theo ngành dọc (Hà Nội) thành công.' };
+    } catch (e: any) {
+      console.error('Error in getNganhDocFTSalaryHanoiTool:', e);
+      return { data: null, message: `Lỗi khi lấy lương FT theo ngành dọc (Hà Nội): ${e.message}` };
+    }
+  }
+);
+
+// Tool for get_donvi2_pt_salary
+export const getDonVi2PTSalaryTool = ai.defineTool(
+  {
+    name: 'getDonVi2PTSalaryTool',
+    description: 'Fetches Part-time salary aggregated by "Don_vi_2", for a given year and optional months. Assumes Parttime table has "Don_vi_2" column.',
+    inputSchema: NganhDocDonVi2QueryFilterSchema,
+    outputSchema: DonVi2PTSalaryOutputSchema,
+  },
+  async (input) => {
+    try {
+      const { data, error } = await supabase.rpc('get_donvi2_pt_salary', {
+        p_filter_year: input.p_filter_year,
+        p_filter_months: input.p_filter_months,
+      });
+      if (error) throw error;
+      if (!data || data.length === 0) return { data: null, message: `Không có dữ liệu lương PT theo Đơn vị 2 cho năm ${input.p_filter_year}.` };
+      const typedData = data.map((item: any) => ({
+        don_vi_2_key: String(item.don_vi_2_key),
+        pt_salary: Number(item.pt_salary) || 0,
+      }));
+      return { data: typedData, message: 'Truy vấn lương PT theo Đơn vị 2 thành công.' };
+    } catch (e: any) {
+      console.error('Error in getDonVi2PTSalaryTool:', e);
+      return { data: null, message: `Lỗi khi lấy lương PT theo Đơn vị 2: ${e.message}` };
+    }
+  }
+);
+    
     
 
     
