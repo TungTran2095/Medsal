@@ -62,7 +62,7 @@ const EXCLUDED_LOCATIONS: string[] = [
   "Medlatec Group", "Med Kiên Giang", "Med Long An", "Med Mê Linh", 
   "Med Ba Đình", "Med Thanh Xuân", "Med Tây Hồ", "Med Cầu giấy", 
   "Med Sơn Tây", "Medcom", "Medicons", "Medon",
-  "Med Thụy Khuê"
+  "Med Thụy Khuê", "Medim", "MEDIM" // Added Medim and MEDIM
 ];
 
 const calculateChange = (valNew: number | null, valOld: number | null): number | null => {
@@ -156,7 +156,7 @@ export default function LocationComparisonTable({ selectedMonths, selectedDepart
     
     const mergedMap = new Map<string, MergedComparisonData>();
 
-    const processYearData = (yearDataResult: LocationMetric[] | FetchError, yearSuffix: '2024' | '2025') => {
+    const processYearData = (yearDataResult: LocationMetric[] | FetchError, year: 2024 | 2025) => {
         if (!Array.isArray(yearDataResult)) return; 
 
         yearDataResult.forEach(item => {
@@ -177,12 +177,12 @@ export default function LocationComparisonTable({ selectedMonths, selectedDepart
               };
             }
             
-            if (yearSuffix === '2024') {
+            if (year === 2024) {
                 existingEntry.ft_salary_2024 += item.ft_salary;
                 existingEntry.pt_salary_2024 += item.pt_salary;
                 existingEntry.total_salary_2024 += (item.ft_salary + item.pt_salary);
                 existingEntry.total_revenue_2024 += item.total_revenue;
-            } else { // yearSuffix === '2025'
+            } else { // year === 2025
                 existingEntry.ft_salary_2025 += item.ft_salary;
                 existingEntry.pt_salary_2025 += item.pt_salary;
                 existingEntry.total_salary_2025 += (item.ft_salary + item.pt_salary);
@@ -192,10 +192,10 @@ export default function LocationComparisonTable({ selectedMonths, selectedDepart
         });
     };
 
-    if (Array.isArray(data2024Result)) processYearData(data2024Result, '2024');
+    if (Array.isArray(data2024Result)) processYearData(data2024Result, 2024);
     else if (data2024Result.type && !error) setError(data2024Result as FetchError);
 
-    if (Array.isArray(data2025Result)) processYearData(data2025Result, '2025');
+    if (Array.isArray(data2025Result)) processYearData(data2025Result, 2025);
     else if (data2025Result.type && !error) setError(data2025Result as FetchError);
 
 
