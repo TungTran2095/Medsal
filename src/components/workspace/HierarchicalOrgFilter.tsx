@@ -44,8 +44,8 @@ const OrgCheckboxSubItem: React.FC<OrgCheckboxItemProps> = ({ node, level, selec
         className="text-xs py-1.5"
         style={{ paddingLeft: `${1 + level * 1.25}rem` }}
       >
-        <span className="truncate" title={`${node.name}${node.loai ? ` (${node.loai})` : ''}`}>
-          {node.name} {node.loai && <span className="text-muted-foreground text-[10px]">({node.loai})</span>}
+        <span className="truncate" title={node.name}>
+          {node.name}
         </span>
       </DropdownMenuCheckboxItem>
       {node.children && node.children.length > 0 && (
