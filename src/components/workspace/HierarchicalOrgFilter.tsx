@@ -47,8 +47,8 @@ const OrgCheckboxSubItem: React.FC<OrgCheckboxItemProps> = ({ node, level, selec
 
   return (
     <>
-      <div 
-        className="flex items-center w-full text-xs" 
+      <div
+        className="flex items-center w-full text-xs"
         style={{ paddingLeft: baseIndentPadding }}
       >
         {hasChildren ? (
@@ -62,13 +62,13 @@ const OrgCheckboxSubItem: React.FC<OrgCheckboxItemProps> = ({ node, level, selec
             {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
           </button>
         ) : (
-          <span className="w-[calc(0.875rem+0.125rem+0.25rem)] shrink-0"></span> 
+          <span className="w-[calc(0.875rem+0.125rem+0.25rem)] shrink-0"></span>
         )}
         <DropdownMenuCheckboxItem
           checked={isSelected}
           onCheckedChange={(checked) => onToggle(node.id, checked as boolean)}
           onSelect={(e) => e.preventDefault()}
-          className="text-xs py-1.5 flex-1 min-w-0" // Removed !pl-2, added flex-1 and min-w-0
+          className="text-xs py-1.5 flex-1 min-w-0"
         >
           <span className="truncate" title={node.name}>
             {node.name}
@@ -103,15 +103,69 @@ export default function HierarchicalOrgFilter({
 }: HierarchicalOrgFilterProps) {
   const [isOpen, setIsOpen] = useState(false);
 
-  const handleToggle = useCallback((id: string, checked: boolean) => {
-    const newSelectedIds = new Set(selectedIds);
+  const getAllDescendantIds = useCallback((nodeId: string, nodes: OrgNode[]): string[] => {
+    const descendantIds: string[] = [];
+    const findNodeAndDescendants = (currentNodeId: string, currentNodes: OrgNode[]) => {
+      const node = currentNodes.find(n => n.id === currentNodeId);
+      if (node) {
+        node.children.forEach(child => {
+          descendantIds.push(child.id);
+          findNodeAndDescendants(child.id, node.children); // Continue search from child's children array
+        });
+      } else { // If not found at current level, search deeper
+        currentNodes.forEach(n => {
+          if (n.children && n.children.length > 0) {
+            findNodeAndDescendants(currentNodeId, n.children);
+          }
+        });
+      }
+    };
+    
+    // Helper to find the initial node in the top-level hierarchy
+    const findInitialNodeAndGetDescendants = (searchNodeId: string, hierarchyNodes: OrgNode[]): string[] => {
+        const directIds: string[] = [];
+        let queue: OrgNode[] = [...hierarchyNodes];
+        let head = 0;
+        let targetNode: OrgNode | null = null;
+
+        while(head < queue.length){
+            const current = queue[head++];
+            if(current.id === searchNodeId){
+                targetNode = current;
+                break;
+            }
+            if(current.children) queue.push(...current.children);
+        }
+        
+        if (targetNode) {
+            const childQueue: OrgNode[] = [...targetNode.children];
+            head = 0;
+            while(head < childQueue.length){
+                const child = childQueue[head++];
+                directIds.push(child.id);
+                if(child.children) childQueue.push(...child.children);
+            }
+        }
+        return directIds;
+    };
+
+    return findInitialNodeAndGetDescendants(nodeId, nodes);
+  }, []);
+
+
+  const handleToggle = useCallback((toggledNodeId: string, checked: boolean) => {
+    const newSelectedIdsSet = new Set(selectedIds);
+    const descendantIds = getAllDescendantIds(toggledNodeId, hierarchy);
+
     if (checked) {
-      newSelectedIds.add(id);
+      newSelectedIdsSet.add(toggledNodeId);
+      descendantIds.forEach(id => newSelectedIdsSet.add(id));
     } else {
-      newSelectedIds.delete(id);
+      newSelectedIdsSet.delete(toggledNodeId);
+      descendantIds.forEach(id => newSelectedIdsSet.delete(id));
     }
-    onSelectionChange(Array.from(newSelectedIds));
-  }, [selectedIds, onSelectionChange]);
+    onSelectionChange(Array.from(newSelectedIdsSet));
+  }, [selectedIds, onSelectionChange, hierarchy, getAllDescendantIds]);
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
@@ -128,18 +182,18 @@ export default function HierarchicalOrgFilter({
       onSelectionChange([]);
     }
   };
-  
+
   const isAllSelected = useMemo(() => {
     if (!hierarchy || hierarchy.length === 0) return false;
     const allNodeIds: string[] = [];
     const collectIds = (nodes: OrgNode[]) => {
-        nodes.forEach(node => {
-            allNodeIds.push(node.id);
-            if (node.children) collectIds(node.children);
-        });
+      nodes.forEach(node => {
+        allNodeIds.push(node.id);
+        if (node.children) collectIds(node.children);
+      });
     };
     collectIds(hierarchy);
-    if (allNodeIds.length === 0) return false; 
+    if (allNodeIds.length === 0) return false;
     return selectedIds.length > 0 && allNodeIds.every(id => selectedIds.includes(id));
   }, [hierarchy, selectedIds]);
 
@@ -147,10 +201,10 @@ export default function HierarchicalOrgFilter({
   const buttonLabelText = isLoading
     ? "Đang tải CCTC..."
     : error
-    ? "Lỗi CCTC"
-    : selectedIds.length > 0
-    ? `${triggerButtonLabel} (${selectedIds.length})`
-    : triggerButtonLabel;
+      ? "Lỗi CCTC"
+      : selectedIds.length > 0
+        ? `${triggerButtonLabel} (${selectedIds.length})`
+        : triggerButtonLabel;
 
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
@@ -166,7 +220,7 @@ export default function HierarchicalOrgFilter({
           <ChevronDown className="ml-1 h-4 w-4 opacity-50 shrink-0" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent 
+      <DropdownMenuContent
         className="w-[350px] p-0 flex flex-col max-h-[450px]"
         align="end"
       >
@@ -176,28 +230,28 @@ export default function HierarchicalOrgFilter({
             {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
           </DropdownMenuLabel>
         </div>
-        
+
         <div className="flex-grow min-h-0 overflow-y-auto">
           <div className="p-2">
             {error && (
               <div className="p-2 text-xs text-destructive bg-destructive/10 m-1 rounded-sm flex items-center gap-1.5">
-                <AlertTriangle className="h-3.5 w-3.5 shrink-0"/> {error}
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0" /> {error}
               </div>
             )}
             {!isLoading && !error && hierarchy.length === 0 && (
-                <div className="p-2 text-xs text-muted-foreground text-center">Không có dữ liệu cơ cấu tổ chức.</div>
+              <div className="p-2 text-xs text-muted-foreground text-center">Không có dữ liệu cơ cấu tổ chức.</div>
             )}
             {!isLoading && !error && hierarchy.length > 0 && (
               <>
                 <DropdownMenuCheckboxItem
-                    checked={isAllSelected}
-                    onCheckedChange={handleSelectAll}
-                    onSelect={(e) => e.preventDefault()}
-                    className="text-xs font-medium"
+                  checked={isAllSelected}
+                  onCheckedChange={handleSelectAll}
+                  onSelect={(e) => e.preventDefault()}
+                  className="text-xs font-medium"
                 >
-                    Chọn Tất Cả / Bỏ Chọn Tất Cả
+                  Chọn Tất Cả / Bỏ Chọn Tất Cả
                 </DropdownMenuCheckboxItem>
-                <DropdownMenuSeparator className="my-1"/>
+                <DropdownMenuSeparator className="my-1" />
                 {hierarchy.map(node => (
                   <OrgCheckboxSubItem
                     key={node.id}
@@ -215,3 +269,4 @@ export default function HierarchicalOrgFilter({
     </DropdownMenu>
   );
 }
+
