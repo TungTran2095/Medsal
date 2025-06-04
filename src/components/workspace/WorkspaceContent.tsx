@@ -7,13 +7,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, ChevronDown, FilterIcon, GanttChartSquare, MapPin, Settings2, Circle, Percent, Target, FolderKanban, BarChart3, Filter as FilterIconLucide } from "lucide-react"; // Renamed Filter to FilterIconLucide
-import type { PayrollEntry, FlatOrgUnit } from '@/types'; // OrgNode removed as HierarchicalOrgFilter is removed
+import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, ChevronDown, FilterIcon, GanttChartSquare, MapPin, Settings2, Circle, Percent, Target, FolderKanban, BarChart3, Filter as FilterIconLucide } from "lucide-react";
+import type { PayrollEntry, FlatOrgUnit, OrgNode } from '@/types';
 import { supabase } from '@/lib/supabaseClient';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import SupabaseTableList from './SupabaseTableList';
 import AiToolsViewer from './AiToolsViewer';
-// import HierarchicalOrgFilter from './HierarchicalOrgFilter'; // Temporarily removed
+import HierarchicalOrgFilter from './HierarchicalOrgFilter';
 import { Separator } from '@/components/ui/separator';
 import TotalSalaryCard from '@/components/dashboard/TotalSalaryCard';
 import TotalSalaryParttimeCard from '@/components/dashboard/TotalSalaryParttimeCard';
@@ -97,12 +97,11 @@ export default function WorkspaceContent() {
   const [isLoadingLocationFilters, setIsLoadingLocationFilters] = useState<boolean>(false);
   const [locationFilterError, setLocationFilterError] = useState<string | null>(null);
 
-  // States for HierarchicalOrgFilter temporarily removed
-  // const [orgHierarchyData, setOrgHierarchyData] = useState<OrgNode[]>([]);
-  // const [selectedOrgUnitIds, setSelectedOrgUnitIds] = useState<string[]>([]);
-  // const [isLoadingOrgHierarchy, setIsLoadingOrgHierarchy] = useState<boolean>(false);
-  // const [orgHierarchyError, setOrgHierarchyError] = useState<string | null>(null);
-  // const [flatOrgUnits, setFlatOrgUnits] = useState<FlatOrgUnit[]>([]);
+  const [orgHierarchyData, setOrgHierarchyData] = useState<OrgNode[]>([]);
+  const [selectedOrgUnitIds, setSelectedOrgUnitIds] = useState<string[]>([]);
+  const [isLoadingOrgHierarchy, setIsLoadingOrgHierarchy] = useState<boolean>(false);
+  const [orgHierarchyError, setOrgHierarchyError] = useState<string | null>(null);
+  const [flatOrgUnits, setFlatOrgUnits] = useState<FlatOrgUnit[]>([]);
 
 
   const [activeDashboardTab, setActiveDashboardTab] = useState<DashboardTab>('payrollOverview');
@@ -229,19 +228,18 @@ export default function WorkspaceContent() {
     }
   }, [activeView, toast]);
 
-  // fetchAndBuildOrgHierarchy and buildTree functions temporarily removed
-  /*
+
   const buildTree = useCallback((items: FlatOrgUnit[], parentId: string | null = "1"): OrgNode[] => {
     const children = items
       .filter(item => item.Parent_ID === parentId)
       .map(item => ({
-        id: String(item.ID), 
+        id: String(item.ID),
         name: item.Department,
         loai: item.Loai,
         parent_id: item.Parent_ID ? String(item.Parent_ID) : null,
         children: buildTree(items, String(item.ID))
       }));
-    return children.sort((a,b) => a.name.localeCompare(b.name)); 
+    return children.sort((a,b) => a.name.localeCompare(b.name));
   }, []);
 
 
@@ -258,13 +256,13 @@ export default function WorkspaceContent() {
         .select('ID, Parent_ID, Department, Loai');
 
       if (error) {
-        // Temporarily throw original error to see details
+        // Ném lỗi gốc từ Supabase để có thể debug chính xác hơn
         // if (String(error.message).toLowerCase().includes("ms_org_nganhdoc") && String(error.message).toLowerCase().includes("does not exist")) {
         //     throw new Error("Bảng 'MS_Org_nganhdoc' không tồn tại. Vui lòng tạo bảng này để sử dụng bộ lọc cơ cấu tổ chức.");
         // }
         throw error;
       }
-      
+
       const flatData = (data || []).map(d => ({...d, ID: String(d.ID), Parent_ID: d.Parent_ID ? String(d.Parent_ID) : null})) as FlatOrgUnit[];
       setFlatOrgUnits(flatData);
 
@@ -291,7 +289,7 @@ export default function WorkspaceContent() {
         if (hierarchy.length === 0 && flatData.length > 0) {
              setOrgHierarchyError("Không tìm thấy đơn vị gốc (ID=1) hoặc đơn vị nào không có Parent_ID trong 'MS_Org_nganhdoc'. Kiểm tra dữ liệu.");
         } else if (flatData.length === 0) {
-             setOrgHierarchyData([]);
+             setOrgHierarchyData([]); // Explicitly set to empty if no data
         }
       }
 
@@ -299,45 +297,43 @@ export default function WorkspaceContent() {
       console.error("Error fetching/building org hierarchy from MS_Org_nganhdoc:", err);
       const errorMessage = err.message || "Không thể tải dữ liệu cơ cấu tổ chức từ 'MS_Org_nganhdoc'.";
       setOrgHierarchyError(errorMessage);
-      toast({
-        title: "Lỗi Tải Cơ Cấu Tổ Chức",
-        description: errorMessage,
-        variant: "destructive",
-      });
+      // Không toast ở đây nữa vì lỗi sẽ hiển thị trên UI của filter
+      // toast({
+      //   title: "Lỗi Tải Cơ Cấu Tổ Chức",
+      //   description: errorMessage,
+      //   variant: "destructive",
+      // });
     } finally {
       setIsLoadingOrgHierarchy(false);
     }
-  }, [activeView, toast, buildTree]);
-  */
+  }, [activeView, buildTree]);
+
 
   useEffect(() => {
     if (activeView === 'dashboard') {
       fetchDistinctYears();
       fetchLocationFilterOptions();
-      // fetchAndBuildOrgHierarchy(); // Temporarily removed
+      fetchAndBuildOrgHierarchy();
     }
-  //}, [activeView, fetchDistinctYears, fetchLocationFilterOptions, fetchAndBuildOrgHierarchy]);
-  }, [activeView, fetchDistinctYears, fetchLocationFilterOptions]);
+  }, [activeView, fetchDistinctYears, fetchLocationFilterOptions, fetchAndBuildOrgHierarchy]);
 
 
   const finalSelectedDepartmentNames = useMemo(() => {
     const namesFromLoaiFilter = new Set(selectedDepartmentsByLoai.map(id => id.split('__')[1]));
-    
-    // Logic for org filter temporarily removed
-    // const namesFromOrgFilter = new Set<string>();
-    // if (selectedOrgUnitIds.length > 0 && flatOrgUnits.length > 0) {
-    //     selectedOrgUnitIds.forEach(id => {
-    //         const unit = flatOrgUnits.find(u => String(u.ID) === String(id));
-    //         if (unit && unit.Department) {
-    //             namesFromOrgFilter.add(unit.Department);
-    //         }
-    //     });
-    // }
-    
-    // const combined = new Set([...namesFromLoaiFilter, ...namesFromOrgFilter]);
-    // return Array.from(combined);
-    return Array.from(namesFromLoaiFilter); // Only use Loai filter for now
-  }, [selectedDepartmentsByLoai /*, selectedOrgUnitIds, flatOrgUnits*/]);
+    const namesFromOrgFilter = new Set<string>();
+
+    if (selectedOrgUnitIds.length > 0 && flatOrgUnits.length > 0) {
+        selectedOrgUnitIds.forEach(id => {
+            const unit = flatOrgUnits.find(u => String(u.ID) === String(id));
+            if (unit && unit.Department) {
+                namesFromOrgFilter.add(unit.Department);
+            }
+        });
+    }
+
+    const combined = new Set([...namesFromLoaiFilter, ...namesFromOrgFilter]);
+    return Array.from(combined);
+  }, [selectedDepartmentsByLoai, selectedOrgUnitIds, flatOrgUnits]);
 
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -940,7 +936,7 @@ export default function WorkspaceContent() {
                         )}
                         </DropdownMenuContent>
                     </DropdownMenu>
-                    {/* HierarchicalOrgFilter temporarily removed
+                    
                     <HierarchicalOrgFilter
                         hierarchy={orgHierarchyData}
                         selectedIds={selectedOrgUnitIds}
@@ -949,7 +945,6 @@ export default function WorkspaceContent() {
                         error={orgHierarchyError}
                         triggerButtonLabel="Cơ Cấu Tổ Chức"
                     />
-                    */}
                   </div>
                 </div>
               </CardHeader>
@@ -1027,4 +1022,3 @@ export default function WorkspaceContent() {
   );
 }
 
-    
