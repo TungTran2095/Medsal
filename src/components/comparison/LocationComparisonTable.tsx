@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabaseClient'; 
-import { Loader2, AlertTriangle, TrendingUp, TrendingDown, Minus, Percent, Banknote, DollarSign, GanttChartSquare, ArrowUpDown, ArrowUp, ArrowDown, Filter } from 'lucide-react';
+import { Loader2, AlertTriangle, TrendingUp, TrendingDown, Minus, GanttChartSquare, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -56,10 +56,10 @@ type SortableColumnKey =
   | 'total_revenue_2024' | 'total_revenue_2025' | 'revenue_change_val'
   | 'ratio_2024' | 'ratio_2025' | 'ratio_change_pp_val';
 
-const calculateChange = (valNew: number, valOld: number): number | null => {
+const calculateChange = (valNew: number | null, valOld: number | null): number | null => {
+    if (valNew === null || valOld === null) return null;
     if (valOld === 0 && valNew === 0) return 0;
     if (valOld === 0) return valNew > 0 ? Infinity : (valNew < 0 ? -Infinity : 0); 
-    if (valNew === null || valOld === null) return null;
     return (valNew - valOld) / valOld;
 };
 
@@ -147,15 +147,15 @@ export default function LocationComparisonTable({ selectedMonths, selectedDepart
     }
     setFilterDescription(`${monthSegment} tại ${locationSegment}`);
 
-    const [data2024, data2025] = await Promise.all([
+    const [data2024Result, data2025Result] = await Promise.all([
       fetchDataForYear(2024),
       fetchDataForYear(2025),
     ]);
 
-    if (Array.isArray(data2024) && Array.isArray(data2025)) {
+    if (Array.isArray(data2024Result) && Array.isArray(data2025Result)) {
       const mergedMap = new Map<string, Partial<MergedComparisonData>>();
 
-      data2024.forEach(item => {
+      data2024Result.forEach(item => {
         let correctedLocationName = item.location_name;
         if (correctedLocationName.startsWith("MED ")) {
             correctedLocationName = "Med " + correctedLocationName.substring(4);
@@ -163,31 +163,34 @@ export default function LocationComparisonTable({ selectedMonths, selectedDepart
             correctedLocationName = "Med";
         }
 
-        mergedMap.set(correctedLocationName, { // Use corrected name as key
-          location_name: correctedLocationName,
-          ft_salary_2024: item.ft_salary,
-          pt_salary_2024: item.pt_salary,
-          total_salary_2024: item.ft_salary + item.pt_salary,
-          total_revenue_2024: item.total_revenue,
-          ratio_2024: item.total_revenue !== 0 ? (item.ft_salary + item.pt_salary) / item.total_revenue : null,
+        const existingEntry = mergedMap.get(correctedLocationName) || { location_name: correctedLocationName };
+        
+        mergedMap.set(correctedLocationName, {
+          ...existingEntry,
+          ft_salary_2024: (existingEntry.ft_salary_2024 || 0) + item.ft_salary,
+          pt_salary_2024: (existingEntry.pt_salary_2024 || 0) + item.pt_salary,
+          total_salary_2024: (existingEntry.total_salary_2024 || 0) + item.ft_salary + item.pt_salary,
+          total_revenue_2024: (existingEntry.total_revenue_2024 || 0) + item.total_revenue,
         });
       });
 
-      data2025.forEach(item => {
+      data2025Result.forEach(item => {
         let correctedLocationName = item.location_name;
         if (correctedLocationName.startsWith("MED ")) {
             correctedLocationName = "Med " + correctedLocationName.substring(4);
         } else if (correctedLocationName === "MED") {
             correctedLocationName = "Med";
         }
-        const existing = mergedMap.get(correctedLocationName) || { location_name: correctedLocationName };
+        const existingEntry = mergedMap.get(correctedLocationName) || { 
+            location_name: correctedLocationName,
+            ft_salary_2024: 0, pt_salary_2024: 0, total_salary_2024: 0, total_revenue_2024: 0, // Init 2024 if no prior data
+        };
         mergedMap.set(correctedLocationName, {
-          ...existing,
-          ft_salary_2025: item.ft_salary,
-          pt_salary_2025: item.pt_salary,
-          total_salary_2025: item.ft_salary + item.pt_salary,
-          total_revenue_2025: item.total_revenue,
-          ratio_2025: item.total_revenue !== 0 ? (item.ft_salary + item.pt_salary) / item.total_revenue : null,
+          ...existingEntry,
+          ft_salary_2025: (existingEntry.ft_salary_2025 || 0) + item.ft_salary,
+          pt_salary_2025: (existingEntry.pt_salary_2025 || 0) + item.pt_salary,
+          total_salary_2025: (existingEntry.total_salary_2025 || 0) + item.ft_salary + item.pt_salary,
+          total_revenue_2025: (existingEntry.total_revenue_2025 || 0) + item.total_revenue,
         });
       });
       
@@ -196,12 +199,13 @@ export default function LocationComparisonTable({ selectedMonths, selectedDepart
         const ft_s_2025 = item.ft_salary_2025 || 0;
         const pt_s_2024 = item.pt_salary_2024 || 0;
         const pt_s_2025 = item.pt_salary_2025 || 0;
-        const total_s_2024 = item.total_salary_2024 || 0;
-        const total_s_2025 = item.total_salary_2025 || 0;
+        const total_s_2024 = item.total_salary_2024 || 0; 
+        const total_s_2025 = item.total_salary_2025 || 0; 
         const total_r_2024 = item.total_revenue_2024 || 0;
         const total_r_2025 = item.total_revenue_2025 || 0;
-        const r_2024 = item.ratio_2024 === undefined ? null : item.ratio_2024;
-        const r_2025 = item.ratio_2025 === undefined ? null : item.ratio_2025;
+        
+        const r_2024 = total_r_2024 !== 0 ? total_s_2024 / total_r_2024 : null;
+        const r_2025 = total_r_2025 !== 0 ? total_s_2025 / total_r_2025 : null;
 
         return {
             location_name: item.location_name!,
@@ -231,8 +235,8 @@ export default function LocationComparisonTable({ selectedMonths, selectedDepart
       setComparisonData(rawFinalData);
 
     } else {
-      if (!Array.isArray(data2024)) setError(data2024 as FetchError);
-      else if (!Array.isArray(data2025)) setError(data2025 as FetchError);
+      if (!Array.isArray(data2024Result)) setError(data2024Result as FetchError);
+      else if (!Array.isArray(data2025Result)) setError(data2025Result as FetchError);
       setComparisonData([]);
     }
 
@@ -342,7 +346,7 @@ export default function LocationComparisonTable({ selectedMonths, selectedDepart
           isSticky && "sticky left-0 bg-card z-20", 
           minWidth && `min-w-[${minWidth}]`
         )}
-        style={isSticky ? { minWidth: minWidth || '150px' } : {}} 
+        style={isSticky ? { minWidth: minWidth || '180px' } : { minWidth : minWidth }} 
         onClick={() => requestSort(columnKey)}
       >
         <div className={cn("flex items-center gap-1", `justify-${align === 'center' ? 'center' : align === 'left' ? 'start' : 'end'}`)}>
@@ -418,21 +422,21 @@ export default function LocationComparisonTable({ selectedMonths, selectedDepart
             <TableHeader className="sticky top-0 bg-card z-20">
               <TableRow>
                 {renderSortableTableHead("Địa Điểm", 'location_name', true, '180px', 'left')}
-                {renderSortableTableHead("Lương FT 24", 'ft_salary_2024', false, undefined, 'right')}
-                {renderSortableTableHead("Lương FT 25", 'ft_salary_2025', false, undefined, 'right')}
-                {renderSortableTableHead("+/- FT", 'ft_salary_change_val')}
-                {renderSortableTableHead("Lương PT 24", 'pt_salary_2024', false, undefined, 'right')}
-                {renderSortableTableHead("Lương PT 25", 'pt_salary_2025', false, undefined, 'right')}
-                {renderSortableTableHead("+/- PT", 'pt_salary_change_val')}
-                {renderSortableTableHead("Tổng Lương 24", 'total_salary_2024', false, undefined, 'right')}
-                {renderSortableTableHead("Tổng Lương 25", 'total_salary_2025', false, undefined, 'right')}
-                {renderSortableTableHead("+/- Lương", 'total_salary_change_val')}
-                {renderSortableTableHead("Doanh Thu 24", 'total_revenue_2024', false, undefined, 'right')}
-                {renderSortableTableHead("Doanh Thu 25", 'total_revenue_2025', false, undefined, 'right')}
-                {renderSortableTableHead("+/- DT", 'revenue_change_val')}
-                {renderSortableTableHead("QL/DT 24", 'ratio_2024')}
-                {renderSortableTableHead("QL/DT 25", 'ratio_2025')}
-                {renderSortableTableHead("+/- QL/DT", 'ratio_change_pp_val')}
+                {renderSortableTableHead("Lương FT 24", 'ft_salary_2024', false, '100px', 'right')}
+                {renderSortableTableHead("Lương FT 25", 'ft_salary_2025', false, '100px', 'right')}
+                {renderSortableTableHead("+/- FT", 'ft_salary_change_val', false, '80px')}
+                {renderSortableTableHead("Lương PT 24", 'pt_salary_2024', false, '100px', 'right')}
+                {renderSortableTableHead("Lương PT 25", 'pt_salary_2025', false, '100px', 'right')}
+                {renderSortableTableHead("+/- PT", 'pt_salary_change_val', false, '80px')}
+                {renderSortableTableHead("Tổng Lương 24", 'total_salary_2024', false, '110px', 'right')}
+                {renderSortableTableHead("Tổng Lương 25", 'total_salary_2025', false, '110px', 'right')}
+                {renderSortableTableHead("+/- Lương", 'total_salary_change_val', false, '90px')}
+                {renderSortableTableHead("Doanh Thu 24", 'total_revenue_2024', false, '110px', 'right')}
+                {renderSortableTableHead("Doanh Thu 25", 'total_revenue_2025', false, '110px', 'right')}
+                {renderSortableTableHead("+/- DT", 'revenue_change_val', false, '80px')}
+                {renderSortableTableHead("QL/DT 24", 'ratio_2024', false, '80px')}
+                {renderSortableTableHead("QL/DT 25", 'ratio_2025', false, '80px')}
+                {renderSortableTableHead("+/- QL/DT", 'ratio_change_pp_val', false, '90px')}
               </TableRow>
             </TableHeader>
             <TableBody>
