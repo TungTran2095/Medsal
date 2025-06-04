@@ -229,9 +229,9 @@ export default function WorkspaceContent() {
   }, [activeView, toast]);
 
 
-  const buildTree = useCallback((items: FlatOrgUnit[], parentId: string | null = "1"): OrgNode[] => {
+ const buildTree = useCallback((items: FlatOrgUnit[], parentId: string | null = "1"): OrgNode[] => {
     const children = items
-      .filter(item => item.Parent_ID === parentId)
+      .filter(item => String(item.Parent_ID) === String(parentId)) // Ensure strict comparison for Parent_ID
       .map(item => ({
         id: String(item.ID),
         name: item.Department,
@@ -251,22 +251,47 @@ export default function WorkspaceContent() {
     setFlatOrgUnits([]);
 
     try {
-      const { data, error } = await supabase
-        .from('"MS_Org_nganhdoc"') // Use quoted table name
-        .select('ID, Parent_ID, Department, Loai');
+      // Try with lowercase name first, as PostgreSQL often folds unquoted identifiers to lowercase.
+      const { data, error } = await supabase.from('ms_org_nganhdoc').select('ID, Parent_ID, Department, Loai');
 
       if (error) {
-        // Ném lỗi gốc từ Supabase để có thể debug chính xác hơn
-        // if (String(error.message).toLowerCase().includes("ms_org_nganhdoc") && String(error.message).toLowerCase().includes("does not exist")) {
-        //     throw new Error("Bảng 'MS_Org_nganhdoc' không tồn tại. Vui lòng tạo bảng này để sử dụng bộ lọc cơ cấu tổ chức.");
-        // }
-        throw error;
+        // Log the full error object to console for detailed debugging
+        console.error("Full error object from Supabase for 'ms_org_nganhdoc':", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+
+        let displayErrorMessage = "Không thể tải dữ liệu cơ cấu tổ chức từ bảng 'ms_org_nganhdoc'.";
+        const errString = JSON.stringify(error).toLowerCase(); // Stringify the error for searching
+
+        if (error && typeof error === 'object' && 'message' in error) {
+            const message = String((error as any).message).toLowerCase();
+            if (message.includes("relation") && message.includes("does not exist") || (error as any).code === 'PGRST200' && (error as any).details?.includes("materialized view") && (error as any).details?.includes("does not exist")) {
+                 displayErrorMessage = "Lỗi 404: Bảng/View 'ms_org_nganhdoc' không tìm thấy. Vui lòng kiểm tra lại tên (đảm bảo là chữ thường 'ms_org_nganhdoc' nếu không tạo bằng dấu ngoặc kép) và schema ('public').";
+            } else if ((error as any).code === '42P01') { // Undefined table
+                 displayErrorMessage = "Lỗi 404 (42P01): Bảng 'ms_org_nganhdoc' không được định nghĩa hoặc không tồn tại. Kiểm tra tên và schema.";
+            } else if (String((error as any).code).startsWith('40') || String((error as any).status).startsWith('40')) { // Other 4xx client errors
+                 displayErrorMessage = `Lỗi Client (${(error as any).status || (error as any).code}): ${ (error as any).message || 'Không thể truy cập bảng ms_org_nganhdoc. Kiểm tra quyền (RLS).'}`;
+            }
+            else {
+                displayErrorMessage = `Lỗi Supabase: ${ (error as any).message || 'Lỗi không xác định.'}`;
+            }
+        } else if (errString.includes("404") || errString.includes("not found")) {
+            displayErrorMessage = "Lỗi 404: Bảng 'ms_org_nganhdoc' không tìm thấy. Vui lòng kiểm tra lại tên bảng (đảm bảo là chữ thường 'ms_org_nganhdoc' và nằm trong schema 'public') và các chính sách RLS trong Supabase.";
+        } else if (errString.includes("401") || errString.includes("unauthorized") || errString.includes("403") || errString.includes("forbidden")) {
+            displayErrorMessage = "Lỗi quyền truy cập: Không có quyền đọc bảng 'ms_org_nganhdoc'. Vui lòng kiểm tra các chính sách RLS trong Supabase.";
+        }
+
+        setOrgHierarchyError(displayErrorMessage);
+        setOrgHierarchyData([]);
+        setFlatOrgUnits([]);
+        setIsLoadingOrgHierarchy(false);
+        return; 
       }
 
       const flatData = (data || []).map(d => ({...d, ID: String(d.ID), Parent_ID: d.Parent_ID ? String(d.Parent_ID) : null})) as FlatOrgUnit[];
       setFlatOrgUnits(flatData);
 
+      // Attempt to find root "Med Group" with ID '1'
       const medGroupRoot = flatData.find(item => String(item.ID) === "1");
+
       if (medGroupRoot) {
         const hierarchy = [{
             id: String(medGroupRoot.ID),
@@ -277,7 +302,8 @@ export default function WorkspaceContent() {
         }];
         setOrgHierarchyData(hierarchy);
       } else {
-        const rootItems = flatData.filter(item => !item.Parent_ID);
+        // Fallback: build tree from items with no Parent_ID if "Med Group" (ID 1) is not found
+        const rootItems = flatData.filter(item => !item.Parent_ID || item.Parent_ID === null);
         const hierarchy = rootItems.map(item => ({
             id: String(item.ID),
             name: item.Department,
@@ -285,24 +311,23 @@ export default function WorkspaceContent() {
             parent_id: null,
             children: buildTree(flatData, String(item.ID))
         })).sort((a,b) => a.name.localeCompare(b.name));
+        
         setOrgHierarchyData(hierarchy);
         if (hierarchy.length === 0 && flatData.length > 0) {
-             setOrgHierarchyError("Không tìm thấy đơn vị gốc (ID=1) hoặc đơn vị nào không có Parent_ID trong 'MS_Org_nganhdoc'. Kiểm tra dữ liệu.");
+             setOrgHierarchyError("Không tìm thấy đơn vị gốc (ID=1 hoặc Parent_ID NULL) trong 'ms_org_nganhdoc'. Kiểm tra dữ liệu.");
         } else if (flatData.length === 0) {
-             setOrgHierarchyData([]); // Explicitly set to empty if no data
+             setOrgHierarchyData([]); // Explicitly set to empty if no data from db
+             // Optionally set an error or info message if no data is expected to be problematic
+             // setOrgHierarchyError("Không có dữ liệu nào trong bảng 'ms_org_nganhdoc'.");
         }
       }
 
     } catch (err: any) {
-      console.error("Error fetching/building org hierarchy from MS_Org_nganhdoc:", err);
-      const errorMessage = err.message || "Không thể tải dữ liệu cơ cấu tổ chức từ 'MS_Org_nganhdoc'.";
-      setOrgHierarchyError(errorMessage);
-      // Không toast ở đây nữa vì lỗi sẽ hiển thị trên UI của filter
-      // toast({
-      //   title: "Lỗi Tải Cơ Cấu Tổ Chức",
-      //   description: errorMessage,
-      //   variant: "destructive",
-      // });
+      // This catch block is for unexpected errors during the try block execution, not covered by Supabase error object.
+      console.error("Unexpected error in fetchAndBuildOrgHierarchy:", JSON.stringify(err, Object.getOwnPropertyNames(err), 2));
+      setOrgHierarchyError(`Lỗi không mong muốn khi xử lý cơ cấu tổ chức: ${err.message || "Vui lòng kiểm tra console."}`);
+      setOrgHierarchyData([]);
+      setFlatOrgUnits([]);
     } finally {
       setIsLoadingOrgHierarchy(false);
     }
@@ -330,8 +355,8 @@ export default function WorkspaceContent() {
             }
         });
     }
-
-    const combined = new Set([...namesFromLoaiFilter, ...namesFromOrgFilter]);
+    // Combine and deduplicate
+    const combined = new Set([...Array.from(namesFromLoaiFilter), ...Array.from(namesFromOrgFilter)]);
     return Array.from(combined);
   }, [selectedDepartmentsByLoai, selectedOrgUnitIds, flatOrgUnits]);
 
@@ -736,7 +761,7 @@ export default function WorkspaceContent() {
                        Phân Tích Lương & Doanh Thu Tổng Hợp
                     </CardTitle>
                   </div>
-                  <div className="flex items-center gap-2 mt-2 sm:mt-0 flex-wrap">
+                  <div className="flex items-center gap-2 mt-2 sm:mt-0 flex-wrap"> {/* Added flex-wrap */}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="outline" className="h-9 text-sm min-w-[200px] justify-between px-3">
@@ -936,7 +961,7 @@ export default function WorkspaceContent() {
                         )}
                         </DropdownMenuContent>
                     </DropdownMenu>
-                    
+
                     <HierarchicalOrgFilter
                         hierarchy={orgHierarchyData}
                         selectedIds={selectedOrgUnitIds}
