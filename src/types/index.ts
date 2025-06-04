@@ -1,5 +1,4 @@
 
-
 export interface Message {
   id: string;
   text: string;
@@ -25,3 +24,18 @@ export interface SupabaseTable {
 }
 
 export type DataRow = Record<string, any>;
+
+export interface OrgNode {
+  id: string;
+  name: string; // Department name
+  loai?: string | null; // "Loại" from MS_Org_Diadiem
+  parent_id: string | null;
+  children: OrgNode[];
+}
+
+export interface FlatOrgUnit {
+  ID: string;
+  Parent_ID: string | null;
+  Department: string;
+  Loai?: string | null;
+}

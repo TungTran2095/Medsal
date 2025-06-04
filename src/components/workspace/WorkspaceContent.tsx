@@ -1,18 +1,19 @@
 
 "use client";
 
-import React, { useState, ChangeEvent, useEffect, useCallback } from 'react';
+import React, { useState, ChangeEvent, useEffect, useCallback, useMemo } from 'react';
 import Papa from 'papaparse';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, ChevronDown, FilterIcon, GanttChartSquare, MapPin, Settings2, Circle, Percent, Target, FolderKanban, BarChart3 } from "lucide-react";
-import type { PayrollEntry } from '@/types';
+import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, ChevronDown, FilterIcon, GanttChartSquare, MapPin, Settings2, Circle, Percent, Target, FolderKanban, BarChart3, Filter as FilterIconLucide } from "lucide-react"; // Renamed Filter to FilterIconLucide
+import type { PayrollEntry, OrgNode, FlatOrgUnit } from '@/types';
 import { supabase } from '@/lib/supabaseClient';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import SupabaseTableList from './SupabaseTableList';
 import AiToolsViewer from './AiToolsViewer';
+import HierarchicalOrgFilter from './HierarchicalOrgFilter'; // Added
 import { Separator } from '@/components/ui/separator';
 import TotalSalaryCard from '@/components/dashboard/TotalSalaryCard';
 import TotalSalaryParttimeCard from '@/components/dashboard/TotalSalaryParttimeCard';
@@ -27,7 +28,7 @@ import ComparisonCombinedSalaryCard from '@/components/comparison/ComparisonComb
 import ComparisonRevenueCard from '@/components/comparison/ComparisonRevenueCard';
 import ComparisonSalaryRevenueRatioCard from '@/components/comparison/ComparisonSalaryRevenueRatioCard';
 import LocationComparisonTable from '@/components/comparison/LocationComparisonTable';
-import NganhDocComparisonTable from '@/components/comparison/NganhDocComparisonTable'; // Added
+import NganhDocComparisonTable from '@/components/comparison/NganhDocComparisonTable';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -57,7 +58,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type WorkspaceView = 'dbManagement' | 'dashboard' | 'aiTools';
-type DashboardTab = 'payrollOverview' | 'comparison' | 'kpiComparison' | 'detailedSalary'; 
+type DashboardTab = 'payrollOverview' | 'comparison' | 'kpiComparison' | 'detailedSalary';
 
 interface NavItem {
   id: WorkspaceView;
@@ -92,9 +93,16 @@ export default function WorkspaceContent() {
 
   const [availableLocationTypes, setAvailableLocationTypes] = useState<string[]>([]);
   const [availableDepartmentsByLoai, setAvailableDepartmentsByLoai] = useState<Record<string, string[]>>({});
-  const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]); 
+  const [selectedDepartmentsByLoai, setSelectedDepartmentsByLoai] = useState<string[]>([]);
   const [isLoadingLocationFilters, setIsLoadingLocationFilters] = useState<boolean>(false);
   const [locationFilterError, setLocationFilterError] = useState<string | null>(null);
+
+  const [orgHierarchyData, setOrgHierarchyData] = useState<OrgNode[]>([]);
+  const [selectedOrgUnitIds, setSelectedOrgUnitIds] = useState<string[]>([]);
+  const [isLoadingOrgHierarchy, setIsLoadingOrgHierarchy] = useState<boolean>(false);
+  const [orgHierarchyError, setOrgHierarchyError] = useState<string | null>(null);
+  const [flatOrgUnits, setFlatOrgUnits] = useState<FlatOrgUnit[]>([]);
+
 
   const [activeDashboardTab, setActiveDashboardTab] = useState<DashboardTab>('payrollOverview');
 
@@ -204,7 +212,9 @@ export default function WorkspaceContent() {
       console.error("Error fetching location filter options:", err);
       const errorMessage = err.message || "Không thể tải tùy chọn lọc địa điểm.";
       setLocationFilterError(errorMessage);
-      if (!errorMessage.toLowerCase().includes("relation \"ms_org_diadiem\" does not exist")) {
+      if (String(errorMessage).toLowerCase().includes("ms_org_diadiem") && String(errorMessage).toLowerCase().includes("does not exist")) {
+         setLocationFilterError("Bảng 'MS_Org_Diadiem' không tồn tại. Vui lòng tạo bảng này để sử dụng bộ lọc địa điểm.");
+      } else {
         toast({
           title: "Lỗi Tải Lọc Địa Điểm",
           description: errorMessage,
@@ -218,13 +228,116 @@ export default function WorkspaceContent() {
     }
   }, [activeView, toast]);
 
+  const buildTree = (items: FlatOrgUnit[], parentId: string | null = "1"): OrgNode[] => {
+    // If parentId is "1" (Med Group), we find items whose Parent_ID is "1"
+    // If parentId is null for true roots (not Med Group as parent), find items with Parent_ID null.
+    // The prompt specifies Med Group ID=1 as the root for display.
+    const children = items
+      .filter(item => item.Parent_ID === parentId)
+      .map(item => ({
+        id: String(item.ID), // Ensure ID is string
+        name: item.Department,
+        loai: item.Loai,
+        parent_id: item.Parent_ID ? String(item.Parent_ID) : null,
+        children: buildTree(items, String(item.ID))
+      }));
+    return children.sort((a,b) => a.name.localeCompare(b.name)); // Sort children by name
+  };
+
+
+  const fetchAndBuildOrgHierarchy = useCallback(async () => {
+    if (activeView !== 'dashboard') return;
+    setIsLoadingOrgHierarchy(true);
+    setOrgHierarchyError(null);
+    setOrgHierarchyData([]);
+    setFlatOrgUnits([]);
+
+    try {
+      const { data, error } = await supabase
+        .from('MS_Org_Diadiem')
+        .select('ID, Parent_ID, Department, Loai')
+        .eq('Division', 'Company'); // Assuming 'Company' division for main org structure
+
+      if (error) {
+        if (String(error.message).toLowerCase().includes("ms_org_diadiem") && String(error.message).toLowerCase().includes("does not exist")) {
+            throw new Error("Bảng 'MS_Org_Diadiem' không tồn tại. Vui lòng tạo bảng này để sử dụng bộ lọc cơ cấu tổ chức.");
+        }
+        throw error;
+      }
+      
+      const flatData = (data || []).map(d => ({...d, ID: String(d.ID), Parent_ID: d.Parent_ID ? String(d.Parent_ID) : null})) as FlatOrgUnit[];
+      setFlatOrgUnits(flatData);
+
+      // Find the root "Med Group"
+      const medGroupRoot = flatData.find(item => String(item.ID) === "1");
+      if (medGroupRoot) {
+        const hierarchy = [{
+            id: String(medGroupRoot.ID),
+            name: medGroupRoot.Department,
+            loai: medGroupRoot.Loai,
+            parent_id: medGroupRoot.Parent_ID ? String(medGroupRoot.Parent_ID) : null,
+            children: buildTree(flatData, String(medGroupRoot.ID))
+        }];
+        setOrgHierarchyData(hierarchy);
+      } else {
+        // Fallback if Med Group ID=1 is not found, try to build from items with Parent_ID null
+        // This might not be ideal if Med Group is expected as the single root.
+        const rootItems = flatData.filter(item => !item.Parent_ID);
+        const hierarchy = rootItems.map(item => ({
+            id: String(item.ID),
+            name: item.Department,
+            loai: item.Loai,
+            parent_id: null,
+            children: buildTree(flatData, String(item.ID))
+        })).sort((a,b) => a.name.localeCompare(b.name));
+        setOrgHierarchyData(hierarchy);
+        if (hierarchy.length === 0 && flatData.length > 0) {
+             setOrgHierarchyError("Không tìm thấy đơn vị gốc (ID=1) hoặc đơn vị nào không có Parent_ID. Kiểm tra dữ liệu `MS_Org_Diadiem`.");
+        } else if (flatData.length === 0) {
+             setOrgHierarchyData([]); // No data, no hierarchy
+        }
+      }
+
+    } catch (err: any) {
+      console.error("Error fetching/building org hierarchy:", err);
+      const errorMessage = err.message || "Không thể tải dữ liệu cơ cấu tổ chức.";
+      setOrgHierarchyError(errorMessage);
+      toast({
+        title: "Lỗi Tải Cơ Cấu Tổ Chức",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingOrgHierarchy(false);
+    }
+  }, [activeView, toast]);
+
 
   useEffect(() => {
     if (activeView === 'dashboard') {
       fetchDistinctYears();
       fetchLocationFilterOptions();
+      fetchAndBuildOrgHierarchy();
     }
-  }, [activeView, fetchDistinctYears, fetchLocationFilterOptions]);
+  }, [activeView, fetchDistinctYears, fetchLocationFilterOptions, fetchAndBuildOrgHierarchy]);
+
+  const finalSelectedDepartmentNames = useMemo(() => {
+    const namesFromLoaiFilter = new Set(selectedDepartmentsByLoai.map(id => id.split('__')[1]));
+    
+    const namesFromOrgFilter = new Set<string>();
+    if (selectedOrgUnitIds.length > 0 && flatOrgUnits.length > 0) {
+        selectedOrgUnitIds.forEach(id => {
+            const unit = flatOrgUnits.find(u => String(u.ID) === String(id));
+            if (unit && unit.Department) {
+                namesFromOrgFilter.add(unit.Department);
+            }
+        });
+    }
+    
+    // Combine both sets
+    const combined = new Set([...namesFromLoaiFilter, ...namesFromOrgFilter]);
+    return Array.from(combined);
+  }, [selectedDepartmentsByLoai, selectedOrgUnitIds, flatOrgUnits]);
 
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -414,9 +527,9 @@ export default function WorkspaceContent() {
     return `${yearText} - ${monthText}`;
   };
 
-  const handleDepartmentSelection = (loai: string, department: string, checked: boolean) => {
+  const handleDepartmentByLoaiSelection = (loai: string, department: string, checked: boolean) => {
     const departmentIdentifier = `${loai}__${department}`;
-    setSelectedDepartments(prev => {
+    setSelectedDepartmentsByLoai(prev => {
       const newSelected = new Set(prev);
       if (checked) {
         newSelected.add(departmentIdentifier);
@@ -431,7 +544,7 @@ export default function WorkspaceContent() {
     const departmentsInLoai = availableDepartmentsByLoai[loai] || [];
     const departmentIdentifiersInLoai = departmentsInLoai.map(dept => `${loai}__${dept}`);
 
-    setSelectedDepartments(prev => {
+    setSelectedDepartmentsByLoai(prev => {
       const newSelected = new Set(prev);
       if (checked) {
         departmentIdentifiersInLoai.forEach(id => newSelected.add(id));
@@ -445,22 +558,22 @@ export default function WorkspaceContent() {
   const areAllDepartmentsSelectedForLoai = (loai: string): boolean => {
     const departmentsInLoai = availableDepartmentsByLoai[loai] || [];
     if (departmentsInLoai.length === 0) return false;
-    return departmentsInLoai.every(dept => selectedDepartments.includes(`${loai}__${dept}`));
+    return departmentsInLoai.every(dept => selectedDepartmentsByLoai.includes(`${loai}__${dept}`));
   };
 
   const getLocationFilterButtonLabel = () => {
-    if (selectedDepartments.length === 0) {
+    if (selectedDepartmentsByLoai.length === 0) {
       return "Tất cả địa điểm";
     }
 
     const activeLoai = new Set<string>();
-    selectedDepartments.forEach(deptId => {
+    selectedDepartmentsByLoai.forEach(deptId => {
       const [loai] = deptId.split('__');
       activeLoai.add(loai);
     });
 
     const loaiCount = activeLoai.size;
-    const deptCount = selectedDepartments.length;
+    const deptCount = selectedDepartmentsByLoai.length;
 
     let label = "";
     if (loaiCount > 0) {
@@ -632,7 +745,7 @@ export default function WorkspaceContent() {
                       <DropdownMenuTrigger asChild>
                         <Button variant="outline" className="h-9 text-sm min-w-[200px] justify-between px-3">
                           <div className="flex items-center gap-1.5 truncate">
-                            <FilterIcon className="h-3.5 w-3.5 opacity-80 shrink-0" />
+                            <FilterIconLucide className="h-3.5 w-3.5 opacity-80 shrink-0" />
                             <span className="truncate" title={getTimeFilterButtonLabel()}>{getTimeFilterButtonLabel()}</span>
                           </div>
                           <ChevronDown className="ml-1 h-4 w-4 opacity-50 shrink-0" />
@@ -756,7 +869,7 @@ export default function WorkspaceContent() {
                         </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent className="w-[320px]" align="end">
-                        <DropdownMenuLabel className="text-sm">Lọc theo Địa Điểm</DropdownMenuLabel>
+                        <DropdownMenuLabel className="text-sm">Lọc theo Địa Điểm (Loại/Phòng ban)</DropdownMenuLabel>
                         <DMSR />
                         {isLoadingLocationFilters && (
                             <div className="px-2 py-4 text-center text-xs text-muted-foreground">
@@ -805,8 +918,8 @@ export default function WorkspaceContent() {
                                         {(availableDepartmentsByLoai[loai] || []).map((dept) => (
                                             <DropdownMenuCheckboxItem
                                             key={`${loai}-${dept}`}
-                                            checked={selectedDepartments.includes(`${loai}__${dept}`)}
-                                            onCheckedChange={(checked) => handleDepartmentSelection(loai, dept, checked as boolean)}
+                                            checked={selectedDepartmentsByLoai.includes(`${loai}__${dept}`)}
+                                            onCheckedChange={(checked) => handleDepartmentByLoaiSelection(loai, dept, checked as boolean)}
                                             onSelect={(e) => e.preventDefault()}
                                             className="text-xs"
                                             >
@@ -827,6 +940,14 @@ export default function WorkspaceContent() {
                         )}
                         </DropdownMenuContent>
                     </DropdownMenu>
+                    <HierarchicalOrgFilter
+                        hierarchy={orgHierarchyData}
+                        selectedIds={selectedOrgUnitIds}
+                        onSelectionChange={setSelectedOrgUnitIds}
+                        isLoading={isLoadingOrgHierarchy}
+                        error={orgHierarchyError}
+                        triggerButtonLabel="Cơ Cấu Tổ Chức"
+                    />
                   </div>
                 </div>
               </CardHeader>
@@ -850,33 +971,33 @@ export default function WorkspaceContent() {
                   </div>
                   <TabsContent value="payrollOverview" className="flex-grow overflow-y-auto space-y-3 mt-2">
                     <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-                        <TotalSalaryCard selectedMonths={selectedMonths} selectedYear={selectedYear} selectedDepartments={selectedDepartments} />
-                        <TotalSalaryParttimeCard selectedMonths={selectedMonths} selectedYear={selectedYear} selectedDepartments={selectedDepartments} />
-                        <RevenueCard selectedMonths={selectedMonths} selectedYear={selectedYear} selectedDepartments={selectedDepartments} />
-                        <SalaryToRevenueRatioCard selectedMonths={selectedMonths} selectedYear={selectedYear} selectedDepartments={selectedDepartments} />
+                        <TotalSalaryCard selectedMonths={selectedMonths} selectedYear={selectedYear} selectedDepartments={finalSelectedDepartmentNames} />
+                        <TotalSalaryParttimeCard selectedMonths={selectedMonths} selectedYear={selectedYear} selectedDepartments={finalSelectedDepartmentNames} />
+                        <RevenueCard selectedMonths={selectedMonths} selectedYear={selectedYear} selectedDepartments={finalSelectedDepartmentNames} />
+                        <SalaryToRevenueRatioCard selectedMonths={selectedMonths} selectedYear={selectedYear} selectedDepartments={finalSelectedDepartmentNames} />
                     </div>
                     <div className="grid grid-cols-1 gap-3">
-                        <CombinedMonthlyTrendChart selectedYear={selectedYear} selectedMonths={selectedMonths} selectedDepartments={selectedDepartments} />
+                        <CombinedMonthlyTrendChart selectedYear={selectedYear} selectedMonths={selectedMonths} selectedDepartments={finalSelectedDepartmentNames} />
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <div className="md:col-span-1">
-                           <SalaryProportionPieChart selectedMonths={selectedMonths} selectedYear={selectedYear} selectedDepartments={selectedDepartments} />
+                           <SalaryProportionPieChart selectedMonths={selectedMonths} selectedYear={selectedYear} selectedDepartments={finalSelectedDepartmentNames} />
                         </div>
                         <div className="md:col-span-2">
-                           <LocationSalaryRevenueColumnChart selectedMonths={selectedMonths} selectedYear={selectedYear} selectedDepartments={selectedDepartments} />
+                           <LocationSalaryRevenueColumnChart selectedMonths={selectedMonths} selectedYear={selectedYear} selectedDepartments={finalSelectedDepartmentNames} />
                         </div>
                     </div>
                   </TabsContent>
                   <TabsContent value="comparison" className="flex-grow overflow-y-auto space-y-3 mt-2">
                     <div className="grid gap-3 md:grid-cols-5">
-                        <ComparisonFulltimeSalaryCard selectedMonths={selectedMonths} selectedDepartments={selectedDepartments} />
-                        <ComparisonParttimeSalaryCard selectedMonths={selectedMonths} selectedDepartments={selectedDepartments} />
-                        <ComparisonCombinedSalaryCard selectedMonths={selectedMonths} selectedDepartments={selectedDepartments} />
-                        <ComparisonRevenueCard selectedMonths={selectedMonths} selectedDepartments={selectedDepartments} />
-                        <ComparisonSalaryRevenueRatioCard selectedMonths={selectedMonths} selectedDepartments={selectedDepartments} />
+                        <ComparisonFulltimeSalaryCard selectedMonths={selectedMonths} selectedDepartments={finalSelectedDepartmentNames} />
+                        <ComparisonParttimeSalaryCard selectedMonths={selectedMonths} selectedDepartments={finalSelectedDepartmentNames} />
+                        <ComparisonCombinedSalaryCard selectedMonths={selectedMonths} selectedDepartments={finalSelectedDepartmentNames} />
+                        <ComparisonRevenueCard selectedMonths={selectedMonths} selectedDepartments={finalSelectedDepartmentNames} />
+                        <ComparisonSalaryRevenueRatioCard selectedMonths={selectedMonths} selectedDepartments={finalSelectedDepartmentNames} />
                     </div>
                     <NganhDocComparisonTable selectedMonths={selectedMonths} />
-                    <LocationComparisonTable selectedMonths={selectedMonths} selectedDepartments={selectedDepartments} />
+                    <LocationComparisonTable selectedMonths={selectedMonths} selectedDepartments={finalSelectedDepartmentNames} />
                   </TabsContent>
                    <TabsContent value="kpiComparison" className="flex-grow overflow-y-auto space-y-3 mt-2">
                     <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-6">
@@ -903,7 +1024,3 @@ export default function WorkspaceContent() {
     </SidebarProvider>
   );
 }
-
-    
-
-    
