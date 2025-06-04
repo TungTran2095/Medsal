@@ -7,8 +7,6 @@ import { Loader2, AlertTriangle, TrendingUp, TrendingDown, Minus, Percent, Bankn
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from '@/components/ui/scroll-area';
-// Button is not used here, but kept for potential future use like export.
-// import { Button } from '@/components/ui/button';
 import { cn } from "@/lib/utils";
 
 interface LocationComparisonTableProps {
@@ -35,7 +33,6 @@ interface MergedComparisonData {
   total_revenue_2025: number;
   ratio_2024: number | null;
   ratio_2025: number | null;
-  // Calculated fields for sorting by change
   ft_salary_change_val: number | null;
   pt_salary_change_val: number | null;
   total_salary_change_val: number | null;
@@ -59,14 +56,19 @@ type SortableColumnKey =
   | 'total_revenue_2024' | 'total_revenue_2025' | 'revenue_change_val'
   | 'ratio_2024' | 'ratio_2025' | 'ratio_change_pp_val';
 
-
-// Helper function to calculate change, handling division by zero
 const calculateChange = (valNew: number, valOld: number): number | null => {
     if (valOld === 0 && valNew === 0) return 0;
-    if (valOld === 0) return valNew > 0 ? Infinity : (valNew < 0 ? -Infinity : 0); // Or simply Infinity if valNew is not 0
+    if (valOld === 0) return valNew > 0 ? Infinity : (valNew < 0 ? -Infinity : 0); 
     if (valNew === null || valOld === null) return null;
     return (valNew - valOld) / valOld;
 };
+
+const EXCLUDED_LOCATIONS: string[] = [
+  "#N/A", "0", "Med An Giang", "Med BR-VT", "Med Group", 
+  "Medlatec Group", "Med Kiên Giang", "Med Long An", "Med Mê Linh", 
+  "Med Ba Đình", "Med Thanh Xuân", "Med Tây Hồ", "Med Cầu giấy", 
+  "Medim", "Med Sơn Tây", "Medcom", "Medicons", "Medon"
+];
 
 
 export default function LocationComparisonTable({ selectedMonths, selectedDepartments }: LocationComparisonTableProps) {
@@ -207,9 +209,10 @@ export default function LocationComparisonTable({ selectedMonths, selectedDepart
             ratio_change_pp_val: (r_2025 !== null && r_2024 !== null) ? r_2025 - r_2024 : null,
         };
       }).filter(d => 
-        d.ft_salary_2024 !== 0 || d.ft_salary_2025 !== 0 ||
+        (d.ft_salary_2024 !== 0 || d.ft_salary_2025 !== 0 ||
         d.pt_salary_2024 !== 0 || d.pt_salary_2025 !== 0 ||
-        d.total_revenue_2024 !== 0 || d.total_revenue_2025 !== 0
+        d.total_revenue_2024 !== 0 || d.total_revenue_2025 !== 0) &&
+        !EXCLUDED_LOCATIONS.includes(d.location_name) // Added exclusion filter
       );
 
       setComparisonData(rawFinalData);
@@ -243,8 +246,8 @@ export default function LocationComparisonTable({ selectedMonths, selectedDepart
         const valB = b[sortConfig.key!];
 
         if (valA === null && valB === null) return 0;
-        if (valA === null) return sortConfig.direction === 'ascending' ? -1 : 1; // Nulls first on ascending
-        if (valB === null) return sortConfig.direction === 'ascending' ? 1 : -1; // Nulls first on ascending
+        if (valA === null) return sortConfig.direction === 'ascending' ? -1 : 1; 
+        if (valB === null) return sortConfig.direction === 'ascending' ? 1 : -1; 
         
         if (valA === Infinity) return sortConfig.direction === 'ascending' ? 1 : -1;
         if (valB === Infinity) return sortConfig.direction === 'ascending' ? -1 : 1;
@@ -382,7 +385,7 @@ export default function LocationComparisonTable({ selectedMonths, selectedDepart
             </CardDescription>
         </CardHeader>
          <CardContent className="pt-2 flex items-center justify-center flex-grow">
-           <p className="text-sm text-muted-foreground">Không có dữ liệu địa điểm nào cho kỳ đã chọn.</p>
+           <p className="text-sm text-muted-foreground">Không có dữ liệu địa điểm nào cho kỳ đã chọn hoặc sau khi loại trừ các địa điểm không cần thiết.</p>
          </CardContent>
        </Card>
     );
@@ -393,7 +396,7 @@ export default function LocationComparisonTable({ selectedMonths, selectedDepart
       <CardHeader className="pb-2 pt-3">
         <CardTitle className="text-base font-semibold flex items-center gap-1.5"><GanttChartSquare className="h-4 w-4 text-primary" />Bảng So Sánh Chi Tiết Theo Địa Điểm</CardTitle>
         <CardDescription className="text-xs truncate">
-            {filterDescription}.
+            {filterDescription}. Một số địa điểm không hoạt động hoặc thuộc nhóm tổng công ty đã được loại trừ.
         </CardDescription>
       </CardHeader>
       <CardContent className="pt-2 flex-grow overflow-hidden flex flex-col">
