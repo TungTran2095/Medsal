@@ -250,11 +250,9 @@ export default function WorkspaceContent() {
     setFlatOrgUnits([]);
 
     try {
-      // Use MS_Org_nganhdoc instead of MS_Org_Diadiem
-      // Assuming MS_Org_nganhdoc has ID, Parent_ID, Department (or equivalent name), Loai (or equivalent type)
       const { data, error } = await supabase
-        .from('MS_Org_nganhdoc') // Changed table name
-        .select('ID, Parent_ID, Department, Loai'); // Adjust columns if different in MS_Org_nganhdoc
+        .from('"MS_Org_nganhdoc"') // Use quoted table name
+        .select('ID, Parent_ID, Department, Loai');
 
       if (error) {
         if (String(error.message).toLowerCase().includes("ms_org_nganhdoc") && String(error.message).toLowerCase().includes("does not exist")) {
@@ -270,8 +268,8 @@ export default function WorkspaceContent() {
       if (medGroupRoot) {
         const hierarchy = [{
             id: String(medGroupRoot.ID),
-            name: medGroupRoot.Department, // Ensure this column exists in MS_Org_nganhdoc or change to the correct one
-            loai: medGroupRoot.Loai, // Ensure this column exists
+            name: medGroupRoot.Department,
+            loai: medGroupRoot.Loai,
             parent_id: medGroupRoot.Parent_ID ? String(medGroupRoot.Parent_ID) : null,
             children: buildTree(flatData, String(medGroupRoot.ID))
         }];
@@ -280,8 +278,8 @@ export default function WorkspaceContent() {
         const rootItems = flatData.filter(item => !item.Parent_ID);
         const hierarchy = rootItems.map(item => ({
             id: String(item.ID),
-            name: item.Department, // Ensure this column exists
-            loai: item.Loai, // Ensure this column exists
+            name: item.Department,
+            loai: item.Loai,
             parent_id: null,
             children: buildTree(flatData, String(item.ID))
         })).sort((a,b) => a.name.localeCompare(b.name));
@@ -323,7 +321,7 @@ export default function WorkspaceContent() {
     if (selectedOrgUnitIds.length > 0 && flatOrgUnits.length > 0) {
         selectedOrgUnitIds.forEach(id => {
             const unit = flatOrgUnits.find(u => String(u.ID) === String(id));
-            if (unit && unit.Department) { // Ensure Department field is used here
+            if (unit && unit.Department) {
                 namesFromOrgFilter.add(unit.Department);
             }
         });
