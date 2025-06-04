@@ -116,17 +116,16 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
     }
     // Note: This chart's RPC 'get_salary_revenue_ratio_components_by_location' uses p_filter_locations, which corresponds to dia_diem/Don vi/Ten don vi.
     // It does not currently support filtering by nganh_doc or Don_vi_2 directly at the RPC level for ratio components.
-    // If nganh_doc/Don_vi_2 filtering is needed here, the RPC itself would need significant changes to incorporate these different grouping/filtering dimensions.
-    // For now, nganh_doc and don_vi_2 selections will effectively narrow down the *input data* to the RPC if other cards/charts filter by them, but this chart's RPC won't use them directly.
-    // We will only use selectedDepartmentsForDiadiem for the p_filter_locations parameter.
-    if (appliedFilters.length > 0) locationSegment = appliedFilters.join(' và ');
-    else if (selectedNganhDoc && selectedNganhDoc.length > 0) { // If only nganh_doc is selected, describe it
-      locationSegment = selectedNganhDoc.length <=2 ? selectedNganhDoc.join(' & ') : `${selectedNganhDoc.length} ngành dọc`;
-    } else if (selectedDonVi2 && selectedDonVi2.length > 0) { // If only don_vi_2 is selected
-      locationSegment = selectedDonVi2.length <=2 ? selectedDonVi2.join(' & ') : `${selectedDonVi2.length} đơn vị 2`;
+    // For now, selectedNganhDoc and selectedDonVi2 primarily affect the filterDescription.
+    if (selectedNganhDoc && selectedNganhDoc.length > 0) { 
+      appliedFilters.push(selectedNganhDoc.length <=2 ? selectedNganhDoc.join(' & ') : `${selectedNganhDoc.length} ngành dọc`);
+    }
+    if (selectedDonVi2 && selectedDonVi2.length > 0) { 
+      appliedFilters.push(selectedDonVi2.length <=2 ? selectedDonVi2.join(' & ') : `${selectedDonVi2.length} đơn vị 2`);
     }
 
-
+    if (appliedFilters.length > 0) locationSegment = appliedFilters.join(' và ');
+    
     finalFilterDescription = selectedYear 
       ? `${monthSegment} của ${yearSegment} tại ${locationSegment}` 
       : (selectedMonths && selectedMonths.length > 0 && selectedMonths.length < 12) 
@@ -137,10 +136,9 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
     const rpcArgs = {
       p_filter_year: selectedYear,
       p_filter_months: (selectedMonths && selectedMonths.length > 0) ? selectedMonths : null,
-      // IMPORTANT: This RPC uses p_filter_locations for department names from MS_Org_Diadiem, Fulltime.dia_diem, Parttime."Don vi", Doanh_thu."Ten don vi"
-      // It does NOT currently take separate p_filter_nganh_docs or p_filter_donvi2.
-      // Passing selectedNganhDoc or selectedDonVi2 here would be incorrect unless the RPC is redesigned.
       p_filter_locations: (selectedDepartmentsForDiadiem && selectedDepartmentsForDiadiem.length > 0) ? selectedDepartmentsForDiadiem : null,
+      // p_filter_nganh_docs: (selectedNganhDoc && selectedNganhDoc.length > 0) ? selectedNganhDoc : null, // Not used by current RPC
+      // p_filter_donvi2: (selectedDonVi2 && selectedDonVi2.length > 0) ? selectedDonVi2 : null,         // Not used by current RPC
     };
 
     try {
@@ -154,14 +152,16 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
         if (rpcMessageText.includes('relation "fulltime" does not exist')) { setupErrorDetails += " Bảng 'Fulltime' không tồn tại."; isCriticalSetupError = true; }
         if (rpcMessageText.includes('relation "parttime" does not exist')) { setupErrorDetails += " Bảng 'Parttime' không tồn tại."; isCriticalSetupError = true; }
         if (rpcMessageText.includes('relation "doanh_thu" does not exist')) { setupErrorDetails += " Bảng 'Doanh_thu' không tồn tại."; isCriticalSetupError = true; }
-        // Check for p_filter_nganh_docs or p_filter_donvi2 if we were to add them. For now, this check is for p_filter_locations.
+        
         if (rpcMessageText.includes('p_filter_locations') && rpcMessageText.includes('does not exist')) { setupErrorDetails += " Hàm RPC có thể chưa được cập nhật để nhận 'p_filter_locations TEXT[]'."; isCriticalSetupError = true;}
+        // Add checks for p_filter_nganh_docs or p_filter_donvi2 if the RPC is ever updated to use them
+        // e.g., if (rpcMessageText.includes('p_filter_nganh_docs') && rpcMessageText.includes('does not exist')) { ... }
 
 
         if (isCriticalSetupError) {
           let detailedGuidance = `${CRITICAL_SETUP_ERROR_PREFIX} Lỗi với hàm RPC '${functionName}' hoặc các bảng/cột phụ thuộc. Chi tiết:${setupErrorDetails.trim()}`;
             detailedGuidance += `\n\nVui lòng kiểm tra và đảm bảo các mục sau theo README.md:`;
-            detailedGuidance += `\n1. Hàm RPC '${functionName}' được tạo đúng trong Supabase và đã được cập nhật để nhận tham số 'p_filter_locations TEXT[]'.`;
+            detailedGuidance += `\n1. Hàm RPC '${functionName}' được tạo đúng trong Supabase và đã được cập nhật để nhận các tham số lọc cần thiết (ví dụ: 'p_filter_locations TEXT[]').`;
             detailedGuidance += `\n2. Các bảng 'Fulltime', 'Parttime', 'Doanh_thu' tồn tại với đúng tên và các cột cần thiết.`;
            throw new Error(detailedGuidance);
         }
@@ -182,12 +182,33 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
       setChartData(filteredData);
 
     } catch (err: any) {
-      setError(err.message || 'Không thể tải dữ liệu tỷ lệ theo địa điểm.');
-      console.error("Error fetching location salary/revenue ratio:", err);
+      let errorMessage = 'Không thể tải dữ liệu tỷ lệ theo địa điểm.';
+      if (err && typeof err === 'object') {
+          if (err.message) {
+              errorMessage = err.message;
+          } else if (err.details) {
+              errorMessage = `Lỗi chi tiết: ${err.details}`;
+          } else if (err.code) {
+              errorMessage = `Lỗi RPC với mã: ${err.code}`;
+          } else {
+              try {
+                  const stringifiedError = JSON.stringify(err);
+                  if (stringifiedError !== '{}') { // Avoid setting "{}" as error message
+                      errorMessage = `Lỗi không xác định: ${stringifiedError}`;
+                  }
+              } catch (e) {
+                  // Ignore stringification error, keep default message
+              }
+          }
+      } else if (typeof err === 'string') {
+          errorMessage = err;
+      }
+      setError(errorMessage);
+      console.error("Error fetching location salary/revenue ratio (raw):", err, "Stringified:", JSON.stringify(err, Object.getOwnPropertyNames(err), 2));
     } finally {
       setIsLoading(false);
     }
-  }, [selectedYear, selectedMonths, selectedDepartmentsForDiadiem, selectedNganhDoc, selectedDonVi2]); // Added new filters to dependency array
+  }, [selectedYear, selectedMonths, selectedDepartmentsForDiadiem, selectedNganhDoc, selectedDonVi2]); 
 
   useEffect(() => {
     fetchData();
@@ -302,3 +323,4 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
     </Card>
   );
 }
+
