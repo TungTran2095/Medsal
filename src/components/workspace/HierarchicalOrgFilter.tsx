@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import type { OrgNode } from '@/types';
 import { Button } from "@/components/ui/button";
 import {
@@ -12,8 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-// ScrollArea is removed to use native scroll
-import { ChevronDown, Filter, Loader2, AlertTriangle } from 'lucide-react';
+import { ChevronDown, Filter, Loader2, AlertTriangle, ChevronRight } from 'lucide-react'; // Added ChevronRight
 import { cn } from '@/lib/utils';
 
 interface HierarchicalOrgFilterProps {
@@ -34,27 +33,59 @@ interface OrgCheckboxItemProps {
 
 const OrgCheckboxSubItem: React.FC<OrgCheckboxItemProps> = ({ node, level, selectedIds, onToggle }) => {
   const isSelected = selectedIds.includes(node.id);
+  const [isExpanded, setIsExpanded] = useState(false); // Default to collapsed
+  const hasChildren = node.children && node.children.length > 0;
+
+  const handleExpandToggle = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent checkbox toggle when clicking expander
+    if (hasChildren) {
+      setIsExpanded(!isExpanded);
+    }
+  };
+
+  // Calculate base padding for the entire item based on level for indentation
+  const baseIndentPadding = `${0.5 + level * 1.25}rem`; // Start with 0.5rem for top level, then indent further
 
   return (
     <>
-      <DropdownMenuCheckboxItem
-        checked={isSelected}
-        onCheckedChange={(checked) => onToggle(node.id, checked as boolean)}
-        onSelect={(e) => e.preventDefault()} 
-        className="text-xs py-1.5"
-        style={{ paddingLeft: `${1 + level * 1.25}rem` }}
+      <div 
+        className="flex items-center w-full text-xs" 
+        style={{ paddingLeft: baseIndentPadding }}
       >
-        <span className="truncate" title={node.name}>
-          {node.name}
-        </span>
-      </DropdownMenuCheckboxItem>
-      {node.children && node.children.length > 0 && (
+        {hasChildren ? (
+          <button
+            type="button"
+            onClick={handleExpandToggle}
+            className="p-0.5 rounded hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring mr-1 shrink-0"
+            aria-expanded={isExpanded}
+            title={isExpanded ? "Thu gọn" : "Mở rộng"}
+          >
+            {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+          </button>
+        ) : (
+          // Placeholder to maintain alignment for items without children (same width as button)
+          <span className="w-[calc(0.875rem+0.125rem)] mr-1 shrink-0"></span> // approx (h-3.5) + padding + margin-right
+        )}
+        <DropdownMenuCheckboxItem
+          checked={isSelected}
+          onCheckedChange={(checked) => onToggle(node.id, checked as boolean)}
+          onSelect={(e) => e.preventDefault()} // Prevent menu close on item select
+          className="text-xs py-1.5 flex-grow !pl-2" // Override default pl-8, use !pl-2 for consistent padding near checkbox
+                                                 // flex-grow allows it to take remaining space
+        >
+          <span className="truncate" title={node.name}>
+            {node.name}
+          </span>
+        </DropdownMenuCheckboxItem>
+      </div>
+
+      {isExpanded && hasChildren && (
         <>
           {node.children.map(childNode => (
             <OrgCheckboxSubItem
               key={childNode.id}
               node={childNode}
-              level={level + 1}
+              level={level + 1} // Children are one level deeper
               selectedIds={selectedIds}
               onToggle={onToggle}
             />
@@ -139,7 +170,7 @@ export default function HierarchicalOrgFilter({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent 
-        className="w-[350px] p-0 flex flex-col max-h-[450px]"
+        className="w-[350px] p-0 flex flex-col max-h-[450px]" // Set max height for the whole dropdown
         align="end"
       >
         <div className="p-2 border-b shrink-0"> {/* Header section */}
@@ -150,7 +181,7 @@ export default function HierarchicalOrgFilter({
         </div>
         
         {/* This div will handle the scrolling for the list content */}
-        <div className="flex-grow min-h-0 overflow-y-auto">
+        <div className="flex-grow min-h-0 overflow-y-auto"> {/* Apply scroll to this container */}
           <div className="p-2"> {/* Padding for the actual list content */}
             {error && (
               <div className="p-2 text-xs text-destructive bg-destructive/10 m-1 rounded-sm flex items-center gap-1.5">
@@ -175,7 +206,7 @@ export default function HierarchicalOrgFilter({
                   <OrgCheckboxSubItem
                     key={node.id}
                     node={node}
-                    level={0}
+                    level={0} // Start top-level nodes at level 0
                     selectedIds={selectedIds}
                     onToggle={handleToggle}
                   />
