@@ -8,17 +8,15 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from "@/lib/utils";
-// Assuming these tools are created as discussed
-// import { getNganhDocFTSalaryHanoiTool, getDonVi2PTSalaryTool } from '@/ai/tools/dashboardQueryTools';
 
 interface NganhDocMetric {
-  key: string; // This will be either nganh_doc_key or don_vi_2_key
+  key: string; 
   ft_salary?: number;
   pt_salary?: number;
 }
 
 interface MergedNganhDocData {
-  grouping_key: string; // This is the unified key from nganh_doc or Don_vi_2
+  grouping_key: string; 
   ft_salary_2024: number;
   ft_salary_2025: number;
   pt_salary_2024: number;
@@ -54,7 +52,6 @@ const calculateChange = (valNew: number | null, valOld: number | null): number |
 
 interface NganhDocComparisonTableProps {
   selectedMonths?: number[];
-  // selectedYear is not directly used as this table compares 2024 vs 2025
 }
 
 
@@ -75,39 +72,37 @@ export default function NganhDocComparisonTable({ selectedMonths }: NganhDocComp
       p_filter_months: (selectedMonths && selectedMonths.length > 0) ? selectedMonths : null,
     };
 
-    // Fetch Full-time Salary (Hanoi, by nganh_doc)
     try {
       const ftFunctionName = 'get_nganhdoc_ft_salary_hanoi';
       const { data: ftRpcData, error: ftRpcError } = await supabase.rpc(ftFunctionName, rpcArgs);
       if (ftRpcError) {
         const msg = ftRpcError.message ? String(ftRpcError.message).toLowerCase() : '';
-        yearError = { type: (ftRpcError.code === '42883' || msg.includes(ftFunctionName.toLowerCase())) ? 'rpcMissing' : 'generic', message: `Lỗi RPC (${ftFunctionName}, ${year}): ${ftRpcError.message}` };
+        yearError = { type: (ftRpcError.code === '42883' || msg.includes(ftFunctionName.toLowerCase()) || (msg.includes(ftFunctionName.toLowerCase()) && msg.includes('does not exist')) ) ? 'rpcMissing' : 'generic', message: `Lỗi RPC (${ftFunctionName}, ${year}): ${ftRpcError.message}` };
       } else {
-        ftSalaryData = (ftRpcData || []).map((item: any) => ({
+        ftSalaryData = (Array.isArray(ftRpcData) ? ftRpcData : []).map((item: any) => ({
           key: String(item.nganh_doc_key),
           ft_salary: Number(item.ft_salary) || 0,
         }));
       }
     } catch (e: any) {
-      if (!yearError) yearError = { type: 'generic', message: `Lỗi không xác định (FT, ${year}): ${e.message}` };
+      if (!yearError) yearError = { type: 'generic', message: `Lỗi không xác định khi gọi RPC Lương FT (năm ${year}): ${e.message}` };
     }
 
-    // Fetch Part-time Salary (by Don_vi_2)
-    if (!yearError) { // Only proceed if no error from FT fetch for this year
+    if (!yearError) { 
         try {
             const ptFunctionName = 'get_donvi2_pt_salary';
             const { data: ptRpcData, error: ptRpcError } = await supabase.rpc(ptFunctionName, rpcArgs);
             if (ptRpcError) {
-            const msg = ptRpcError.message ? String(ptRpcError.message).toLowerCase() : '';
-            yearError = { type: (ptRpcError.code === '42883' || msg.includes(ptFunctionName.toLowerCase())) ? 'rpcMissing' : 'generic', message: `Lỗi RPC (${ptFunctionName}, ${year}): ${ptRpcError.message}` };
+                const msg = ptRpcError.message ? String(ptRpcError.message).toLowerCase() : '';
+                yearError = { type: (ptRpcError.code === '42883' || msg.includes(ptFunctionName.toLowerCase()) || (msg.includes(ptFunctionName.toLowerCase()) && msg.includes('does not exist')) ) ? 'rpcMissing' : 'generic', message: `Lỗi RPC (${ptFunctionName}, ${year}): ${ptRpcError.message}` };
             } else {
-            ptSalaryData = (ptRpcData || []).map((item: any) => ({
-                key: String(item.don_vi_2_key),
-                pt_salary: Number(item.pt_salary) || 0,
-            }));
+                ptSalaryData = (Array.isArray(ptRpcData) ? ptRpcData : []).map((item: any) => ({
+                    key: String(item.don_vi_2_key),
+                    pt_salary: Number(item.pt_salary) || 0,
+                }));
             }
         } catch (e: any) {
-            if (!yearError) yearError = { type: 'generic', message: `Lỗi không xác định (PT, ${year}): ${e.message}` };
+            if (!yearError) yearError = { type: 'generic', message: `Lỗi không xác định khi gọi RPC Lương PT (năm ${year}): ${e.message}` };
         }
     }
     
@@ -159,7 +154,7 @@ export default function NganhDocComparisonTable({ selectedMonths }: NganhDocComp
         const pt2025 = data2025Result.ptData.find(d => d.key === key)?.pt_salary || 0;
 
         if (ft2024 === 0 && pt2024 === 0 && ft2025 === 0 && pt2025 === 0) {
-            return; // Skip if all values are zero for this key
+            return; 
         }
 
         mergedMap.set(key, {
@@ -170,7 +165,7 @@ export default function NganhDocComparisonTable({ selectedMonths }: NganhDocComp
             ft_salary_2025: ft2025,
             pt_salary_2025: pt2025,
             total_salary_2025: ft2025 + pt2025,
-            ft_salary_change_val: null, // Will be calculated next
+            ft_salary_change_val: null, 
             pt_salary_change_val: null,
             total_salary_change_val: null,
         });
@@ -320,9 +315,9 @@ export default function NganhDocComparisonTable({ selectedMonths }: NganhDocComp
         </CardHeader>
         <CardContent className="pt-2 flex-grow">
            <p className="text-xs text-destructive whitespace-pre-line">{error.message}</p>
-            {(error.message.includes(CRITICAL_SETUP_ERROR_PREFIX) || error.type === 'rpcMissing' || error.message.includes("RPC")) && (
+            {(error.message.includes(CRITICAL_SETUP_ERROR_PREFIX) || error.type === 'rpcMissing' || error.message.toLowerCase().includes("does not exist") || error.message.includes("RPC")) && (
                 <p className="text-xs text-muted-foreground mt-1 whitespace-pre-line">
-                  Đây là một lỗi cấu hình quan trọng. Vui lòng kiểm tra kỹ các hàm RPC `get_nganhdoc_ft_salary_hanoi` và `get_donvi2_pt_salary` trong Supabase theo hướng dẫn tại README.md. Đảm bảo các bảng `Fulltime` (với cột `nganh_doc`, `hn_or_note`) và `Parttime` (với cột `Don_vi_2`) tồn tại.
+                  {CRITICAL_SETUP_ERROR_PREFIX} Đây là một lỗi cấu hình quan trọng. Vui lòng kiểm tra kỹ các hàm RPC `get_nganhdoc_ft_salary_hanoi` và `get_donvi2_pt_salary` trong Supabase theo hướng dẫn tại README.md. Đảm bảo các bảng `Fulltime` (với cột `nganh_doc`, `hn_or_note`) và `Parttime` (với cột `Don_vi_2`) tồn tại và có dữ liệu.
                 </p>
             )}
         </CardContent>
@@ -347,7 +342,7 @@ export default function NganhDocComparisonTable({ selectedMonths }: NganhDocComp
   }
 
   return (
-    <Card className="mt-4 flex-grow flex flex-col h-[500px]"> {/* Adjust height as needed */}
+    <Card className="mt-4 flex-grow flex flex-col h-[500px]">
       <CardHeader className="pb-2 pt-3">
         <CardTitle className="text-base font-semibold flex items-center gap-1.5"><BarChart3 className="h-4 w-4 text-primary" />Bảng so sánh theo Ngành dọc (Hà Nội FT) & Đơn vị 2 (PT)</CardTitle>
         <CardDescription className="text-xs truncate">
@@ -394,5 +389,7 @@ export default function NganhDocComparisonTable({ selectedMonths }: NganhDocComp
     </Card>
   );
 }
+
+    
 
     
