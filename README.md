@@ -21,7 +21,7 @@ To create these functions:
         *   Ensure your selection is exact.
         *   **Before clicking RUN, visually inspect the pasted code in the Supabase SQL Editor. If the editor has automatically added any comments (lines starting with `--`, like `-- source: dashboard...`) at the very end of the function block (especially after the `END;` line but before the final `$$;`), you MUST manually delete those comments from the editor before running the SQL. Otherwise, you will get an "unterminated dollar-quoted string" error.**
 5.  Click **Run** for each function.
-    *   **For `get_monthly_salary_trend_fulltime`, `get_monthly_salary_trend_parttime`, `get_monthly_revenue_trend`, `get_salary_revenue_ratio_components_by_location`, `get_location_comparison_metrics`, `get_nganhdoc_ft_salary_hanoi`, or `get_donvi2_pt_salary`**: If you encounter an error like "cannot change return type of existing function", you MUST first run `DROP FUNCTION function_name(parameters);` (e.g., `DROP FUNCTION get_monthly_salary_trend_fulltime(integer, text[]);` or `DROP FUNCTION get_location_comparison_metrics(integer, integer[], text[]);` or `DROP FUNCTION get_nganhdoc_ft_salary_hanoi(INTEGER, INTEGER[]);`) and then run the `CREATE OR REPLACE FUNCTION` script for it.
+    *   **For `get_monthly_salary_trend_fulltime`, `get_monthly_salary_trend_parttime`, `get_monthly_revenue_trend`, `get_salary_revenue_ratio_components_by_location`, `get_location_comparison_metrics`, `get_nganhdoc_ft_salary_hanoi`, or `get_donvi2_pt_salary`**: If you encounter an error like "cannot change return type of existing function" or "function with specified name and arguments already exists", you MUST first run `DROP FUNCTION function_name(parameters);` (e.g., `DROP FUNCTION get_monthly_salary_trend_fulltime(integer, text[], text[]);` or `DROP FUNCTION get_location_comparison_metrics(integer, integer[], text[]);` or `DROP FUNCTION get_nganhdoc_ft_salary_hanoi(INTEGER, INTEGER[]);`) and then run the `CREATE OR REPLACE FUNCTION` script for it.
 
 #### `get_public_tables`
 
@@ -41,48 +41,56 @@ $$;
 
 #### `get_total_salary_fulltime`
 
-This function is used by the Payroll Dashboard to calculate the total sum of `tong_thu_nhap` from the `Fulltime` table, with optional filters for a selected year, an array of months, and an array of location names. It correctly parses text-based month columns (e.g., "Tháng 01") into integers.
+This function is used by the Payroll Dashboard to calculate the total sum of `tong_thu_nhap` from the `Fulltime` table, with optional filters for a selected year, an array of months, an array of location names, and an array of `nganh_doc` names. It correctly parses text-based month columns (e.g., "Tháng 01") into integers.
 
 **SQL Code:**
 ```sql
-DROP FUNCTION IF EXISTS get_total_salary_fulltime(INTEGER, INTEGER[], TEXT[]);
+DROP FUNCTION IF EXISTS get_total_salary_fulltime(INTEGER, INTEGER[], TEXT[], TEXT[]);
 CREATE OR REPLACE FUNCTION get_total_salary_fulltime(
     filter_year INTEGER DEFAULT NULL,
     filter_months INTEGER[] DEFAULT NULL,
-    filter_locations TEXT[] DEFAULT NULL -- Added
+    filter_locations TEXT[] DEFAULT NULL,
+    filter_nganh_docs TEXT[] DEFAULT NULL -- Added
 )
 RETURNS DOUBLE PRECISION
 LANGUAGE SQL
 AS $$
   SELECT SUM(CAST(REPLACE(tong_thu_nhap::text, ',', '') AS DOUBLE PRECISION))
-  FROM "Fulltime"
-  WHERE (filter_year IS NULL OR nam::INTEGER = filter_year)
+  FROM "Fulltime" f -- Added alias f
+  WHERE (filter_year IS NULL OR f.nam::INTEGER = filter_year)
     AND (
         filter_months IS NULL OR
         array_length(filter_months, 1) IS NULL OR
         array_length(filter_months, 1) = 0 OR
-        regexp_replace(thang, '\D', '', 'g')::INTEGER = ANY(filter_months)
+        regexp_replace(f.thang, '\D', '', 'g')::INTEGER = ANY(filter_months)
     )
-    AND ( -- Added location filter
+    AND ( 
         filter_locations IS NULL OR
         array_length(filter_locations, 1) IS NULL OR
         array_length(filter_locations, 1) = 0 OR
-        dia_diem = ANY(filter_locations)
+        f.dia_diem = ANY(filter_locations)
+    )
+    AND ( -- Added nganh_doc filter
+        filter_nganh_docs IS NULL OR
+        array_length(filter_nganh_docs, 1) IS NULL OR
+        array_length(filter_nganh_docs, 1) = 0 OR
+        f.nganh_doc = ANY(filter_nganh_docs)
     );
 $$;
 ```
 
 #### `get_total_salary_parttime`
 
-This function is used by the Payroll Dashboard to calculate the total sum of `"Tong tien"` from the `Parttime` table, with optional filters for a selected year, an array of months, and an array of location names. It correctly parses text-based month columns (e.g., "Tháng 01") into integers. It assumes the `Parttime` table has `"Nam"` (INTEGER for year), `"Thoi gian"` (TEXT for month description), and `"Don vi"` (TEXT for location) columns.
+This function is used by the Payroll Dashboard to calculate the total sum of `"Tong tien"` from the `Parttime` table, with optional filters for a selected year, an array of months, an array of location names, and an array of `"Don vi 2"` names. It correctly parses text-based month columns (e.g., "Tháng 01") into integers. It assumes the `Parttime` table has `"Nam"` (INTEGER for year), `"Thoi gian"` (TEXT for month description), `"Don vi"` (TEXT for location), and `"Don_vi_2"` (TEXT for secondary unit) columns.
 
 **SQL Code:**
 ```sql
-DROP FUNCTION IF EXISTS get_total_salary_parttime(INTEGER, INTEGER[], TEXT[]);
+DROP FUNCTION IF EXISTS get_total_salary_parttime(INTEGER, INTEGER[], TEXT[], TEXT[]);
 CREATE OR REPLACE FUNCTION get_total_salary_parttime(
     filter_year INTEGER DEFAULT NULL,
     filter_months INTEGER[] DEFAULT NULL,
-    filter_locations TEXT[] DEFAULT NULL -- Added
+    filter_locations TEXT[] DEFAULT NULL,
+    filter_donvi2 TEXT[] DEFAULT NULL -- Added
 )
 RETURNS DOUBLE PRECISION
 LANGUAGE SQL
@@ -96,11 +104,17 @@ AS $$
         array_length(filter_months, 1) = 0 OR
         regexp_replace(pt."Thoi gian", '\D', '', 'g')::INTEGER = ANY(filter_months)
     )
-    AND ( -- Added location filter
+    AND ( 
         filter_locations IS NULL OR
         array_length(filter_locations, 1) IS NULL OR
         array_length(filter_locations, 1) = 0 OR
         pt."Don vi" = ANY(filter_locations)
+    )
+    AND ( -- Added Don_vi_2 filter
+        filter_donvi2 IS NULL OR
+        array_length(filter_donvi2, 1) IS NULL OR
+        array_length(filter_donvi2, 1) = 0 OR
+        pt."Don_vi_2" = ANY(filter_donvi2) -- Assuming the column is named "Don_vi_2"
     );
 $$;
 ```
@@ -115,7 +129,7 @@ DROP FUNCTION IF EXISTS get_total_revenue(INTEGER, INTEGER[], TEXT[]);
 CREATE OR REPLACE FUNCTION get_total_revenue(
     filter_year INTEGER DEFAULT NULL,
     filter_months INTEGER[] DEFAULT NULL,
-    filter_locations TEXT[] DEFAULT NULL -- Added
+    filter_locations TEXT[] DEFAULT NULL 
 )
 RETURNS DOUBLE PRECISION
 LANGUAGE SQL
@@ -130,7 +144,7 @@ AS $$
         regexp_replace(dr."Tháng", '\D', '', 'g')::INTEGER = ANY(filter_months)
     )
     AND dr."Tên đơn vị" NOT IN ('Medcom', 'Medon', 'Medicons', 'Meddom', 'Med Group')
-    AND ( -- Added location filter
+    AND ( 
         filter_locations IS NULL OR
         array_length(filter_locations, 1) IS NULL OR
         array_length(filter_locations, 1) = 0 OR
@@ -141,14 +155,15 @@ $$;
 
 #### `get_monthly_salary_trend_fulltime`
 
-This function is used by the Payroll Dashboard to fetch the total salary (`tong_thu_nhap` from "Fulltime" table) aggregated per month and year, for a given year and optional list of locations. The X-axis of the chart will use the `Thang_x` column from your `Time` table.
+This function is used by the Payroll Dashboard to fetch the total salary (`tong_thu_nhap` from "Fulltime" table) aggregated per month and year, for a given year, optional list of locations, and optional list of `nganh_doc`. The X-axis of the chart will use the `Thang_x` column from your `Time` table.
 
 **SQL Code:**
 ```sql
-DROP FUNCTION IF EXISTS get_monthly_salary_trend_fulltime(INTEGER, TEXT[]);
+DROP FUNCTION IF EXISTS get_monthly_salary_trend_fulltime(INTEGER, TEXT[], TEXT[]);
 CREATE OR REPLACE FUNCTION get_monthly_salary_trend_fulltime(
     p_filter_year INTEGER DEFAULT NULL,
-    p_filter_locations TEXT[] DEFAULT NULL -- Added
+    p_filter_locations TEXT[] DEFAULT NULL,
+    p_filter_nganh_docs TEXT[] DEFAULT NULL -- Added
 )
 RETURNS TABLE(
     month_label TEXT,
@@ -170,11 +185,17 @@ BEGIN
                  AND f.thang = t."Thang_x"
     WHERE
         (p_filter_year IS NULL OR f.nam::INTEGER = p_filter_year)
-        AND ( -- Added location filter
+        AND ( 
             p_filter_locations IS NULL OR
             array_length(p_filter_locations, 1) IS NULL OR
             array_length(p_filter_locations, 1) = 0 OR
             f.dia_diem = ANY(p_filter_locations)
+        )
+        AND ( -- Added nganh_doc filter
+            p_filter_nganh_docs IS NULL OR
+            array_length(p_filter_nganh_docs, 1) IS NULL OR
+            array_length(p_filter_nganh_docs, 1) = 0 OR
+            f.nganh_doc = ANY(p_filter_nganh_docs)
         )
     GROUP BY
         f.nam::INTEGER,
@@ -189,14 +210,15 @@ $$;
 
 #### `get_monthly_salary_trend_parttime`
 
-This function is used by the Payroll Dashboard to fetch the total part-time salary (`"Tong tien"` from "Parttime" table) aggregated per month and year, for a given year and optional list of locations. The X-axis of the chart will use the `Thang_x` column from your `Time` table. It assumes "Parttime" has columns `"Nam"` (INTEGER), `"Thoi gian"` (TEXT), and `"Don vi"` (TEXT).
+This function is used by the Payroll Dashboard to fetch the total part-time salary (`"Tong tien"` from "Parttime" table) aggregated per month and year, for a given year, optional list of locations, and optional list of `"Don vi 2"`. The X-axis of the chart will use the `Thang_x` column from your `Time` table. It assumes "Parttime" has columns `"Nam"` (INTEGER), `"Thoi gian"` (TEXT), `"Don vi"` (TEXT), and `"Don_vi_2"` (TEXT).
 
 **SQL Code:**
 ```sql
-DROP FUNCTION IF EXISTS get_monthly_salary_trend_parttime(INTEGER, TEXT[]);
+DROP FUNCTION IF EXISTS get_monthly_salary_trend_parttime(INTEGER, TEXT[], TEXT[]);
 CREATE OR REPLACE FUNCTION get_monthly_salary_trend_parttime(
     p_filter_year INTEGER DEFAULT NULL,
-    p_filter_locations TEXT[] DEFAULT NULL -- Added
+    p_filter_locations TEXT[] DEFAULT NULL,
+    p_filter_donvi2 TEXT[] DEFAULT NULL -- Added
 )
 RETURNS TABLE(
     month_label TEXT,
@@ -218,11 +240,17 @@ BEGIN
                  AND pt."Thoi gian" = t."Thang_x"
     WHERE
         (p_filter_year IS NULL OR pt."Nam"::INTEGER = p_filter_year)
-        AND ( -- Added location filter
+        AND ( 
             p_filter_locations IS NULL OR
             array_length(p_filter_locations, 1) IS NULL OR
             array_length(p_filter_locations, 1) = 0 OR
             pt."Don vi" = ANY(p_filter_locations)
+        )
+        AND ( -- Added Don_vi_2 filter
+            p_filter_donvi2 IS NULL OR
+            array_length(p_filter_donvi2, 1) IS NULL OR
+            array_length(p_filter_donvi2, 1) = 0 OR
+            pt."Don_vi_2" = ANY(p_filter_donvi2) -- Assuming the column is named "Don_vi_2"
         )
     GROUP BY
         pt."Nam"::INTEGER,
@@ -244,7 +272,7 @@ This function is used by the Payroll Dashboard to fetch the total revenue ("Kỳ
 DROP FUNCTION IF EXISTS get_monthly_revenue_trend(INTEGER, TEXT[]);
 CREATE OR REPLACE FUNCTION get_monthly_revenue_trend(
     p_filter_year INTEGER DEFAULT NULL,
-    p_filter_locations TEXT[] DEFAULT NULL -- Added
+    p_filter_locations TEXT[] DEFAULT NULL 
 )
 RETURNS TABLE(
     month_label TEXT,
@@ -267,7 +295,7 @@ BEGIN
     WHERE
         (p_filter_year IS NULL OR dr."Năm"::INTEGER = p_filter_year)
         AND dr."Tên đơn vị" NOT IN ('Medcom', 'Medon', 'Medicons', 'Meddom', 'Med Group')
-        AND ( -- Added location filter
+        AND ( 
             p_filter_locations IS NULL OR
             array_length(p_filter_locations, 1) IS NULL OR
             array_length(p_filter_locations, 1) = 0 OR
@@ -288,6 +316,7 @@ $$;
 
 This function calculates the full-time and part-time salary components of the salary-to-revenue ratio for each work location, applying optional year, month, and specific location filters.
 It unifies location names from `Fulltime.dia_diem`, `Parttime."Don vi"`, and `Doanh_thu."Tên đơn vị"`.
+**Note:** If you need this RPC to also filter its results based on `nganh_doc` (from Fulltime) or `Don_vi_2` (from Parttime) for the *purpose of this ratio calculation per location*, the SQL logic of this function would need significant redesign. The current signature does not include parameters for those.
 
 **SQL Code:**
 ```sql
@@ -295,7 +324,7 @@ DROP FUNCTION IF EXISTS get_salary_revenue_ratio_components_by_location(INTEGER,
 CREATE OR REPLACE FUNCTION get_salary_revenue_ratio_components_by_location(
     p_filter_year INTEGER DEFAULT NULL,
     p_filter_months INTEGER[] DEFAULT NULL,
-    p_filter_locations TEXT[] DEFAULT NULL -- Added: list of specific location names (department names) to filter for
+    p_filter_locations TEXT[] DEFAULT NULL 
 )
 RETURNS TABLE(
     location_name TEXT,
@@ -319,7 +348,7 @@ BEGIN
               array_length(p_filter_months, 1) = 0 OR
               regexp_replace(f.thang, '\D', '', 'g')::INTEGER = ANY(p_filter_months)
           )
-          AND ( -- Apply main location filter here
+          AND ( 
               p_filter_locations IS NULL OR
               array_length(p_filter_locations, 1) IS NULL OR
               array_length(p_filter_locations, 1) = 0 OR
@@ -339,7 +368,7 @@ BEGIN
               array_length(p_filter_months, 1) = 0 OR
               regexp_replace(pt."Thoi gian", '\D', '', 'g')::INTEGER = ANY(p_filter_months)
           )
-          AND ( -- Apply main location filter here
+          AND ( 
               p_filter_locations IS NULL OR
               array_length(p_filter_locations, 1) IS NULL OR
               array_length(p_filter_locations, 1) = 0 OR
@@ -360,7 +389,7 @@ BEGIN
               regexp_replace(dr."Tháng", '\D', '', 'g')::INTEGER = ANY(p_filter_months)
           )
           AND dr."Tên đơn vị" NOT IN ('Medcom', 'Medon', 'Medicons', 'Meddom', 'Med Group')
-          AND ( -- Apply main location filter here
+          AND ( 
               p_filter_locations IS NULL OR
               array_length(p_filter_locations, 1) IS NULL OR
               array_length(p_filter_locations, 1) = 0 OR
@@ -397,6 +426,7 @@ $$;
 #### `get_location_comparison_metrics`
 
 This function fetches aggregated full-time salary, part-time salary, and total revenue for each location, based on a specified year and optional month/location filters. It's used for the detailed location comparison table.
+**Note:** Similar to `get_salary_revenue_ratio_components_by_location`, this RPC aggregates by location. If filtering by `nganh_doc` or `Don_vi_2` is desired here, the SQL logic would need substantial changes. The current signature does not include parameters for those.
 
 **SQL Code:**
 ```sql
@@ -405,7 +435,7 @@ DROP FUNCTION IF EXISTS get_location_comparison_metrics(INTEGER, INTEGER[], TEXT
 CREATE OR REPLACE FUNCTION get_location_comparison_metrics(
     p_filter_year INTEGER,
     p_filter_months INTEGER[] DEFAULT NULL,
-    p_filter_locations TEXT[] DEFAULT NULL -- Input: specific location names to filter for
+    p_filter_locations TEXT[] DEFAULT NULL 
 )
 RETURNS TABLE(
     location_name TEXT,
@@ -430,7 +460,7 @@ BEGIN
               array_length(p_filter_months, 1) = 0 OR
               regexp_replace(f.thang, '\D', '', 'g')::INTEGER = ANY(p_filter_months)
           )
-          AND ( -- Apply main location filter here IF provided, otherwise ALL locations for the year/months
+          AND ( 
               p_filter_locations IS NULL OR
               array_length(p_filter_locations, 1) IS NULL OR
               array_length(p_filter_locations, 1) = 0 OR
@@ -450,7 +480,7 @@ BEGIN
               array_length(p_filter_months, 1) = 0 OR
               regexp_replace(pt."Thoi gian", '\D', '', 'g')::INTEGER = ANY(p_filter_months)
           )
-          AND ( -- Apply main location filter here IF provided
+          AND ( 
               p_filter_locations IS NULL OR
               array_length(p_filter_locations, 1) IS NULL OR
               array_length(p_filter_locations, 1) = 0 OR
@@ -471,7 +501,7 @@ BEGIN
               regexp_replace(dr."Tháng", '\D', '', 'g')::INTEGER = ANY(p_filter_months)
           )
           AND dr."Tên đơn vị" NOT IN ('Medcom', 'Medon', 'Medicons', 'Meddom', 'Med Group')
-          AND ( -- Apply main location filter here IF provided
+          AND ( 
               p_filter_locations IS NULL OR
               array_length(p_filter_locations, 1) IS NULL OR
               array_length(p_filter_locations, 1) = 0 OR
@@ -479,7 +509,7 @@ BEGIN
           )
         GROUP BY COALESCE(dr."Tên đơn vị", 'Không xác định')
     ),
-    all_locs AS ( -- Collect all distinct locations that have any data in the given period
+    all_locs AS ( 
         SELECT loc_name FROM ft_salaries
         UNION
         SELECT loc_name FROM pt_salaries
@@ -541,7 +571,7 @@ $$;
 
 #### `get_donvi2_pt_salary`
 
-This function fetches aggregated part-time salary by `Don_vi_2` (from `Parttime` table), for a specified year and optional months.
+This function fetches aggregated part-time salary by `Don_vi_2` (from `Parttime` table), for a specified year and optional months. Assumes the column in `Parttime` table is named `Don_vi_2`.
 
 **SQL Code:**
 ```sql
@@ -560,7 +590,7 @@ AS $$
 BEGIN
     RETURN QUERY
     SELECT
-        COALESCE(pt."Don_vi_2", 'Chưa phân loại') AS don_vi_2_key,
+        COALESCE(pt."Don_vi_2", 'Chưa phân loại') AS don_vi_2_key, -- Ensure this matches your column name
         SUM(CAST(REPLACE(pt."Tong tien"::text, ',', '') AS NUMERIC)) AS pt_salary
     FROM "Parttime" pt
     WHERE
@@ -571,7 +601,7 @@ BEGIN
             array_length(p_filter_months, 1) = 0 OR
             regexp_replace(pt."Thoi gian", '\D', '', 'g')::INTEGER = ANY(p_filter_months)
         )
-    GROUP BY COALESCE(pt."Don_vi_2", 'Chưa phân loại')
+    GROUP BY COALESCE(pt."Don_vi_2", 'Chưa phân loại') -- Ensure this matches your column name
     ORDER BY don_vi_2_key;
 END;
 $$;
