@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, ChevronDown, Filter as FilterIcon, GanttChartSquare, MapPin, Settings2, Circle, Percent } from "lucide-react"; // Added Percent
+import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, ChevronDown, FilterIcon, GanttChartSquare, MapPin, Settings2, Circle, Percent, Target } from "lucide-react"; // Added Target
 import type { PayrollEntry } from '@/types';
 import { supabase } from '@/lib/supabaseClient';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -25,8 +25,8 @@ import ComparisonFulltimeSalaryCard from '@/components/comparison/ComparisonFull
 import ComparisonParttimeSalaryCard from '@/components/comparison/ComparisonParttimeSalaryCard';
 import ComparisonCombinedSalaryCard from '@/components/comparison/ComparisonCombinedSalaryCard';
 import ComparisonRevenueCard from '@/components/comparison/ComparisonRevenueCard';
-import ComparisonSalaryRevenueRatioCard from '@/components/comparison/ComparisonSalaryRevenueRatioCard'; 
-import LocationComparisonTable from '@/components/comparison/LocationComparisonTable'; // Added
+import ComparisonSalaryRevenueRatioCard from '@/components/comparison/ComparisonSalaryRevenueRatioCard';
+import LocationComparisonTable from '@/components/comparison/LocationComparisonTable';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -56,7 +56,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type WorkspaceView = 'dbManagement' | 'dashboard' | 'aiTools';
-type DashboardTab = 'payrollOverview' | 'comparison';
+type DashboardTab = 'payrollOverview' | 'comparison' | 'kpiComparison'; // Added kpiComparison
 
 interface NavItem {
   id: WorkspaceView;
@@ -89,7 +89,7 @@ export default function WorkspaceContent() {
   const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [isLoadingYears, setIsLoadingYears] = useState<boolean>(true);
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
-  
+
   // Location filter state
   const [availableLocationTypes, setAvailableLocationTypes] = useState<string[]>([]);
   const [availableDepartmentsByLoai, setAvailableDepartmentsByLoai] = useState<Record<string, string[]>>({});
@@ -145,19 +145,19 @@ export default function WorkspaceContent() {
         });
         const sortedYears = Array.from(yearSet).sort((a, b) => b - a);
         setAvailableYears(sortedYears);
-        
+
         if (sortedYears.length > 0) {
             if (selectedYear === null || !sortedYears.includes(selectedYear)) {
                  setSelectedYear(sortedYears[0]);
             }
         } else {
-            setSelectedYear(null); 
-            setAvailableYears([]); 
+            setSelectedYear(null);
+            setAvailableYears([]);
         }
 
       } else {
          setAvailableYears([]);
-         setSelectedYear(null); 
+         setSelectedYear(null);
       }
     } catch (error: any) {
       console.error("Error fetching distinct years:", error);
@@ -196,7 +196,7 @@ export default function WorkspaceContent() {
           .select('Department')
           .eq('Division', 'Company')
           .eq('Loại', loai);
-        if (deptError) throw deptError; 
+        if (deptError) throw deptError;
         deptsByLoai[loai] = [...new Set(deptData?.map(item => item.Department).filter(Boolean) as string[])].sort();
       }
       setAvailableDepartmentsByLoai(deptsByLoai);
@@ -315,9 +315,9 @@ export default function WorkspaceContent() {
 
           if (dateISO) {
              payDateObj = new Date(entry.pay_date);
-          } else if (datePartsDMY) { 
+          } else if (datePartsDMY) {
             payDateObj = new Date(parseInt(datePartsDMY[3]), parseInt(datePartsDMY[2]) - 1, parseInt(datePartsDMY[1]));
-          } else if (datePartsMDY) { 
+          } else if (datePartsMDY) {
             payDateObj = new Date(parseInt(datePartsMDY[3]), parseInt(datePartsMDY[1]) - 1, parseInt(datePartsMDY[2]));
           } else {
              payDateObj = new Date(entry.pay_date);
@@ -328,7 +328,7 @@ export default function WorkspaceContent() {
             thang = `Tháng ${String(monthNumber).padStart(2, '0')}`;
             nam = payDateObj.getFullYear();
           } else {
-            payDateObj = null; 
+            payDateObj = null;
             thang = null;
             nam = null;
           }
@@ -339,13 +339,13 @@ export default function WorkspaceContent() {
           employee_name: entry.employee_name,
           tong_thu_nhap: entry.salary,
           pay_date: payDateObj ? payDateObj.toISOString().split('T')[0] : null,
-          thang: thang, 
-          nam: nam,     
+          thang: thang,
+          nam: nam,
         };
       });
 
       const { error } = await supabase
-        .from('Fulltime') 
+        .from('Fulltime')
         .insert(dataToUpload);
 
       if (error) {
@@ -358,7 +358,7 @@ export default function WorkspaceContent() {
       });
       setParsedData([]);
       setSelectedFile(null);
-      
+
       const fileInput = document.getElementById('payroll-csv-input') as HTMLInputElement;
       if (fileInput) fileInput.value = '';
 
@@ -391,7 +391,7 @@ export default function WorkspaceContent() {
   };
 
   const handleAllMonthsSelection = (yearForContext: number | null, checked: boolean) => {
-    setSelectedYear(yearForContext); 
+    setSelectedYear(yearForContext);
     if (checked) {
       setSelectedMonths(staticMonths.map(m => m.value));
     } else {
@@ -416,7 +416,7 @@ export default function WorkspaceContent() {
   };
 
   const handleDepartmentSelection = (loai: string, department: string, checked: boolean) => {
-    const departmentIdentifier = `${loai}__${department}`; 
+    const departmentIdentifier = `${loai}__${department}`;
     setSelectedDepartments(prev => {
       const newSelected = new Set(prev);
       if (checked) {
@@ -431,7 +431,7 @@ export default function WorkspaceContent() {
   const handleSelectAllDepartmentsForLoai = (loai: string, checked: boolean) => {
     const departmentsInLoai = availableDepartmentsByLoai[loai] || [];
     const departmentIdentifiersInLoai = departmentsInLoai.map(dept => `${loai}__${dept}`);
-    
+
     setSelectedDepartments(prev => {
       const newSelected = new Set(prev);
       if (checked) {
@@ -442,10 +442,10 @@ export default function WorkspaceContent() {
       return Array.from(newSelected);
     });
   };
-  
+
   const areAllDepartmentsSelectedForLoai = (loai: string): boolean => {
     const departmentsInLoai = availableDepartmentsByLoai[loai] || [];
-    if (departmentsInLoai.length === 0) return false; 
+    if (departmentsInLoai.length === 0) return false;
     return departmentsInLoai.every(dept => selectedDepartments.includes(`${loai}__${dept}`));
   };
 
@@ -453,16 +453,16 @@ export default function WorkspaceContent() {
     if (selectedDepartments.length === 0) {
       return "Tất cả địa điểm";
     }
-  
+
     const activeLoai = new Set<string>();
     selectedDepartments.forEach(deptId => {
       const [loai] = deptId.split('__');
       activeLoai.add(loai);
     });
-  
+
     const loaiCount = activeLoai.size;
     const deptCount = selectedDepartments.length;
-  
+
     let label = "";
     if (loaiCount > 0) {
       label += `${loaiCount} Loại`;
@@ -688,7 +688,7 @@ export default function WorkspaceContent() {
                                 </ScrollArea>
                               </DropdownMenuSubContent>
                             </DropdownMenuSub>
-                            
+
                             {isLoadingYears && availableYears.length === 0 && (
                               <div className="px-2 py-1.5 text-xs text-muted-foreground">Đang tải năm...</div>
                             )}
@@ -841,10 +841,13 @@ export default function WorkspaceContent() {
                       <TabsTrigger value="comparison" className="text-xs px-2.5 py-1.5 flex items-center gap-1">
                         <GanttChartSquare className="h-3.5 w-3.5"/> So sánh cùng kỳ
                       </TabsTrigger>
+                       <TabsTrigger value="kpiComparison" className="text-xs px-2.5 py-1.5 flex items-center gap-1">
+                        <Target className="h-3.5 w-3.5"/> So sánh với Chỉ Tiêu
+                      </TabsTrigger>
                     </TabsList>
                   </div>
                   <TabsContent value="payrollOverview" className="flex-grow overflow-y-auto space-y-3 mt-2">
-                    <div className="grid gap-3 md:grid-cols-4">
+                    <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
                         <TotalSalaryCard selectedMonths={selectedMonths} selectedYear={selectedYear} selectedDepartments={selectedDepartments} />
                         <TotalSalaryParttimeCard selectedMonths={selectedMonths} selectedYear={selectedYear} selectedDepartments={selectedDepartments} />
                         <RevenueCard selectedMonths={selectedMonths} selectedYear={selectedYear} selectedDepartments={selectedDepartments} />
@@ -872,6 +875,14 @@ export default function WorkspaceContent() {
                     </div>
                      <LocationComparisonTable selectedMonths={selectedMonths} selectedDepartments={selectedDepartments} />
                   </TabsContent>
+                   <TabsContent value="kpiComparison" className="flex-grow overflow-y-auto space-y-3 mt-2">
+                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-6">
+                      <Target className="h-16 w-16 mb-4 opacity-50" />
+                      <h3 className="text-xl font-semibold mb-2">So sánh với Chỉ Tiêu</h3>
+                      <p className="text-sm text-center">Chức năng này đang được phát triển và sẽ sớm có mặt.</p>
+                      <p className="text-sm text-center mt-1">Vui lòng quay lại sau để xem các so sánh với chỉ tiêu KPI của bạn.</p>
+                    </div>
+                  </TabsContent>
                 </Tabs>
               </CardContent>
             </Card>
@@ -881,7 +892,5 @@ export default function WorkspaceContent() {
     </SidebarProvider>
   );
 }
-
-
 
     
