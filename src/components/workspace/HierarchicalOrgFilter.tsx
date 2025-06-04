@@ -116,10 +116,10 @@ export default function HierarchicalOrgFilter({
   }, [hierarchy, selectedIds]);
 
 
-  const buttonLabel = isLoading
-    ? "Đang tải TC..."
+  const buttonLabelText = isLoading
+    ? "Đang tải CCTC..."
     : error
-    ? "Lỗi TC"
+    ? "Lỗi CCTC"
     : selectedIds.length > 0
     ? `${triggerButtonLabel} (${selectedIds.length})`
     : triggerButtonLabel;
@@ -130,41 +130,45 @@ export default function HierarchicalOrgFilter({
         <Button variant="outline" className="h-9 text-sm min-w-[180px] justify-between px-3">
           <div className="flex items-center gap-1.5 truncate">
             <Filter className="h-3.5 w-3.5 opacity-80 shrink-0" />
-            <span className="truncate" title={buttonLabel}>
+            <span className="truncate" title={buttonLabelText}>
               {isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : null}
-              {buttonLabel}
+              {buttonLabelText}
             </span>
           </div>
           <ChevronDown className="ml-1 h-4 w-4 opacity-50 shrink-0" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-[350px]" align="end">
-        <DropdownMenuLabel className="text-sm flex items-center justify-between">
-          <span>Chọn Đơn Vị Theo Cơ Cấu</span>
-           {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {error && (
-          <div className="p-2 text-xs text-destructive bg-destructive/10 m-1 rounded-sm flex items-center gap-1.5">
-            <AlertTriangle className="h-3.5 w-3.5 shrink-0"/> {error}
-          </div>
-        )}
-        {!isLoading && !error && hierarchy.length === 0 && (
-            <div className="p-2 text-xs text-muted-foreground text-center">Không có dữ liệu cơ cấu tổ chức.</div>
-        )}
-        {!isLoading && !error && hierarchy.length > 0 && (
-          <>
-            <DropdownMenuCheckboxItem
-                checked={isAllSelected}
-                onCheckedChange={handleSelectAll}
-                onSelect={(e) => e.preventDefault()}
-                className="text-xs font-medium"
-            >
-                Chọn Tất Cả / Bỏ Chọn Tất Cả
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuSeparator />
-            <ScrollArea className="max-h-[380px]">
-              <div className="p-1">
+      <DropdownMenuContent className="w-[350px] p-0" align="end"> {/* Removed default padding */}
+        <div className="p-2 border-b"> {/* Header section with padding and border */}
+          <DropdownMenuLabel className="p-0 text-sm flex items-center justify-between"> {/* Label without its own padding */}
+            <span>Chọn Đơn Vị Theo Cơ Cấu</span>
+            {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+          </DropdownMenuLabel>
+        </div>
+        
+        {/* Scrollable content area */}
+        <ScrollArea className="max-h-[350px]"> {/* Max height for the scrollable area */}
+          <div className="p-2"> {/* Padding for the content inside ScrollArea */}
+            {error && (
+              <div className="p-2 text-xs text-destructive bg-destructive/10 m-1 rounded-sm flex items-center gap-1.5">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0"/> {error}
+              </div>
+            )}
+            {!isLoading && !error && hierarchy.length === 0 && (
+                <div className="p-2 text-xs text-muted-foreground text-center">Không có dữ liệu cơ cấu tổ chức.</div>
+            )}
+            {!isLoading && !error && hierarchy.length > 0 && (
+              <>
+                <DropdownMenuCheckboxItem
+                    checked={isAllSelected}
+                    onCheckedChange={handleSelectAll}
+                    onSelect={(e) => e.preventDefault()}
+                    className="text-xs font-medium"
+                >
+                    Chọn Tất Cả / Bỏ Chọn Tất Cả
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuSeparator className="my-1"/>
+                {/* The list of hierarchical items will be rendered here by OrgCheckboxSubItem */}
                 {hierarchy.map(node => (
                   <OrgCheckboxSubItem
                     key={node.id}
@@ -174,10 +178,10 @@ export default function HierarchicalOrgFilter({
                     onToggle={handleToggle}
                   />
                 ))}
-              </div>
-            </ScrollArea>
-          </>
-        )}
+              </>
+            )}
+          </div>
+        </ScrollArea>
       </DropdownMenuContent>
     </DropdownMenu>
   );
