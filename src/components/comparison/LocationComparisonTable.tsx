@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabaseClient'; 
-import { Loader2, AlertTriangle, TrendingUp, TrendingDown, Minus, GanttChartSquare, ArrowUpDown, ArrowUp, ArrowDown, Filter } from 'lucide-react';
+import { Loader2, AlertTriangle, TrendingUp, TrendingDown, Minus, GanttChartSquare, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -56,21 +56,21 @@ type SortableColumnKey =
   | 'total_revenue_2024' | 'total_revenue_2025' | 'revenue_change_val'
   | 'ratio_2024' | 'ratio_2025' | 'ratio_change_pp_val';
 
-const calculateChange = (valNew: number | null, valOld: number | null): number | null => {
-    if (valNew === null || valOld === null) return null;
-    if (valOld === 0 && valNew === 0) return 0;
-    if (valOld === 0) return valNew > 0 ? Infinity : (valNew < 0 ? -Infinity : 0); 
-    return (valNew - valOld) / valOld;
-};
-
 // List of locations to exclude from the table
 const EXCLUDED_LOCATIONS: string[] = [
   "#N/A", "0", "Med An Giang", "Med BR-VT", "Med Group", 
   "Medlatec Group", "Med Kiên Giang", "Med Long An", "Med Mê Linh", 
   "Med Ba Đình", "Med Thanh Xuân", "Med Tây Hồ", "Med Cầu giấy", 
   "Med Sơn Tây", "Medcom", "Medicons", "Medon",
-  "Med Thụy Khuê" 
+  "Med Thụy Khuê"
 ];
+
+const calculateChange = (valNew: number | null, valOld: number | null): number | null => {
+    if (valNew === null || valOld === null) return null;
+    if (valOld === 0 && valNew === 0) return 0;
+    if (valOld === 0) return valNew > 0 ? Infinity : (valNew < 0 ? -Infinity : 0); 
+    return (valNew - valOld) / valOld;
+};
 
 
 export default function LocationComparisonTable({ selectedMonths, selectedDepartments }: LocationComparisonTableProps) {
@@ -157,7 +157,7 @@ export default function LocationComparisonTable({ selectedMonths, selectedDepart
     const mergedMap = new Map<string, MergedComparisonData>();
 
     const processYearData = (yearDataResult: LocationMetric[] | FetchError, yearSuffix: '2024' | '2025') => {
-        if (!Array.isArray(yearDataResult)) return; // Skip if there was an error fetching data for this year
+        if (!Array.isArray(yearDataResult)) return; 
 
         yearDataResult.forEach(item => {
             let correctedLocationName = item.location_name;
@@ -167,13 +167,16 @@ export default function LocationComparisonTable({ selectedMonths, selectedDepart
                 correctedLocationName = "Med";
             }
 
-            const existingEntry = mergedMap.get(correctedLocationName) || {
+            let existingEntry = mergedMap.get(correctedLocationName);
+            if (!existingEntry) {
+              existingEntry = {
                 location_name: correctedLocationName,
                 ft_salary_2024: 0, pt_salary_2024: 0, total_salary_2024: 0, total_revenue_2024: 0, ratio_2024: null,
                 ft_salary_2025: 0, pt_salary_2025: 0, total_salary_2025: 0, total_revenue_2025: 0, ratio_2025: null,
                 ft_salary_change_val: null, pt_salary_change_val: null, total_salary_change_val: null, revenue_change_val: null, ratio_change_pp_val: null,
-            };
-
+              };
+            }
+            
             if (yearSuffix === '2024') {
                 existingEntry.ft_salary_2024 += item.ft_salary;
                 existingEntry.pt_salary_2024 += item.pt_salary;
@@ -190,7 +193,7 @@ export default function LocationComparisonTable({ selectedMonths, selectedDepart
     };
 
     if (Array.isArray(data2024Result)) processYearData(data2024Result, '2024');
-    else if (data2024Result.type && !error) setError(data2024Result as FetchError); // Set error if not already set
+    else if (data2024Result.type && !error) setError(data2024Result as FetchError);
 
     if (Array.isArray(data2025Result)) processYearData(data2025Result, '2025');
     else if (data2025Result.type && !error) setError(data2025Result as FetchError);
@@ -214,7 +217,7 @@ export default function LocationComparisonTable({ selectedMonths, selectedDepart
       );
       setComparisonData(rawFinalData);
       setIsLoading(false);
-  }, [selectedMonths, selectedDepartments, fetchDataForYear, error]); // Added error to dependency array to avoid re-fetch loops if error already set
+  }, [selectedMonths, selectedDepartments, fetchDataForYear, error]); 
 
   useEffect(() => {
     fetchAllComparisonData();
