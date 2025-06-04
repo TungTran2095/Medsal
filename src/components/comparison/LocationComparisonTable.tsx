@@ -56,13 +56,12 @@ type SortableColumnKey =
   | 'total_revenue_2024' | 'total_revenue_2025' | 'revenue_change_val'
   | 'ratio_2024' | 'ratio_2025' | 'ratio_change_pp_val';
 
-// List of locations to exclude from the table
 const EXCLUDED_LOCATIONS: string[] = [
   "#N/A", "0", "Med An Giang", "Med BR-VT", "Med Group", 
   "Medlatec Group", "Med Kiên Giang", "Med Long An", "Med Mê Linh", 
   "Med Ba Đình", "Med Thanh Xuân", "Med Tây Hồ", "Med Cầu giấy", 
   "Med Sơn Tây", "Medcom", "Medicons", "Medon",
-  "Med Thụy Khuê", "Medim", "MEDIM" // Added Medim and MEDIM
+  "Med Thụy Khuê", "Medim", "MEDIM" 
 ];
 
 const calculateChange = (valNew: number | null, valOld: number | null): number | null => {
@@ -198,6 +197,39 @@ export default function LocationComparisonTable({ selectedMonths, selectedDepart
     if (Array.isArray(data2025Result)) processYearData(data2025Result, 2025);
     else if (data2025Result.type && !error) setError(data2025Result as FetchError);
 
+    // Grouping for "Med Đông Nam Bộ"
+    const dongNamBoGroup = ["Med TP.HCM", "Med Bình Dương", "Med Bình Phước", "Med Đồng Nai"];
+    const dongNamBoTargetName = "Med Đông Nam Bộ";
+    let dongNamBoAccumulator: MergedComparisonData | null = null;
+
+    for (const locationToGroup of dongNamBoGroup) {
+        if (mergedMap.has(locationToGroup)) {
+            const entryToGroup = mergedMap.get(locationToGroup)!;
+            if (!dongNamBoAccumulator) {
+                dongNamBoAccumulator = {
+                    location_name: dongNamBoTargetName,
+                    ft_salary_2024: 0, pt_salary_2024: 0, total_salary_2024: 0, total_revenue_2024: 0, ratio_2024: null,
+                    ft_salary_2025: 0, pt_salary_2025: 0, total_salary_2025: 0, total_revenue_2025: 0, ratio_2025: null,
+                    ft_salary_change_val: null, pt_salary_change_val: null, total_salary_change_val: null, revenue_change_val: null, ratio_change_pp_val: null,
+                };
+            }
+            dongNamBoAccumulator.ft_salary_2024 += entryToGroup.ft_salary_2024;
+            dongNamBoAccumulator.pt_salary_2024 += entryToGroup.pt_salary_2024;
+            dongNamBoAccumulator.total_salary_2024 += entryToGroup.total_salary_2024;
+            dongNamBoAccumulator.total_revenue_2024 += entryToGroup.total_revenue_2024;
+            
+            dongNamBoAccumulator.ft_salary_2025 += entryToGroup.ft_salary_2025;
+            dongNamBoAccumulator.pt_salary_2025 += entryToGroup.pt_salary_2025;
+            dongNamBoAccumulator.total_salary_2025 += entryToGroup.total_salary_2025;
+            dongNamBoAccumulator.total_revenue_2025 += entryToGroup.total_revenue_2025;
+            
+            mergedMap.delete(locationToGroup);
+        }
+    }
+
+    if (dongNamBoAccumulator) {
+        mergedMap.set(dongNamBoTargetName, dongNamBoAccumulator);
+    }
 
     const rawFinalData = Array.from(mergedMap.values()).map(item => {
         item.ratio_2024 = item.total_revenue_2024 !== 0 ? item.total_salary_2024 / item.total_revenue_2024 : null;
