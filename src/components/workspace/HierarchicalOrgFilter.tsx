@@ -12,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ScrollArea } from "@/components/ui/scroll-area";
+// ScrollArea is removed to use native scroll
 import { ChevronDown, Filter, Loader2, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -139,17 +139,18 @@ export default function HierarchicalOrgFilter({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent 
-        className="w-[350px] p-0 flex flex-col max-h-[450px]" // Ensure flex column and set max-height
+        className="w-[350px] p-0 flex flex-col max-h-[450px]"
         align="end"
       >
-        <div className="p-2 border-b shrink-0"> {/* Header section, does not grow/shrink */}
+        <div className="p-2 border-b shrink-0"> {/* Header section */}
           <DropdownMenuLabel className="p-0 text-sm flex items-center justify-between">
             <span>Chọn Đơn Vị Theo Cơ Cấu</span>
             {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
           </DropdownMenuLabel>
         </div>
         
-        <ScrollArea className="flex-grow min-h-0"> {/* ScrollArea takes remaining space and handles overflow */}
+        {/* This div will handle the scrolling for the list content */}
+        <div className="flex-grow min-h-0 overflow-y-auto">
           <div className="p-2"> {/* Padding for the actual list content */}
             {error && (
               <div className="p-2 text-xs text-destructive bg-destructive/10 m-1 rounded-sm flex items-center gap-1.5">
@@ -182,9 +183,8 @@ export default function HierarchicalOrgFilter({
               </>
             )}
           </div>
-        </ScrollArea>
+        </div>
       </DropdownMenuContent>
     </DropdownMenu>
   );
 }
-
