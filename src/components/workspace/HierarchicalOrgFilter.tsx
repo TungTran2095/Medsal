@@ -138,17 +138,19 @@ export default function HierarchicalOrgFilter({
           <ChevronDown className="ml-1 h-4 w-4 opacity-50 shrink-0" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-[350px] p-0" align="end"> {/* Removed default padding */}
-        <div className="p-2 border-b"> {/* Header section with padding and border */}
-          <DropdownMenuLabel className="p-0 text-sm flex items-center justify-between"> {/* Label without its own padding */}
+      <DropdownMenuContent 
+        className="w-[350px] p-0 flex flex-col max-h-[450px]" // Ensure flex column and set max-height
+        align="end"
+      >
+        <div className="p-2 border-b shrink-0"> {/* Header section, does not grow/shrink */}
+          <DropdownMenuLabel className="p-0 text-sm flex items-center justify-between">
             <span>Chọn Đơn Vị Theo Cơ Cấu</span>
             {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
           </DropdownMenuLabel>
         </div>
         
-        {/* Scrollable content area */}
-        <ScrollArea className="max-h-[350px]"> {/* Max height for the scrollable area */}
-          <div className="p-2"> {/* Padding for the content inside ScrollArea */}
+        <ScrollArea className="flex-grow min-h-0"> {/* ScrollArea takes remaining space and handles overflow */}
+          <div className="p-2"> {/* Padding for the actual list content */}
             {error && (
               <div className="p-2 text-xs text-destructive bg-destructive/10 m-1 rounded-sm flex items-center gap-1.5">
                 <AlertTriangle className="h-3.5 w-3.5 shrink-0"/> {error}
@@ -168,7 +170,6 @@ export default function HierarchicalOrgFilter({
                     Chọn Tất Cả / Bỏ Chọn Tất Cả
                 </DropdownMenuCheckboxItem>
                 <DropdownMenuSeparator className="my-1"/>
-                {/* The list of hierarchical items will be rendered here by OrgCheckboxSubItem */}
                 {hierarchy.map(node => (
                   <OrgCheckboxSubItem
                     key={node.id}
@@ -186,3 +187,4 @@ export default function HierarchicalOrgFilter({
     </DropdownMenu>
   );
 }
+
