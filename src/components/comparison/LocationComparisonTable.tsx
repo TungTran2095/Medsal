@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabaseClient'; 
-import { Loader2, AlertTriangle, TrendingUp, TrendingDown, Minus, GanttChartSquare, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Loader2, AlertTriangle, TrendingUp, TrendingDown, Minus, GanttChartSquare, ArrowUpDown, ArrowUp, ArrowDown, Filter } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -63,12 +63,13 @@ const calculateChange = (valNew: number | null, valOld: number | null): number |
     return (valNew - valOld) / valOld;
 };
 
+// List of locations to exclude from the table
 const EXCLUDED_LOCATIONS: string[] = [
   "#N/A", "0", "Med An Giang", "Med BR-VT", "Med Group", 
   "Medlatec Group", "Med Kiên Giang", "Med Long An", "Med Mê Linh", 
   "Med Ba Đình", "Med Thanh Xuân", "Med Tây Hồ", "Med Cầu giấy", 
-  "Medim", "Med Sơn Tây", "Medcom", "Medicons", "Medon",
-  "Med Thụy Khuê" // Added new location to exclude
+  "Med Sơn Tây", "Medcom", "Medicons", "Medon",
+  "Med Thụy Khuê" 
 ];
 
 
@@ -152,102 +153,68 @@ export default function LocationComparisonTable({ selectedMonths, selectedDepart
       fetchDataForYear(2024),
       fetchDataForYear(2025),
     ]);
+    
+    const mergedMap = new Map<string, MergedComparisonData>();
 
-    if (Array.isArray(data2024Result) && Array.isArray(data2025Result)) {
-      const mergedMap = new Map<string, Partial<MergedComparisonData>>();
+    const processYearData = (yearDataResult: LocationMetric[] | FetchError, yearSuffix: '2024' | '2025') => {
+        if (!Array.isArray(yearDataResult)) return; // Skip if there was an error fetching data for this year
 
-      data2024Result.forEach(item => {
-        let correctedLocationName = item.location_name;
-        if (correctedLocationName.startsWith("MED ")) {
-            correctedLocationName = "Med " + correctedLocationName.substring(4);
-        } else if (correctedLocationName === "MED") {
-            correctedLocationName = "Med";
-        }
+        yearDataResult.forEach(item => {
+            let correctedLocationName = item.location_name;
+            if (correctedLocationName.startsWith("MED ")) {
+                correctedLocationName = "Med " + correctedLocationName.substring(4);
+            } else if (correctedLocationName === "MED") {
+                correctedLocationName = "Med";
+            }
 
-        const existingEntry = mergedMap.get(correctedLocationName) || { 
-            location_name: correctedLocationName,
-            ft_salary_2024: 0, pt_salary_2024: 0, total_salary_2024: 0, total_revenue_2024: 0,
-            ft_salary_2025: 0, pt_salary_2025: 0, total_salary_2025: 0, total_revenue_2025: 0,
-         };
-        
-        mergedMap.set(correctedLocationName, {
-          ...existingEntry,
-          ft_salary_2024: (existingEntry.ft_salary_2024 || 0) + item.ft_salary,
-          pt_salary_2024: (existingEntry.pt_salary_2024 || 0) + item.pt_salary,
-          total_salary_2024: (existingEntry.total_salary_2024 || 0) + item.ft_salary + item.pt_salary,
-          total_revenue_2024: (existingEntry.total_revenue_2024 || 0) + item.total_revenue,
+            const existingEntry = mergedMap.get(correctedLocationName) || {
+                location_name: correctedLocationName,
+                ft_salary_2024: 0, pt_salary_2024: 0, total_salary_2024: 0, total_revenue_2024: 0, ratio_2024: null,
+                ft_salary_2025: 0, pt_salary_2025: 0, total_salary_2025: 0, total_revenue_2025: 0, ratio_2025: null,
+                ft_salary_change_val: null, pt_salary_change_val: null, total_salary_change_val: null, revenue_change_val: null, ratio_change_pp_val: null,
+            };
+
+            if (yearSuffix === '2024') {
+                existingEntry.ft_salary_2024 += item.ft_salary;
+                existingEntry.pt_salary_2024 += item.pt_salary;
+                existingEntry.total_salary_2024 += (item.ft_salary + item.pt_salary);
+                existingEntry.total_revenue_2024 += item.total_revenue;
+            } else { // yearSuffix === '2025'
+                existingEntry.ft_salary_2025 += item.ft_salary;
+                existingEntry.pt_salary_2025 += item.pt_salary;
+                existingEntry.total_salary_2025 += (item.ft_salary + item.pt_salary);
+                existingEntry.total_revenue_2025 += item.total_revenue;
+            }
+            mergedMap.set(correctedLocationName, existingEntry);
         });
-      });
+    };
 
-      data2025Result.forEach(item => {
-        let correctedLocationName = item.location_name;
-        if (correctedLocationName.startsWith("MED ")) {
-            correctedLocationName = "Med " + correctedLocationName.substring(4);
-        } else if (correctedLocationName === "MED") {
-            correctedLocationName = "Med";
-        }
-        const existingEntry = mergedMap.get(correctedLocationName) || { 
-            location_name: correctedLocationName,
-            ft_salary_2024: 0, pt_salary_2024: 0, total_salary_2024: 0, total_revenue_2024: 0,
-            ft_salary_2025: 0, pt_salary_2025: 0, total_salary_2025: 0, total_revenue_2025: 0,
-        };
-        mergedMap.set(correctedLocationName, {
-          ...existingEntry,
-          ft_salary_2025: (existingEntry.ft_salary_2025 || 0) + item.ft_salary,
-          pt_salary_2025: (existingEntry.pt_salary_2025 || 0) + item.pt_salary,
-          total_salary_2025: (existingEntry.total_salary_2025 || 0) + item.ft_salary + item.pt_salary,
-          total_revenue_2025: (existingEntry.total_revenue_2025 || 0) + item.total_revenue,
-        });
-      });
-      
-      const rawFinalData = Array.from(mergedMap.values()).map(item => {
-        const ft_s_2024 = item.ft_salary_2024 || 0;
-        const ft_s_2025 = item.ft_salary_2025 || 0;
-        const pt_s_2024 = item.pt_salary_2024 || 0;
-        const pt_s_2025 = item.pt_salary_2025 || 0;
-        const total_s_2024 = item.total_salary_2024 || 0; 
-        const total_s_2025 = item.total_salary_2025 || 0; 
-        const total_r_2024 = item.total_revenue_2024 || 0;
-        const total_r_2025 = item.total_revenue_2025 || 0;
+    if (Array.isArray(data2024Result)) processYearData(data2024Result, '2024');
+    else if (data2024Result.type && !error) setError(data2024Result as FetchError); // Set error if not already set
+
+    if (Array.isArray(data2025Result)) processYearData(data2025Result, '2025');
+    else if (data2025Result.type && !error) setError(data2025Result as FetchError);
+
+
+    const rawFinalData = Array.from(mergedMap.values()).map(item => {
+        item.ratio_2024 = item.total_revenue_2024 !== 0 ? item.total_salary_2024 / item.total_revenue_2024 : null;
+        item.ratio_2025 = item.total_revenue_2025 !== 0 ? item.total_salary_2025 / item.total_revenue_2025 : null;
         
-        const r_2024 = total_r_2024 !== 0 ? total_s_2024 / total_r_2024 : null;
-        const r_2025 = total_r_2025 !== 0 ? total_s_2025 / total_r_2025 : null;
-
-        return {
-            location_name: item.location_name!,
-            ft_salary_2024: ft_s_2024,
-            ft_salary_2025: ft_s_2025,
-            pt_salary_2024: pt_s_2024,
-            pt_salary_2025: pt_s_2025,
-            total_salary_2024: total_s_2024,
-            total_salary_2025: total_s_2025,
-            total_revenue_2024: total_r_2024,
-            total_revenue_2025: total_r_2025,
-            ratio_2024: r_2024,
-            ratio_2025: r_2025,
-            ft_salary_change_val: calculateChange(ft_s_2025, ft_s_2024),
-            pt_salary_change_val: calculateChange(pt_s_2025, pt_s_2024),
-            total_salary_change_val: calculateChange(total_s_2025, total_s_2024),
-            revenue_change_val: calculateChange(total_r_2025, total_r_2024),
-            ratio_change_pp_val: (r_2025 !== null && r_2024 !== null) ? r_2025 - r_2024 : null,
-        };
+        item.ft_salary_change_val = calculateChange(item.ft_salary_2025, item.ft_salary_2024);
+        item.pt_salary_change_val = calculateChange(item.pt_salary_2025, item.pt_salary_2024);
+        item.total_salary_change_val = calculateChange(item.total_salary_2025, item.total_salary_2024);
+        item.revenue_change_val = calculateChange(item.total_revenue_2025, item.total_revenue_2024);
+        item.ratio_change_pp_val = (item.ratio_2025 !== null && item.ratio_2024 !== null) ? item.ratio_2025 - item.ratio_2024 : null;
+        return item;
       }).filter(d => 
         (d.ft_salary_2024 !== 0 || d.ft_salary_2025 !== 0 ||
         d.pt_salary_2024 !== 0 || d.pt_salary_2025 !== 0 ||
         d.total_revenue_2024 !== 0 || d.total_revenue_2025 !== 0) &&
         !EXCLUDED_LOCATIONS.includes(d.location_name)
       );
-
       setComparisonData(rawFinalData);
-
-    } else {
-      if (!Array.isArray(data2024Result)) setError(data2024Result as FetchError);
-      else if (!Array.isArray(data2025Result)) setError(data2025Result as FetchError);
-      setComparisonData([]);
-    }
-
-    setIsLoading(false);
-  }, [selectedMonths, selectedDepartments, fetchDataForYear]);
+      setIsLoading(false);
+  }, [selectedMonths, selectedDepartments, fetchDataForYear, error]); // Added error to dependency array to avoid re-fetch loops if error already set
 
   useEffect(() => {
     fetchAllComparisonData();
