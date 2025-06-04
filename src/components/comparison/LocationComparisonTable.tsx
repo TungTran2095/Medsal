@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabaseClient'; 
-import { Loader2, AlertTriangle, TrendingUp, TrendingDown, Minus, Percent, Banknote, DollarSign, GanttChartSquare, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Loader2, AlertTriangle, TrendingUp, TrendingDown, Minus, Percent, Banknote, DollarSign, GanttChartSquare, ArrowUpDown, ArrowUp, ArrowDown, Filter } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -156,8 +156,15 @@ export default function LocationComparisonTable({ selectedMonths, selectedDepart
       const mergedMap = new Map<string, Partial<MergedComparisonData>>();
 
       data2024.forEach(item => {
-        mergedMap.set(item.location_name, {
-          location_name: item.location_name,
+        let correctedLocationName = item.location_name;
+        if (correctedLocationName.startsWith("MED ")) {
+            correctedLocationName = "Med " + correctedLocationName.substring(4);
+        } else if (correctedLocationName === "MED") {
+            correctedLocationName = "Med";
+        }
+
+        mergedMap.set(correctedLocationName, { // Use corrected name as key
+          location_name: correctedLocationName,
           ft_salary_2024: item.ft_salary,
           pt_salary_2024: item.pt_salary,
           total_salary_2024: item.ft_salary + item.pt_salary,
@@ -167,8 +174,14 @@ export default function LocationComparisonTable({ selectedMonths, selectedDepart
       });
 
       data2025.forEach(item => {
-        const existing = mergedMap.get(item.location_name) || { location_name: item.location_name };
-        mergedMap.set(item.location_name, {
+        let correctedLocationName = item.location_name;
+        if (correctedLocationName.startsWith("MED ")) {
+            correctedLocationName = "Med " + correctedLocationName.substring(4);
+        } else if (correctedLocationName === "MED") {
+            correctedLocationName = "Med";
+        }
+        const existing = mergedMap.get(correctedLocationName) || { location_name: correctedLocationName };
+        mergedMap.set(correctedLocationName, {
           ...existing,
           ft_salary_2025: item.ft_salary,
           pt_salary_2025: item.pt_salary,
@@ -212,7 +225,7 @@ export default function LocationComparisonTable({ selectedMonths, selectedDepart
         (d.ft_salary_2024 !== 0 || d.ft_salary_2025 !== 0 ||
         d.pt_salary_2024 !== 0 || d.pt_salary_2025 !== 0 ||
         d.total_revenue_2024 !== 0 || d.total_revenue_2025 !== 0) &&
-        !EXCLUDED_LOCATIONS.includes(d.location_name) // Added exclusion filter
+        !EXCLUDED_LOCATIONS.includes(d.location_name)
       );
 
       setComparisonData(rawFinalData);
@@ -381,7 +394,7 @@ export default function LocationComparisonTable({ selectedMonths, selectedDepart
         <CardHeader className="pb-2 pt-3">
             <CardTitle className="text-base font-semibold text-muted-foreground flex items-center gap-1.5"><GanttChartSquare className="h-4 w-4" />Bảng So Sánh Chi Tiết Theo Địa Điểm</CardTitle>
             <CardDescription className="text-xs truncate">
-                {filterDescription}.
+                {filterDescription}. Một số địa điểm không hoạt động hoặc thuộc nhóm tổng công ty đã được loại trừ.
             </CardDescription>
         </CardHeader>
          <CardContent className="pt-2 flex items-center justify-center flex-grow">
