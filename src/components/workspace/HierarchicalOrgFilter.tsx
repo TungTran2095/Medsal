@@ -40,7 +40,7 @@ const OrgCheckboxSubItem: React.FC<OrgCheckboxItemProps> = ({ node, level, selec
       <DropdownMenuCheckboxItem
         checked={isSelected}
         onCheckedChange={(checked) => onToggle(node.id, checked as boolean)}
-        onSelect={(e) => e.preventDefault()} // Prevent closing on select
+        onSelect={(e) => e.preventDefault()} 
         className="text-xs py-1.5"
         style={{ paddingLeft: `${1 + level * 1.25}rem` }}
       >
@@ -111,7 +111,7 @@ export default function HierarchicalOrgFilter({
         });
     };
     collectIds(hierarchy);
-    if (allNodeIds.length === 0) return false; // No selectable items
+    if (allNodeIds.length === 0) return false; 
     return selectedIds.length > 0 && allNodeIds.every(id => selectedIds.includes(id));
   }, [hierarchy, selectedIds]);
 
@@ -182,4 +182,3 @@ export default function HierarchicalOrgFilter({
     </DropdownMenu>
   );
 }
-
