@@ -67,7 +67,8 @@ const EXCLUDED_LOCATIONS: string[] = [
   "#N/A", "0", "Med An Giang", "Med BR-VT", "Med Group", 
   "Medlatec Group", "Med Kiên Giang", "Med Long An", "Med Mê Linh", 
   "Med Ba Đình", "Med Thanh Xuân", "Med Tây Hồ", "Med Cầu giấy", 
-  "Medim", "Med Sơn Tây", "Medcom", "Medicons", "Medon"
+  "Medim", "Med Sơn Tây", "Medcom", "Medicons", "Medon",
+  "Med Thụy Khuê" // Added new location to exclude
 ];
 
 
@@ -163,7 +164,11 @@ export default function LocationComparisonTable({ selectedMonths, selectedDepart
             correctedLocationName = "Med";
         }
 
-        const existingEntry = mergedMap.get(correctedLocationName) || { location_name: correctedLocationName };
+        const existingEntry = mergedMap.get(correctedLocationName) || { 
+            location_name: correctedLocationName,
+            ft_salary_2024: 0, pt_salary_2024: 0, total_salary_2024: 0, total_revenue_2024: 0,
+            ft_salary_2025: 0, pt_salary_2025: 0, total_salary_2025: 0, total_revenue_2025: 0,
+         };
         
         mergedMap.set(correctedLocationName, {
           ...existingEntry,
@@ -183,7 +188,8 @@ export default function LocationComparisonTable({ selectedMonths, selectedDepart
         }
         const existingEntry = mergedMap.get(correctedLocationName) || { 
             location_name: correctedLocationName,
-            ft_salary_2024: 0, pt_salary_2024: 0, total_salary_2024: 0, total_revenue_2024: 0, // Init 2024 if no prior data
+            ft_salary_2024: 0, pt_salary_2024: 0, total_salary_2024: 0, total_revenue_2024: 0,
+            ft_salary_2025: 0, pt_salary_2025: 0, total_salary_2025: 0, total_revenue_2025: 0,
         };
         mergedMap.set(correctedLocationName, {
           ...existingEntry,
