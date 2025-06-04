@@ -93,12 +93,12 @@ export default function WorkspaceContent() {
 
   const [availableLocationTypes, setAvailableLocationTypes] = useState<string[]>([]);
   const [availableDepartmentsByLoai, setAvailableDepartmentsByLoai] = useState<Record<string, string[]>>({});
-  const [selectedDepartmentsByLoai, setSelectedDepartmentsByLoai] = useState<string[]>([]);
+  const [selectedDepartmentsByLoai, setSelectedDepartmentsByLoai] = useState<string[]>([]); // Stores "Loại__Department"
   const [isLoadingLocationFilters, setIsLoadingLocationFilters] = useState<boolean>(false);
   const [locationFilterError, setLocationFilterError] = useState<string | null>(null);
 
   const [orgHierarchyData, setOrgHierarchyData] = useState<OrgNode[]>([]);
-  const [selectedOrgUnitIds, setSelectedOrgUnitIds] = useState<string[]>([]);
+  const [selectedOrgUnitIds, setSelectedOrgUnitIds] = useState<string[]>([]); // Stores IDs from ms_org_nganhdoc
   const [isLoadingOrgHierarchy, setIsLoadingOrgHierarchy] = useState<boolean>(false);
   const [orgHierarchyError, setOrgHierarchyError] = useState<string | null>(null);
   const [flatOrgUnits, setFlatOrgUnits] = useState<FlatOrgUnit[]>([]);
@@ -253,27 +253,13 @@ export default function WorkspaceContent() {
       const { data, error } = await supabase.from('ms_org_nganhdoc').select('ID, Parent_ID, Department');
 
       if (error) {
-         // Log the full error structure for better debugging
         console.error("Supabase error object from 'ms_org_nganhdoc':", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
-        
         let displayErrorMessage = `Lỗi khi truy vấn 'ms_org_nganhdoc': ${error.message || 'Unknown error'}`;
-
-        if (error && typeof error === 'object') {
-            const errDetails = (error as any).details;
-            const errHint = (error as any).hint;
-            const errCode = (error as any).code;
-
-            if (String(error.message).toLowerCase().includes("relation") && String(error.message).toLowerCase().includes("does not exist")) {
-                 displayErrorMessage = "Lỗi 404: Bảng 'ms_org_nganhdoc' không tìm thấy trong schema 'public'. Vui lòng kiểm tra lại tên bảng và đảm bảo nó tồn tại.";
-            } else if (errCode === '42P01') { // Undefined table (PostgreSQL specific)
-                 displayErrorMessage = "Lỗi 42P01: Bảng 'ms_org_nganhdoc' không được định nghĩa hoặc không tồn tại. Kiểm tra tên và schema.";
-            } else if (errCode === '42501') { // Insufficient privilege
-                 displayErrorMessage = "Lỗi 42501: Không có quyền truy cập bảng 'ms_org_nganhdoc'. Kiểm tra chính sách RLS và quyền của user.";
-            } else {
-                displayErrorMessage = `Lỗi Supabase (${errCode || 'N/A'}): ${error.message || 'Lỗi không xác định.'}`;
-                if (errDetails) displayErrorMessage += ` Chi tiết: ${errDetails}`;
-                if (errHint) displayErrorMessage += ` Gợi ý: ${errHint}`;
-            }
+        // More detailed error check
+        if (error.code === '42P01' || (error.message && error.message.toLowerCase().includes("relation \"ms_org_nganhdoc\" does not exist"))) {
+             displayErrorMessage = "Lỗi 404: Bảng 'ms_org_nganhdoc' không tìm thấy. Vui lòng kiểm tra tên bảng và đảm bảo nó tồn tại trong schema 'public'.";
+        } else if (error.code === '42501') {
+             displayErrorMessage = "Lỗi 42501: Không có quyền truy cập bảng 'ms_org_nganhdoc'. Kiểm tra chính sách RLS.";
         }
         throw new Error(displayErrorMessage);
       }
@@ -309,8 +295,8 @@ export default function WorkspaceContent() {
       }
 
     } catch (err: any) {
-      console.error("Error fetching/building org hierarchy from ms_org_nganhdoc:", JSON.stringify(err, Object.getOwnPropertyNames(err), 2));
-      const errorMessage = err.message || "Không thể tải dữ liệu cơ cấu tổ chức từ 'ms_org_nganhdoc'.";
+       console.error("Error fetching/building org hierarchy from MS_Org_nganhdoc:", err.code ? JSON.stringify(err, Object.getOwnPropertyNames(err), 2) : err);
+      const errorMessage = err.message || err.details || err.error_description || (typeof err === 'object' ? JSON.stringify(err) : "Không thể tải dữ liệu cơ cấu tổ chức từ 'ms_org_nganhdoc'.");
       setOrgHierarchyError(errorMessage);
     } finally {
       setIsLoadingOrgHierarchy(false);
@@ -326,22 +312,24 @@ export default function WorkspaceContent() {
     }
   }, [activeView, fetchDistinctYears, fetchLocationFilterOptions, fetchAndBuildOrgHierarchy]);
 
+  const selectedDepartmentsFromLoaiFilter = useMemo(() => {
+    return selectedDepartmentsByLoai.map(id => id.split('__')[1]).filter(Boolean);
+  }, [selectedDepartmentsByLoai]);
 
-  const finalSelectedDepartmentNames = useMemo(() => {
-    const namesFromLoaiFilter = new Set(selectedDepartmentsByLoai.map(id => id.split('__')[1]));
-    const namesFromOrgFilter = new Set<string>();
+  const selectedNganhDocForFilter = useMemo(() => {
+    if (selectedOrgUnitIds.length === 0 || flatOrgUnits.length === 0) return [];
+    return selectedOrgUnitIds
+      .map(id => flatOrgUnits.find(u => String(u.ID) === String(id))?.Department)
+      .filter(Boolean) as string[];
+  }, [selectedOrgUnitIds, flatOrgUnits]);
 
-    if (selectedOrgUnitIds.length > 0 && flatOrgUnits.length > 0) {
-        selectedOrgUnitIds.forEach(id => {
-            const unit = flatOrgUnits.find(u => String(u.ID) === String(id));
-            if (unit && unit.Department) {
-                namesFromOrgFilter.add(unit.Department);
-            }
-        });
-    }
-    const combined = new Set([...Array.from(namesFromLoaiFilter), ...Array.from(namesFromOrgFilter)]);
-    return Array.from(combined);
-  }, [selectedDepartmentsByLoai, selectedOrgUnitIds, flatOrgUnits]);
+  const selectedDonVi2ForFilter = useMemo(() => {
+    // Assuming Department names from ms_org_nganhdoc map directly to Don vi 2 values
+    if (selectedOrgUnitIds.length === 0 || flatOrgUnits.length === 0) return [];
+    return selectedOrgUnitIds
+      .map(id => flatOrgUnits.find(u => String(u.ID) === String(id))?.Department)
+      .filter(Boolean) as string[];
+  }, [selectedOrgUnitIds, flatOrgUnits]);
 
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -976,33 +964,33 @@ export default function WorkspaceContent() {
                   </div>
                   <TabsContent value="payrollOverview" className="flex-grow overflow-y-auto space-y-3 mt-2">
                     <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-                        <TotalSalaryCard selectedMonths={selectedMonths} selectedYear={selectedYear} selectedDepartments={finalSelectedDepartmentNames} />
-                        <TotalSalaryParttimeCard selectedMonths={selectedMonths} selectedYear={selectedYear} selectedDepartments={finalSelectedDepartmentNames} />
-                        <RevenueCard selectedMonths={selectedMonths} selectedYear={selectedYear} selectedDepartments={finalSelectedDepartmentNames} />
-                        <SalaryToRevenueRatioCard selectedMonths={selectedMonths} selectedYear={selectedYear} selectedDepartments={finalSelectedDepartmentNames} />
+                        <TotalSalaryCard selectedMonths={selectedMonths} selectedYear={selectedYear} selectedDepartmentsForDiadiem={selectedDepartmentsFromLoaiFilter} selectedNganhDoc={selectedNganhDocForFilter} />
+                        <TotalSalaryParttimeCard selectedMonths={selectedMonths} selectedYear={selectedYear} selectedDepartmentsForDiadiem={selectedDepartmentsFromLoaiFilter} selectedDonVi2={selectedDonVi2ForFilter} />
+                        <RevenueCard selectedMonths={selectedMonths} selectedYear={selectedYear} selectedDepartments={selectedDepartmentsFromLoaiFilter} />
+                        <SalaryToRevenueRatioCard selectedMonths={selectedMonths} selectedYear={selectedYear} selectedDepartmentsForDiadiem={selectedDepartmentsFromLoaiFilter} selectedNganhDoc={selectedNganhDocForFilter} selectedDonVi2={selectedDonVi2ForFilter} />
                     </div>
                     <div className="grid grid-cols-1 gap-3">
-                        <CombinedMonthlyTrendChart selectedYear={selectedYear} selectedMonths={selectedMonths} selectedDepartments={finalSelectedDepartmentNames} />
+                        <CombinedMonthlyTrendChart selectedYear={selectedYear} selectedMonths={selectedMonths} selectedDepartmentsForDiadiem={selectedDepartmentsFromLoaiFilter} selectedNganhDoc={selectedNganhDocForFilter} selectedDonVi2={selectedDonVi2ForFilter} />
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <div className="md:col-span-1">
-                           <SalaryProportionPieChart selectedMonths={selectedMonths} selectedYear={selectedYear} selectedDepartments={finalSelectedDepartmentNames} />
+                           <SalaryProportionPieChart selectedMonths={selectedMonths} selectedYear={selectedYear} selectedDepartmentsForDiadiem={selectedDepartmentsFromLoaiFilter} selectedNganhDoc={selectedNganhDocForFilter} selectedDonVi2={selectedDonVi2ForFilter} />
                         </div>
                         <div className="md:col-span-2">
-                           <LocationSalaryRevenueColumnChart selectedMonths={selectedMonths} selectedYear={selectedYear} selectedDepartments={finalSelectedDepartmentNames} />
+                           <LocationSalaryRevenueColumnChart selectedMonths={selectedMonths} selectedYear={selectedYear} selectedDepartmentsForDiadiem={selectedDepartmentsFromLoaiFilter} selectedNganhDoc={selectedNganhDocForFilter} selectedDonVi2={selectedDonVi2ForFilter} />
                         </div>
                     </div>
                   </TabsContent>
                   <TabsContent value="comparison" className="flex-grow overflow-y-auto space-y-3 mt-2">
                     <div className="grid gap-3 md:grid-cols-5">
-                        <ComparisonFulltimeSalaryCard selectedMonths={selectedMonths} selectedDepartments={finalSelectedDepartmentNames} />
-                        <ComparisonParttimeSalaryCard selectedMonths={selectedMonths} selectedDepartments={finalSelectedDepartmentNames} />
-                        <ComparisonCombinedSalaryCard selectedMonths={selectedMonths} selectedDepartments={finalSelectedDepartmentNames} />
-                        <ComparisonRevenueCard selectedMonths={selectedMonths} selectedDepartments={finalSelectedDepartmentNames} />
-                        <ComparisonSalaryRevenueRatioCard selectedMonths={selectedMonths} selectedDepartments={finalSelectedDepartmentNames} />
+                        <ComparisonFulltimeSalaryCard selectedMonths={selectedMonths} selectedDepartmentsForDiadiem={selectedDepartmentsFromLoaiFilter} selectedNganhDoc={selectedNganhDocForFilter} />
+                        <ComparisonParttimeSalaryCard selectedMonths={selectedMonths} selectedDepartmentsForDiadiem={selectedDepartmentsFromLoaiFilter} selectedDonVi2={selectedDonVi2ForFilter} />
+                        <ComparisonCombinedSalaryCard selectedMonths={selectedMonths} selectedDepartmentsForDiadiem={selectedDepartmentsFromLoaiFilter} selectedNganhDoc={selectedNganhDocForFilter} selectedDonVi2={selectedDonVi2ForFilter} />
+                        <ComparisonRevenueCard selectedMonths={selectedMonths} selectedDepartments={selectedDepartmentsFromLoaiFilter} />
+                        <ComparisonSalaryRevenueRatioCard selectedMonths={selectedMonths} selectedDepartmentsForDiadiem={selectedDepartmentsFromLoaiFilter} selectedNganhDoc={selectedNganhDocForFilter} selectedDonVi2={selectedDonVi2ForFilter} />
                     </div>
-                    <NganhDocComparisonTable selectedMonths={selectedMonths} />
-                    <LocationComparisonTable selectedMonths={selectedMonths} selectedDepartments={finalSelectedDepartmentNames} />
+                    <NganhDocComparisonTable selectedMonths={selectedMonths} selectedNganhDoc={selectedNganhDocForFilter} selectedDonVi2={selectedDonVi2ForFilter} />
+                    <LocationComparisonTable selectedMonths={selectedMonths} selectedDepartmentsForDiadiem={selectedDepartmentsFromLoaiFilter} selectedNganhDoc={selectedNganhDocForFilter} selectedDonVi2={selectedDonVi2ForFilter} />
                   </TabsContent>
                    <TabsContent value="kpiComparison" className="flex-grow overflow-y-auto space-y-3 mt-2">
                     <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-6">

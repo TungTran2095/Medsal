@@ -8,7 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 
 interface ComparisonSalaryRevenueRatioCardProps {
   selectedMonths?: number[];
-  selectedDepartments?: string[];
+  selectedDepartmentsForDiadiem?: string[];
+  selectedNganhDoc?: string[];
+  selectedDonVi2?: string[];
 }
 
 interface FetchError {
@@ -25,7 +27,7 @@ interface YearData {
   error: FetchError | null;
 }
 
-export default function ComparisonSalaryRevenueRatioCard({ selectedMonths, selectedDepartments }: ComparisonSalaryRevenueRatioCardProps) {
+export default function ComparisonSalaryRevenueRatioCard({ selectedMonths, selectedDepartmentsForDiadiem, selectedNganhDoc, selectedDonVi2 }: ComparisonSalaryRevenueRatioCardProps) {
   const [data2024, setData2024] = useState<YearData | null>(null);
   const [data2025, setData2025] = useState<YearData | null>(null);
   const [percentagePointChange, setPercentagePointChange] = useState<number | null>(null);
@@ -33,13 +35,25 @@ export default function ComparisonSalaryRevenueRatioCard({ selectedMonths, selec
   const [error, setError] = useState<FetchError | null>(null);
   const [filterDescription, setFilterDescription] = useState<string>("kỳ được chọn");
 
-  const fetchSingleYearData = useCallback(async (year: number, months?: number[], departments?: string[]): Promise<YearData> => {
-    const departmentNames = departments?.map(depId => depId.split('__')[1]).filter(Boolean) || [];
-    const rpcArgs = {
+  const fetchSingleYearData = useCallback(async (year: number, months?: number[], departmentsDiadiem?: string[], nganhDocs?: string[], donVi2s?: string[]): Promise<YearData> => {
+    const rpcArgsFt = {
       filter_year: year,
       filter_months: (months && months.length > 0) ? months : null,
-      filter_locations: (departmentNames.length > 0) ? departmentNames : null,
+      filter_locations: (departmentsDiadiem && departmentsDiadiem.length > 0) ? departmentsDiadiem : null,
+      filter_nganh_docs: (nganhDocs && nganhDocs.length > 0) ? nganhDocs : null,
     };
+    const rpcArgsPt = {
+      filter_year: year,
+      filter_months: (months && months.length > 0) ? months : null,
+      filter_locations: (departmentsDiadiem && departmentsDiadiem.length > 0) ? departmentsDiadiem : null,
+      filter_donvi2: (donVi2s && donVi2s.length > 0) ? donVi2s : null,
+    };
+    const rpcArgsRevenue = { // Revenue RPC doesn't use nganh_doc or donvi2
+      filter_year: year,
+      filter_months: (months && months.length > 0) ? months : null,
+      filter_locations: (departmentsDiadiem && departmentsDiadiem.length > 0) ? departmentsDiadiem : null,
+    };
+
 
     let ftSal: number | null = null;
     let ptSal: number | null = null;
@@ -47,23 +61,30 @@ export default function ComparisonSalaryRevenueRatioCard({ selectedMonths, selec
     let currentYearError: FetchError | null = null;
 
     const results = await Promise.allSettled([
-      supabase.rpc('get_total_salary_fulltime', rpcArgs),
-      supabase.rpc('get_total_salary_parttime', rpcArgs),
-      supabase.rpc('get_total_revenue', rpcArgs),
+      supabase.rpc('get_total_salary_fulltime', rpcArgsFt),
+      supabase.rpc('get_total_salary_parttime', rpcArgsPt),
+      supabase.rpc('get_total_revenue', rpcArgsRevenue),
     ]);
 
-    const processRpcResult = (res: PromiseSettledResult<any>, dataType: string, funcName: string): number | null => {
+    const processRpcResult = (res: PromiseSettledResult<any>, dataType: string, funcName: string, missingParamCheck?: string): number | null => {
       if (res.status === 'fulfilled') {
         if (res.value.error) {
           const msg = res.value.error.message ? String(res.value.error.message).toLowerCase() : '';
-          const errType = (res.value.error.code === '42883' || (res.value.error.code === 'PGRST202' && msg.includes(funcName))) ? 'rpcMissing' : 'generic';
-          if (!currentYearError) { // Only set first error for the year
-            currentYearError = { type: errType, message: `Lỗi ${dataType} (${year}): ${res.value.error.message}` };
+          const isParamMissing = missingParamCheck && msg.includes(missingParamCheck) && msg.includes('does not exist');
+          const errType = (res.value.error.code === '42883' || msg.includes(funcName) || isParamMissing) ? 'rpcMissing' : 'generic';
+          
+          let errMsg = `Lỗi ${dataType} (${year}): ${res.value.error.message}`;
+          if (isParamMissing) errMsg = `Tham số '${missingParamCheck}' cho ${dataType} (${year}) bị thiếu trong RPC '${funcName}'. Cập nhật RPC.`;
+          else if (errType === 'rpcMissing' && !isParamMissing) errMsg = `Hàm RPC '${funcName}' cho ${dataType} (${year}) bị thiếu hoặc sai.`;
+
+
+          if (!currentYearError) { 
+            currentYearError = { type: errType, message: errMsg };
           }
           return null;
         }
         return Number(res.value.data) || 0;
-      } else { // rejected
+      } else { 
         if (!currentYearError) {
           currentYearError = { type: 'generic', message: `Lỗi ${dataType} (${year}): ${res.reason?.message || 'Unknown rejection'}` };
         }
@@ -71,15 +92,15 @@ export default function ComparisonSalaryRevenueRatioCard({ selectedMonths, selec
       }
     };
 
-    ftSal = processRpcResult(results[0], 'Lương FT', 'get_total_salary_fulltime');
-    ptSal = processRpcResult(results[1], 'Lương PT', 'get_total_salary_parttime');
+    ftSal = processRpcResult(results[0], 'Lương FT', 'get_total_salary_fulltime', 'filter_nganh_docs');
+    ptSal = processRpcResult(results[1], 'Lương PT', 'get_total_salary_parttime', 'filter_donvi2');
     rev = processRpcResult(results[2], 'Doanh Thu', 'get_total_revenue');
 
     if (currentYearError) {
       return { ftSalary: ftSal, ptSalary: ptSal, revenue: rev, ratio: null, error: currentYearError };
     }
 
-    if (rev === null || ftSal === null || ptSal === null) {
+    if (rev === null || ftSal === null || ptSal === null) { // Should be caught by individual errors now
       return { ftSalary: ftSal, ptSalary: ptSal, revenue: rev, ratio: null, error: {type: 'generic', message: `Thiếu dữ liệu để tính tỷ lệ cho năm ${year}.`} };
     }
 
@@ -87,7 +108,7 @@ export default function ComparisonSalaryRevenueRatioCard({ selectedMonths, selec
       if (ftSal > 0 || ptSal > 0) {
         return { ftSalary: ftSal, ptSalary: ptSal, revenue: rev, ratio: null, error: { type: 'dataIssue', message: `Doanh thu bằng 0 cho năm ${year}, không thể tính tỷ lệ.` } };
       }
-      return { ftSalary: ftSal, ptSalary: ptSal, revenue: rev, ratio: 0, error: null }; // All zero
+      return { ftSalary: ftSal, ptSalary: ptSal, revenue: rev, ratio: 0, error: null }; 
     }
     
     const calculatedRatio = (ftSal + ptSal) / rev;
@@ -103,7 +124,6 @@ export default function ComparisonSalaryRevenueRatioCard({ selectedMonths, selec
     setData2025(null);
     setPercentagePointChange(null);
 
-    const departmentNames = selectedDepartments?.map(depId => depId.split('__')[1]).filter(Boolean) || [];
     let monthSegment: string;
     if (selectedMonths && selectedMonths.length > 0) {
       if (selectedMonths.length === 12) monthSegment = "cả năm";
@@ -113,17 +133,22 @@ export default function ComparisonSalaryRevenueRatioCard({ selectedMonths, selec
       monthSegment = "cả năm";
     }
 
-    let locationSegment: string;
-    if (departmentNames.length > 0) {
-      if (departmentNames.length <= 2) locationSegment = departmentNames.join(' & ');
-      else locationSegment = `${departmentNames.length} địa điểm`;
-    } else {
-      locationSegment = "tất cả địa điểm";
+    let locationSegment = "tất cả";
+    let appliedFilters: string[] = [];
+    if (selectedDepartmentsForDiadiem && selectedDepartmentsForDiadiem.length > 0) {
+      appliedFilters.push(selectedDepartmentsForDiadiem.length <= 2 ? selectedDepartmentsForDiadiem.join(' & ') : `${selectedDepartmentsForDiadiem.length} địa điểm (Loại/Pban)`);
     }
+    if (selectedNganhDoc && selectedNganhDoc.length > 0) {
+      appliedFilters.push(selectedNganhDoc.length <= 2 ? selectedNganhDoc.join(' & ') : `${selectedNganhDoc.length} ngành dọc`);
+    }
+    if (selectedDonVi2 && selectedDonVi2.length > 0) {
+      appliedFilters.push(selectedDonVi2.length <= 2 ? selectedDonVi2.join(' & ') : `${selectedDonVi2.length} đơn vị 2`);
+    }
+    if(appliedFilters.length > 0) locationSegment = appliedFilters.join(' và ');
     setFilterDescription(`${monthSegment} tại ${locationSegment}`);
 
-    const res2024 = await fetchSingleYearData(2024, selectedMonths, selectedDepartments);
-    const res2025 = await fetchSingleYearData(2025, selectedMonths, selectedDepartments);
+    const res2024 = await fetchSingleYearData(2024, selectedMonths, selectedDepartmentsForDiadiem, selectedNganhDoc, selectedDonVi2);
+    const res2025 = await fetchSingleYearData(2025, selectedMonths, selectedDepartmentsForDiadiem, selectedNganhDoc, selectedDonVi2);
 
     setData2024(res2024);
     setData2025(res2025);
@@ -141,7 +166,7 @@ export default function ComparisonSalaryRevenueRatioCard({ selectedMonths, selec
         setPercentagePointChange(null);
     }
     setIsLoading(false);
-  }, [selectedMonths, selectedDepartments, fetchSingleYearData]);
+  }, [selectedMonths, selectedDepartmentsForDiadiem, selectedNganhDoc, selectedDonVi2, fetchSingleYearData]);
 
   useEffect(() => {
     fetchAllComparisonData();
@@ -156,7 +181,6 @@ export default function ComparisonSalaryRevenueRatioCard({ selectedMonths, selec
     if (percentagePointChange === null) return <span className="text-sm text-muted-foreground">N/A</span>;
     
     const displayPoints = (percentagePointChange * 100).toFixed(1) + ' điểm %';
-    // Inverted color logic for ratio (cost-like): increase is red (bad), decrease is green (good)
     if (percentagePointChange > 0) {
       return <span className="text-sm text-red-600 dark:text-red-500 flex items-center"><TrendingUp className="mr-1 h-4 w-4" /> +{displayPoints}</span>;
     } else if (percentagePointChange < 0) {
@@ -191,9 +215,9 @@ export default function ComparisonSalaryRevenueRatioCard({ selectedMonths, selec
         </CardHeader>
         <CardContent className="pt-2">
           <p className="text-xs text-destructive">{error.message}</p>
-          {(error.type === 'rpcMissing' || error.message.includes("Hàm RPC")) && (
+          {(error.type === 'rpcMissing' || error.message.includes("Hàm RPC") || error.message.includes("Tham số")) && (
             <p className="text-xs text-muted-foreground mt-1">
-              Đảm bảo các hàm RPC `get_total_salary_fulltime`, `get_total_salary_parttime`, và `get_total_revenue` đã được tạo/cập nhật trong Supabase theo README.md.
+              Đảm bảo các hàm RPC đã được cập nhật trong Supabase để hỗ trợ các tham số lọc mới (filter_nganh_docs, filter_donvi2).
             </p>
           )}
            {error.type === 'dataIssue' && (
@@ -213,7 +237,7 @@ export default function ComparisonSalaryRevenueRatioCard({ selectedMonths, selec
             <CardTitle className="text-sm font-semibold text-muted-foreground">Tỷ Lệ Quỹ Lương/Doanh Thu</CardTitle>
             <Percent className="h-4 w-4 text-muted-foreground" />
         </div>
-        <CardDescription className="text-xs truncate">So sánh {filterDescription} (2024 vs 2025)</CardDescription>
+        <CardDescription className="text-xs truncate" title={filterDescription}>So sánh {filterDescription} (2024 vs 2025)</CardDescription>
       </CardHeader>
       <CardContent className="pt-1 space-y-1">
         <div>
@@ -229,4 +253,3 @@ export default function ComparisonSalaryRevenueRatioCard({ selectedMonths, selec
     </Card>
   );
 }
-

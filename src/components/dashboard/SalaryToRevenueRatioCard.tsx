@@ -14,7 +14,9 @@ import {
 interface SalaryToRevenueRatioCardProps {
   selectedMonths?: number[];
   selectedYear?: number | null;
-  selectedDepartments?: string[]; // Added
+  selectedDepartmentsForDiadiem?: string[]; 
+  selectedNganhDoc?: string[];
+  selectedDonVi2?: string[];
 }
 
 interface FetchError {
@@ -22,7 +24,7 @@ interface FetchError {
   message: string;
 }
 
-export default function SalaryToRevenueRatioCard({ selectedMonths, selectedYear, selectedDepartments }: SalaryToRevenueRatioCardProps) {
+export default function SalaryToRevenueRatioCard({ selectedMonths, selectedYear, selectedDepartmentsForDiadiem, selectedNganhDoc, selectedDonVi2 }: SalaryToRevenueRatioCardProps) {
   const [ratio, setRatio] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<FetchError | null>(null);
@@ -40,57 +42,48 @@ export default function SalaryToRevenueRatioCard({ selectedMonths, selectedYear,
     setParttimeSalary(null);
     setTotalRevenue(null);
 
-    const departmentNames = selectedDepartments?.map(depId => depId.split('__')[1]).filter(Boolean) || [];
-
-    let finalFilterDescription: string;
     const yearSegment = selectedYear ? `Năm ${selectedYear}` : "Tất cả các năm";
-    
     let monthSegment: string;
     if (selectedMonths && selectedMonths.length > 0) {
-      if (selectedMonths.length === 12) {
-        monthSegment = "tất cả các tháng";
-      } else if (selectedMonths.length === 1) {
-        monthSegment = `Tháng ${String(selectedMonths[0]).padStart(2, '0')}`;
-      } else {
-        monthSegment = `các tháng ${selectedMonths.map(m => String(m).padStart(2, '0')).join(', ')}`;
-      }
+      if (selectedMonths.length === 12) monthSegment = "tất cả các tháng";
+      else if (selectedMonths.length === 1) monthSegment = `Tháng ${String(selectedMonths[0]).padStart(2, '0')}`;
+      else monthSegment = `các tháng ${selectedMonths.map(m => String(m).padStart(2, '0')).join(', ')}`;
     } else {
       monthSegment = "tất cả các tháng";
     }
 
-    let locationSegment: string;
-    if (departmentNames.length > 0) {
-      if (departmentNames.length <= 2) {
-        locationSegment = departmentNames.join(' & ');
-      } else {
-        locationSegment = `${departmentNames.length} địa điểm`;
-      }
-    } else {
-      locationSegment = "tất cả địa điểm";
+    let locationSegment = "tất cả địa điểm";
+    let appliedFilters: string[] = [];
+    if (selectedDepartmentsForDiadiem && selectedDepartmentsForDiadiem.length > 0) {
+      appliedFilters.push(selectedDepartmentsForDiadiem.length <= 2 ? selectedDepartmentsForDiadiem.join(' & ') : `${selectedDepartmentsForDiadiem.length} địa điểm (Loại/Pban)`);
     }
-
-    if (selectedYear) {
-      finalFilterDescription = `${monthSegment} của ${yearSegment} tại ${locationSegment}`;
-    } else {
-      if (selectedMonths && selectedMonths.length > 0 && selectedMonths.length < 12) {
-        finalFilterDescription = `${monthSegment} (mọi năm) tại ${locationSegment}`;
-      } else {
-        finalFilterDescription = `tất cả các kỳ tại ${locationSegment}`;
-      }
+    if (selectedNganhDoc && selectedNganhDoc.length > 0) {
+      appliedFilters.push(selectedNganhDoc.length <= 2 ? selectedNganhDoc.join(' & ') : `${selectedNganhDoc.length} ngành dọc`);
     }
-    setFilterDescription(finalFilterDescription);
+    if (selectedDonVi2 && selectedDonVi2.length > 0) {
+      appliedFilters.push(selectedDonVi2.length <= 2 ? selectedDonVi2.join(' & ') : `${selectedDonVi2.length} đơn vị 2`);
+    }
+    if(appliedFilters.length > 0) locationSegment = appliedFilters.join(' và ');
+    
+    setFilterDescription(`${monthSegment} của ${yearSegment} tại ${locationSegment}`);
 
-    const rpcArgs = {
+    const rpcArgsBase = {
       filter_year: selectedYear,
       filter_months: (selectedMonths && selectedMonths.length > 0) ? selectedMonths : null,
-      filter_locations: (departmentNames.length > 0) ? departmentNames : null, // Added
+      filter_locations: (selectedDepartmentsForDiadiem && selectedDepartmentsForDiadiem.length > 0) ? selectedDepartmentsForDiadiem : null,
     };
+    
+    const rpcArgsFt = { ...rpcArgsBase, filter_nganh_docs: (selectedNganhDoc && selectedNganhDoc.length > 0) ? selectedNganhDoc : null };
+    const rpcArgsPt = { ...rpcArgsBase, filter_donvi2: (selectedDonVi2 && selectedDonVi2.length > 0) ? selectedDonVi2 : null };
+    // Revenue RPC does not use nganh_doc or donvi2
+    const rpcArgsRevenue = { ...rpcArgsBase };
+
 
     try {
       const [ftSalaryRes, ptSalaryRes, revenueRes] = await Promise.allSettled([
-        supabase.rpc('get_total_salary_fulltime', rpcArgs),
-        supabase.rpc('get_total_salary_parttime', rpcArgs),
-        supabase.rpc('get_total_revenue', rpcArgs),
+        supabase.rpc('get_total_salary_fulltime', rpcArgsFt),
+        supabase.rpc('get_total_salary_parttime', rpcArgsPt),
+        supabase.rpc('get_total_revenue', rpcArgsRevenue),
       ]);
 
       let ftSal = 0;
@@ -98,7 +91,7 @@ export default function SalaryToRevenueRatioCard({ selectedMonths, selectedYear,
       let rev = 0;
       let currentError: FetchError | null = null;
 
-      const processResult = (res: PromiseSettledResult<any>, name: string, funcName: string, tableName: string, columnName?: string) => {
+      const processResult = (res: PromiseSettledResult<any>, name: string, funcName: string, tableName: string, columnName?: string, missingParamCheck?: string) => {
         if (res.status === 'rejected' || (res.status === 'fulfilled' && res.value.error)) {
           const rpcError = res.status === 'fulfilled' ? res.value.error : res.reason;
           const rpcMessageText = rpcError.message ? String(rpcError.message).toLowerCase() : '';
@@ -109,9 +102,10 @@ export default function SalaryToRevenueRatioCard({ selectedMonths, selectedYear,
           
           const isTableMissingError = rpcMessageText.includes(`relation "${tableName.toLowerCase()}" does not exist`);
           const isColumnMissingError = columnName ? rpcMessageText.includes(`column "${columnName.toLowerCase()}" does not exist`) : false;
-
+          const isParamMissingError = missingParamCheck ? (rpcMessageText.includes(missingParamCheck) && rpcMessageText.includes("does not exist")) : false;
 
           if (isFunctionMissingError) return { type: 'rpcMissing' as 'rpcMissing', message: `Hàm RPC '${funcName}' cho ${name} bị thiếu. Kiểm tra README.md.` };
+          if (isParamMissingError) return { type: 'rpcMissing' as 'rpcMissing', message: `Tham số '${missingParamCheck}' cho ${name} bị thiếu trong RPC '${funcName}'. Cập nhật hàm RPC.` };
           if (isTableMissingError) return { type: 'rpcMissing' as 'rpcMissing', message: `Bảng '${tableName}' cho ${name} không tồn tại.`};
           if (isColumnMissingError) return { type: 'rpcMissing' as 'rpcMissing', message: `Cột '${columnName}' trong bảng '${tableName}' cho ${name} không tồn tại.`};
           
@@ -121,11 +115,11 @@ export default function SalaryToRevenueRatioCard({ selectedMonths, selectedYear,
         return typeof rawValue === 'string' ? parseFloat(rawValue.replace(/,/g, '')) : (typeof rawValue === 'number' ? rawValue : 0);
       };
 
-      const ftSalResult = processResult(ftSalaryRes, 'Lương Fulltime', 'get_total_salary_fulltime', 'Fulltime', 'tong_thu_nhap');
+      const ftSalResult = processResult(ftSalaryRes, 'Lương Fulltime', 'get_total_salary_fulltime', 'Fulltime', 'tong_thu_nhap', 'filter_nganh_docs');
       if (typeof ftSalResult === 'object') currentError = ftSalResult; else ftSal = ftSalResult;
       setFulltimeSalary(ftSal);
 
-      const ptSalResult = processResult(ptSalaryRes, 'Lương Part-time', 'get_total_salary_parttime', 'Parttime', '"Tong tien"'); 
+      const ptSalResult = processResult(ptSalaryRes, 'Lương Part-time', 'get_total_salary_parttime', 'Parttime', '"Tong tien"', 'filter_donvi2'); 
       if (typeof ptSalResult === 'object' && !currentError) currentError = ptSalResult; else ptSal = ptSalResult;
       setParttimeSalary(ptSal);
       
@@ -142,7 +136,7 @@ export default function SalaryToRevenueRatioCard({ selectedMonths, selectedYear,
         if (ftSal > 0 || ptSal > 0) {
           setError({ type: 'dataIssue', message: 'Không thể tính tỷ lệ do tổng doanh thu bằng 0.' });
         } else {
-          setRatio(0); // Both salary and revenue are 0
+          setRatio(0); 
         }
       } else {
         setRatio((ftSal + ptSal) / rev);
@@ -154,7 +148,7 @@ export default function SalaryToRevenueRatioCard({ selectedMonths, selectedYear,
     } finally {
       setIsLoading(false);
     }
-  }, [selectedMonths, selectedYear, selectedDepartments]);
+  }, [selectedMonths, selectedYear, selectedDepartmentsForDiadiem, selectedNganhDoc, selectedDonVi2]);
 
   useEffect(() => {
     fetchData();
@@ -182,7 +176,7 @@ export default function SalaryToRevenueRatioCard({ selectedMonths, selectedYear,
   } else if (totalRevenue === 0 && ratio === 0 && (fulltimeSalary ?? 0) === 0 && (parttimeSalary ?? 0) === 0) {
     displayValue = "0.0%"; 
   } else if (totalRevenue === 0) {
-    displayValue = "N/A"; // Should be caught by error.type === 'dataIssue'
+    displayValue = "N/A"; 
     cardState = "warning";
   }
   else {
@@ -208,9 +202,9 @@ export default function SalaryToRevenueRatioCard({ selectedMonths, selectedYear,
               <AlertTriangle className="h-5 w-5 mr-2" /> Lỗi
             </div>
             <p className="text-xs text-destructive mt-0.5">{error.message}</p>
-            {(error.type === 'rpcMissing' || error.message.includes('Bảng') || error.message.includes('Cột')) && (
+            {(error.type === 'rpcMissing' || error.message.includes('Bảng') || error.message.includes('Cột') || error.message.includes('Tham số')) && (
                  <p className="text-xs text-muted-foreground mt-1">
-                   Hãy đảm bảo các hàm RPC và các bảng/cột liên quan đã tồn tại và được cấu hình đúng theo README.md.
+                   Hãy đảm bảo các hàm RPC và các bảng/cột/tham số liên quan đã tồn tại và được cấu hình đúng theo README.md.
                  </p>
             )}
             {error.type === 'dataIssue' && (
@@ -224,7 +218,7 @@ export default function SalaryToRevenueRatioCard({ selectedMonths, selectedYear,
             <div className={`text-xl font-bold ${cardState === 'warning' || cardState === 'noData' ? 'text-muted-foreground' : 'text-primary'}`}>
               {displayValue}
             </div>
-            <p className="text-xs text-muted-foreground truncate">
+            <p className="text-xs text-muted-foreground truncate" title={filterDescription}>
               Cho: {filterDescription}
             </p>
              {(cardState === 'warning' && totalRevenue === 0 && ((fulltimeSalary ?? 0) > 0 || (parttimeSalary ?? 0) > 0)) && (
@@ -239,4 +233,3 @@ export default function SalaryToRevenueRatioCard({ selectedMonths, selectedYear,
     </Card>
   );
 }
-

@@ -35,18 +35,20 @@ interface LocationRatioData {
 interface LocationSalaryRevenueChartProps {
   selectedYear?: number | null;
   selectedMonths?: number[];
-  selectedDepartments?: string[]; // Added: Array of "Loại__Department" strings
+  selectedDepartmentsForDiadiem?: string[]; 
+  selectedNganhDoc?: string[];
+  selectedDonVi2?: string[];
 }
 
 const chartConfig = {
   ft_salary_ratio_component: {
     label: 'Lương FT / Doanh Thu',
-    color: 'hsl(var(--chart-1))', // Purple
+    color: 'hsl(var(--chart-1))', 
     icon: TrendingUp,
   },
   pt_salary_ratio_component: {
     label: 'Lương PT / Doanh Thu',
-    color: 'hsl(var(--chart-2))', // Orange
+    color: 'hsl(var(--chart-2))', 
     icon: Percent,
   },
 } satisfies ChartConfig;
@@ -88,7 +90,7 @@ const CustomTotalLabel = (props: any) => {
 };
 
 
-export default function LocationSalaryRevenueColumnChart({ selectedYear, selectedMonths, selectedDepartments }: LocationSalaryRevenueChartProps) {
+export default function LocationSalaryRevenueColumnChart({ selectedYear, selectedMonths, selectedDepartmentsForDiadiem, selectedNganhDoc, selectedDonVi2 }: LocationSalaryRevenueChartProps) {
   const [chartData, setChartData] = useState<LocationRatioData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -98,50 +100,47 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
     setIsLoading(true);
     setError(null);
 
-    const departmentNames = selectedDepartments?.map(depId => depId.split('__')[1]).filter(Boolean) || [];
-    
     let finalFilterDescription: string;
     const yearSegment = selectedYear ? `Năm ${selectedYear}` : "Tất cả các năm";
-
     let monthSegment: string;
     if (selectedMonths && selectedMonths.length > 0) {
-      if (selectedMonths.length === 12) {
-        monthSegment = "tất cả các tháng";
-      } else if (selectedMonths.length === 1) {
-        monthSegment = `Tháng ${String(selectedMonths[0]).padStart(2, '0')}`;
-      } else {
-        monthSegment = `các tháng ${selectedMonths.map(m => String(m).padStart(2, '0')).join(', ')}`;
-      }
-    } else {
-      monthSegment = "tất cả các tháng";
-    }
+      if (selectedMonths.length === 12) monthSegment = "tất cả các tháng";
+      else if (selectedMonths.length === 1) monthSegment = `Tháng ${String(selectedMonths[0]).padStart(2, '0')}`;
+      else monthSegment = `các tháng ${selectedMonths.map(m => String(m).padStart(2, '0')).join(', ')}`;
+    } else { monthSegment = "tất cả các tháng"; }
     
-    let locationSegment: string;
-    if (departmentNames.length > 0) {
-      if (departmentNames.length <= 2) {
-        locationSegment = departmentNames.join(' & ');
-      } else {
-        locationSegment = `${departmentNames.length} địa điểm`;
-      }
-    } else {
-      locationSegment = "tất cả địa điểm";
+    let locationSegment = "tất cả";
+    let appliedFilters: string[] = [];
+    if (selectedDepartmentsForDiadiem && selectedDepartmentsForDiadiem.length > 0) {
+      appliedFilters.push(selectedDepartmentsForDiadiem.length <= 2 ? selectedDepartmentsForDiadiem.join(' & ') : `${selectedDepartmentsForDiadiem.length} địa điểm (Loại/Pban)`);
+    }
+    // Note: This chart's RPC 'get_salary_revenue_ratio_components_by_location' uses p_filter_locations, which corresponds to dia_diem/Don vi/Ten don vi.
+    // It does not currently support filtering by nganh_doc or Don_vi_2 directly at the RPC level for ratio components.
+    // If nganh_doc/Don_vi_2 filtering is needed here, the RPC itself would need significant changes to incorporate these different grouping/filtering dimensions.
+    // For now, nganh_doc and don_vi_2 selections will effectively narrow down the *input data* to the RPC if other cards/charts filter by them, but this chart's RPC won't use them directly.
+    // We will only use selectedDepartmentsForDiadiem for the p_filter_locations parameter.
+    if (appliedFilters.length > 0) locationSegment = appliedFilters.join(' và ');
+    else if (selectedNganhDoc && selectedNganhDoc.length > 0) { // If only nganh_doc is selected, describe it
+      locationSegment = selectedNganhDoc.length <=2 ? selectedNganhDoc.join(' & ') : `${selectedNganhDoc.length} ngành dọc`;
+    } else if (selectedDonVi2 && selectedDonVi2.length > 0) { // If only don_vi_2 is selected
+      locationSegment = selectedDonVi2.length <=2 ? selectedDonVi2.join(' & ') : `${selectedDonVi2.length} đơn vị 2`;
     }
 
-    if (selectedYear) {
-      finalFilterDescription = `${monthSegment} của ${yearSegment} tại ${locationSegment}`;
-    } else {
-      if (selectedMonths && selectedMonths.length > 0 && selectedMonths.length < 12) {
-        finalFilterDescription = `${monthSegment} (mọi năm) tại ${locationSegment}`;
-      } else {
-        finalFilterDescription = `tất cả các kỳ tại ${locationSegment}`;
-      }
-    }
+
+    finalFilterDescription = selectedYear 
+      ? `${monthSegment} của ${yearSegment} tại ${locationSegment}` 
+      : (selectedMonths && selectedMonths.length > 0 && selectedMonths.length < 12) 
+        ? `${monthSegment} (mọi năm) tại ${locationSegment}` 
+        : `tất cả các kỳ tại ${locationSegment}`;
     setFilterDescription(finalFilterDescription);
 
     const rpcArgs = {
       p_filter_year: selectedYear,
       p_filter_months: (selectedMonths && selectedMonths.length > 0) ? selectedMonths : null,
-      p_filter_locations: (departmentNames.length > 0) ? departmentNames : null, // Added
+      // IMPORTANT: This RPC uses p_filter_locations for department names from MS_Org_Diadiem, Fulltime.dia_diem, Parttime."Don vi", Doanh_thu."Ten don vi"
+      // It does NOT currently take separate p_filter_nganh_docs or p_filter_donvi2.
+      // Passing selectedNganhDoc or selectedDonVi2 here would be incorrect unless the RPC is redesigned.
+      p_filter_locations: (selectedDepartmentsForDiadiem && selectedDepartmentsForDiadiem.length > 0) ? selectedDepartmentsForDiadiem : null,
     };
 
     try {
@@ -150,16 +149,13 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
 
       if (rpcError) {
         const rpcMessageText = rpcError.message ? String(rpcError.message).toLowerCase() : '';
-        let isCriticalSetupError =
-            rpcError.code === '42883' ||
-            (rpcError.code === 'PGRST202' && rpcMessageText.includes(functionName.toLowerCase())) ||
-            (rpcMessageText.includes(functionName.toLowerCase()) && rpcMessageText.includes('does not exist'));
-
+        let isCriticalSetupError = rpcError.code === '42883' || (rpcError.code === 'PGRST202' && rpcMessageText.includes(functionName.toLowerCase())) || (rpcMessageText.includes(functionName.toLowerCase()) && rpcMessageText.includes('does not exist'));
         let setupErrorDetails = "";
         if (rpcMessageText.includes('relation "fulltime" does not exist')) { setupErrorDetails += " Bảng 'Fulltime' không tồn tại."; isCriticalSetupError = true; }
         if (rpcMessageText.includes('relation "parttime" does not exist')) { setupErrorDetails += " Bảng 'Parttime' không tồn tại."; isCriticalSetupError = true; }
         if (rpcMessageText.includes('relation "doanh_thu" does not exist')) { setupErrorDetails += " Bảng 'Doanh_thu' không tồn tại."; isCriticalSetupError = true; }
-        if (rpcMessageText.includes('p_filter_locations')) { setupErrorDetails += " Hàm RPC có thể chưa được cập nhật để nhận 'p_filter_locations'."; isCriticalSetupError = true;}
+        // Check for p_filter_nganh_docs or p_filter_donvi2 if we were to add them. For now, this check is for p_filter_locations.
+        if (rpcMessageText.includes('p_filter_locations') && rpcMessageText.includes('does not exist')) { setupErrorDetails += " Hàm RPC có thể chưa được cập nhật để nhận 'p_filter_locations TEXT[]'."; isCriticalSetupError = true;}
 
 
         if (isCriticalSetupError) {
@@ -191,7 +187,7 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
     } finally {
       setIsLoading(false);
     }
-  }, [selectedYear, selectedMonths, selectedDepartments]);
+  }, [selectedYear, selectedMonths, selectedDepartmentsForDiadiem, selectedNganhDoc, selectedDonVi2]); // Added new filters to dependency array
 
   useEffect(() => {
     fetchData();
@@ -254,7 +250,7 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
      <Card className="h-[350px] flex flex-col">
        <CardHeader className="pb-2 pt-3">
           <CardTitle className="text-base font-semibold text-muted-foreground flex items-center gap-1.5"><BarChartHorizontal className="h-4 w-4" />Quỹ Lương/Doanh Thu theo Địa Điểm</CardTitle>
-          <CardDescription className="text-xs truncate">Cho: {filterDescription}. Chỉ hiển thị các đơn vị có tỷ lệ từ 2% đến 150%.</CardDescription>
+          <CardDescription className="text-xs truncate" title={filterDescription}>Cho: {filterDescription}. Chỉ hiển thị các đơn vị có tỷ lệ từ 2% đến 150%.</CardDescription>
        </CardHeader>
        <CardContent className="pt-2 flex items-center justify-center flex-grow">
          <p className="text-sm text-muted-foreground">Không có dữ liệu cho kỳ/địa điểm đã chọn hoặc theo bộ lọc tỷ lệ.</p>
@@ -267,7 +263,7 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
     <Card className="h-[350px] flex flex-col">
       <CardHeader className="pb-2 pt-3">
         <CardTitle className="text-base font-semibold flex items-center gap-1.5"><BarChartHorizontal className="h-4 w-4" />Quỹ Lương/Doanh Thu theo Địa Điểm</CardTitle>
-        <CardDescription className="text-xs truncate">
+        <CardDescription className="text-xs truncate" title={filterDescription}>
           Tỷ lệ cho {filterDescription}. Chỉ hiển thị địa điểm có tỷ lệ 2% - 150%. Sắp xếp từ cao đến thấp.
         </CardDescription>
       </CardHeader>
@@ -287,99 +283,16 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
                     barGap={4}
                 >
                     <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                    <XAxis
-                        type="number"
-                        domain={[0, xAxisDomainMax]}
-                        tickFormatter={(value) => `${(value * 100).toFixed(0)}%`}
-                        axisLine={false}
-                        tickLine={false}
-                        tickMargin={8}
-                        className="text-xs"
-                    />
-                    <YAxis
-                        type="category"
-                        dataKey="location_name"
-                        width={Y_AXIS_WIDTH}
-                        tickLine={false}
-                        axisLine={false}
-                        tickMargin={5}
-                        className="text-xs"
-                        interval={0}
-                    />
-                    <Tooltip
-                    content={<ChartTooltipContent
-                        formatter={(value, name, props) => {
-                            const dataKey = props.dataKey as keyof typeof chartConfig;
-                            const payloadValue = props.payload?.[dataKey];
-                            if (typeof payloadValue === 'number') {
-                                return `${(payloadValue * 100).toFixed(1)}%`;
-                            }
-                            return String(value);
-                        }}
-                        labelFormatter={(label, payload) => {
-                           if (payload && payload.length > 0 && payload[0].payload) {
-                             const total = (payload[0].payload.total_ratio * 100).toFixed(1);
-                             return `${label} (Tổng: ${total}%)`;
-                           }
-                           return label;
-                        }}
-                        itemSorter={(item) => (item.dataKey === 'ft_salary_ratio_component' ? 0 : 1)}
-                        indicator="dot"
-                    />}
-                    />
-                    <Legend
-                        verticalAlign="top"
-                        align="center"
-                        height={30}
-                        wrapperStyle={{paddingBottom: "5px"}}
-                        content={({ payload }) => (
-                            <div className="flex items-center justify-center gap-2 mb-1 flex-wrap">
-                            {payload?.sort((a,b) => (a.dataKey === 'ft_salary_ratio_component' ? -1 : 1))
-                                .map((entry: any) => {
-                                const configKey = entry.dataKey as keyof typeof chartConfig;
-                                const Icon = chartConfig[configKey]?.icon;
-                                return (
-                                <div key={`item-${entry.dataKey}`} className="flex items-center gap-0.5 cursor-pointer text-xs">
-                                    {Icon && <Icon className="h-3 w-3" style={{ color: entry.color }} />}
-                                    <span style={{ color: entry.color }}>{chartConfig[configKey]?.label}</span>
-                                </div>
-                                );
-                            })}
-                            </div>
-                        )}
-                    />
-                    <Bar
-                        dataKey="ft_salary_ratio_component"
-                        stackId="a"
-                        fill="var(--color-ft_salary_ratio_component)"
-                        name={chartConfig.ft_salary_ratio_component.label}
-                        radius={[4, 0, 0, 4]}
-                        barSize={Math.max(15, MIN_CATEGORY_HEIGHT * 0.6)}
-                    >
-                        <LabelList
-                            dataKey="ft_salary_ratio_component"
-                            position="center"
-                            content={<CustomSegmentLabel />}
-                        />
+                    <XAxis type="number" domain={[0, xAxisDomainMax]} tickFormatter={(value) => `${(value * 100).toFixed(0)}%`} axisLine={false} tickLine={false} tickMargin={8} className="text-xs" />
+                    <YAxis type="category" dataKey="location_name" width={Y_AXIS_WIDTH} tickLine={false} axisLine={false} tickMargin={5} className="text-xs" interval={0} />
+                    <Tooltip content={<ChartTooltipContent formatter={(value, name, props) => { const dataKey = props.dataKey as keyof typeof chartConfig; const payloadValue = props.payload?.[dataKey]; if (typeof payloadValue === 'number') { return `${(payloadValue * 100).toFixed(1)}%`; } return String(value); }} labelFormatter={(label, payload) => { if (payload && payload.length > 0 && payload[0].payload) { const total = (payload[0].payload.total_ratio * 100).toFixed(1); return `${label} (Tổng: ${total}%)`; } return label; }} itemSorter={(item) => (item.dataKey === 'ft_salary_ratio_component' ? 0 : 1)} indicator="dot" />} />
+                    <Legend verticalAlign="top" align="center" height={30} wrapperStyle={{paddingBottom: "5px"}} content={({ payload }) => ( <div className="flex items-center justify-center gap-2 mb-1 flex-wrap"> {payload?.sort((a,b) => (a.dataKey === 'ft_salary_ratio_component' ? -1 : 1)) .map((entry: any) => { const configKey = entry.dataKey as keyof typeof chartConfig; const Icon = chartConfig[configKey]?.icon; return ( <div key={`item-${entry.dataKey}`} className="flex items-center gap-0.5 cursor-pointer text-xs"> {Icon && <Icon className="h-3 w-3" style={{ color: entry.color }} />} <span style={{ color: entry.color }}>{chartConfig[configKey]?.label}</span> </div> ); })} </div> )} />
+                    <Bar dataKey="ft_salary_ratio_component" stackId="a" fill="var(--color-ft_salary_ratio_component)" name={chartConfig.ft_salary_ratio_component.label} radius={[4, 0, 0, 4]} barSize={Math.max(15, MIN_CATEGORY_HEIGHT * 0.6)} >
+                        <LabelList dataKey="ft_salary_ratio_component" position="center" content={<CustomSegmentLabel />} />
                     </Bar>
-                    <Bar
-                        dataKey="pt_salary_ratio_component"
-                        stackId="a"
-                        fill="var(--color-pt_salary_ratio_component)"
-                        name={chartConfig.pt_salary_ratio_component.label}
-                        radius={[0, 4, 4, 0]}
-                        barSize={Math.max(15, MIN_CATEGORY_HEIGHT * 0.6)}
-                    >
-                        <LabelList
-                            dataKey="pt_salary_ratio_component"
-                            position="center"
-                            content={<CustomSegmentLabel />}
-                        />
-                        <LabelList
-                            dataKey="total_ratio"
-                            position="right"
-                            content={<CustomTotalLabel chartData={chartData}/>}
-                        />
+                    <Bar dataKey="pt_salary_ratio_component" stackId="a" fill="var(--color-pt_salary_ratio_component)" name={chartConfig.pt_salary_ratio_component.label} radius={[0, 4, 4, 0]} barSize={Math.max(15, MIN_CATEGORY_HEIGHT * 0.6)} >
+                        <LabelList dataKey="pt_salary_ratio_component" position="center" content={<CustomSegmentLabel />} />
+                        <LabelList dataKey="total_ratio" position="right" content={<CustomTotalLabel chartData={chartData}/>} />
                     </Bar>
                 </DynamicBarChart>
                 </ResponsiveContainer>
@@ -389,4 +302,3 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
     </Card>
   );
 }
-

@@ -52,10 +52,12 @@ const calculateChange = (valNew: number | null, valOld: number | null): number |
 
 interface NganhDocComparisonTableProps {
   selectedMonths?: number[];
+  selectedNganhDoc?: string[]; // For potential pre-filtering if RPC is enhanced
+  selectedDonVi2?: string[];   // For potential pre-filtering if RPC is enhanced
 }
 
 
-export default function NganhDocComparisonTable({ selectedMonths }: NganhDocComparisonTableProps) {
+export default function NganhDocComparisonTable({ selectedMonths, selectedNganhDoc, selectedDonVi2 }: NganhDocComparisonTableProps) {
   const [comparisonData, setComparisonData] = useState<MergedNganhDocData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<FetchError | null>(null);
@@ -67,6 +69,10 @@ export default function NganhDocComparisonTable({ selectedMonths }: NganhDocComp
     let ftSalaryData: NganhDocMetric[] = [];
     let ptSalaryData: NganhDocMetric[] = [];
 
+    // RPCs get_nganhdoc_ft_salary_hanoi and get_donvi2_pt_salary currently only take year and months.
+    // They do not take selectedNganhDoc or selectedDonVi2 as parameters for filtering their *input* data.
+    // If such filtering is desired, the RPCs themselves would need to be updated.
+    // For now, selectedNganhDoc/selectedDonVi2 from props are not used in RPC calls here.
     const rpcArgs = {
       p_filter_year: year,
       p_filter_months: (selectedMonths && selectedMonths.length > 0) ? selectedMonths : null,
@@ -118,26 +124,26 @@ export default function NganhDocComparisonTable({ selectedMonths }: NganhDocComp
         if (selectedMonths.length === 12) monthSegment = "cả năm";
         else if (selectedMonths.length === 1) monthSegment = `Tháng ${String(selectedMonths[0]).padStart(2, '0')}`;
         else monthSegment = `${selectedMonths.length} tháng đã chọn`;
-    } else {
-        monthSegment = "cả năm";
+    } else { monthSegment = "cả năm"; }
+
+    let appliedFiltersDesc = "";
+    if (selectedNganhDoc && selectedNganhDoc.length > 0) {
+        appliedFiltersDesc += (selectedNganhDoc.length <=2 ? selectedNganhDoc.join(' & ') : `${selectedNganhDoc.length} ngành dọc`);
     }
-    setFilterDescription(`${monthSegment} (2024 vs 2025)`);
+    if (selectedDonVi2 && selectedDonVi2.length > 0) {
+        if (appliedFiltersDesc) appliedFiltersDesc += " và ";
+        appliedFiltersDesc += (selectedDonVi2.length <=2 ? selectedDonVi2.join(' & ') : `${selectedDonVi2.length} đơn vị 2`);
+    }
+    
+    setFilterDescription(`${monthSegment}${appliedFiltersDesc ? ` cho ${appliedFiltersDesc}` : ''} (2024 vs 2025)`);
 
     const [data2024Result, data2025Result] = await Promise.all([
       fetchDataForYear(2024),
       fetchDataForYear(2025),
     ]);
     
-    if (data2024Result.error) {
-        setError(data2024Result.error);
-        setIsLoading(false);
-        return;
-    }
-    if (data2025Result.error) {
-        setError(data2025Result.error);
-        setIsLoading(false);
-        return;
-    }
+    if (data2024Result.error) { setError(data2024Result.error); setIsLoading(false); return; }
+    if (data2025Result.error) { setError(data2025Result.error); setIsLoading(false); return; }
     
     const mergedMap = new Map<string, MergedNganhDocData>();
     const allKeys = new Set<string>();
@@ -153,18 +159,28 @@ export default function NganhDocComparisonTable({ selectedMonths }: NganhDocComp
         const ft2025 = data2025Result.ftData.find(d => d.key === key)?.ft_salary || 0;
         const pt2025 = data2025Result.ptData.find(d => d.key === key)?.pt_salary || 0;
 
-        if (ft2024 === 0 && pt2024 === 0 && ft2025 === 0 && pt2025 === 0) {
+        // Filter by selectedNganhDoc for FT and selectedDonVi2 for PT if they are provided
+        const passesNganhDocFilter = !selectedNganhDoc || selectedNganhDoc.length === 0 || selectedNganhDoc.includes(key);
+        const passesDonVi2Filter = !selectedDonVi2 || selectedDonVi2.length === 0 || selectedDonVi2.includes(key);
+
+        const finalFt2024 = passesNganhDocFilter ? ft2024 : 0;
+        const finalFt2025 = passesNganhDocFilter ? ft2025 : 0;
+        const finalPt2024 = passesDonVi2Filter ? pt2024 : 0;
+        const finalPt2025 = passesDonVi2Filter ? pt2025 : 0;
+
+
+        if (finalFt2024 === 0 && finalPt2024 === 0 && finalFt2025 === 0 && finalPt2025 === 0) {
             return; 
         }
 
         mergedMap.set(key, {
             grouping_key: key,
-            ft_salary_2024: ft2024,
-            pt_salary_2024: pt2024,
-            total_salary_2024: ft2024 + pt2024,
-            ft_salary_2025: ft2025,
-            pt_salary_2025: pt2025,
-            total_salary_2025: ft2025 + pt2025,
+            ft_salary_2024: finalFt2024,
+            pt_salary_2024: finalPt2024,
+            total_salary_2024: finalFt2024 + finalPt2024,
+            ft_salary_2025: finalFt2025,
+            pt_salary_2025: finalPt2025,
+            total_salary_2025: finalFt2025 + finalPt2025,
             ft_salary_change_val: null, 
             pt_salary_change_val: null,
             total_salary_change_val: null,
@@ -180,172 +196,28 @@ export default function NganhDocComparisonTable({ selectedMonths }: NganhDocComp
     
     setComparisonData(finalData);
     setIsLoading(false);
-  }, [selectedMonths, fetchDataForYear]); 
+  }, [selectedMonths, fetchDataForYear, selectedNganhDoc, selectedDonVi2]); 
 
   useEffect(() => {
     fetchAllComparisonData();
   }, [fetchAllComparisonData]);
 
-  const requestSort = (key: SortableNganhDocColumnKey) => {
-    let direction: 'ascending' | 'descending' = 'ascending';
-    if (sortConfig.key === key && sortConfig.direction === 'ascending') {
-      direction = 'descending';
-    }
-    setSortConfig({ key, direction });
-  };
+  const requestSort = (key: SortableNganhDocColumnKey) => { let direction: 'ascending' | 'descending' = 'ascending'; if (sortConfig.key === key && sortConfig.direction === 'ascending') { direction = 'descending'; } setSortConfig({ key, direction }); };
+  const sortedComparisonData = useMemo(() => { let sortableItems = [...comparisonData]; if (sortConfig.key !== null) { sortableItems.sort((a, b) => { const valA = a[sortConfig.key!]; const valB = b[sortConfig.key!]; if (valA === null && valB === null) return 0; if (valA === null) return sortConfig.direction === 'ascending' ? -1 : 1;  if (valB === null) return sortConfig.direction === 'ascending' ? 1 : -1;  if (valA === Infinity) return sortConfig.direction === 'ascending' ? 1 : -1; if (valB === Infinity) return sortConfig.direction === 'ascending' ? -1 : 1; if (valA === -Infinity) return sortConfig.direction === 'ascending' ? -1 : 1; if (valB === -Infinity) return sortConfig.direction === 'ascending' ? 1 : -1; if (typeof valA === 'number' && typeof valB === 'number') { return sortConfig.direction === 'ascending' ? valA - valB : valB - valA; } else if (typeof valA === 'string' && typeof valB === 'string') { return sortConfig.direction === 'ascending' ? valA.localeCompare(valB) : valB.localeCompare(valA); } return 0; }); } return sortableItems; }, [comparisonData, sortConfig]);
+  const formatCurrency = (value: number | null) => { if (value === null || value === undefined) return 'N/A'; return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value); };
+  const formatPercentage = (value: number | null, forceSign = false) => { if (value === null || value === undefined) return 'N/A'; if (value === Infinity) return 'Tăng ∞'; if (value === -Infinity) return 'Giảm ∞'; const sign = value > 0 && forceSign ? '+' : ''; return `${sign}${(value * 100).toFixed(1)}%`; };
+  const renderChangeCell = (change: number | null, isCost: boolean) => { if (change === null || change === undefined) return <TableCell className="text-center text-muted-foreground text-xs py-1.5 px-2">N/A</TableCell>; let colorClass = 'text-muted-foreground'; let Icon = Minus; if (change === Infinity) { colorClass = isCost ? 'text-red-600 dark:text-red-500' : 'text-green-600 dark:text-green-500'; Icon = TrendingUp; } else if (change === -Infinity) { colorClass = isCost ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'; Icon = TrendingDown; } else if (change > 0) { colorClass = isCost ? 'text-red-600 dark:text-red-500' : 'text-green-600 dark:text-green-500'; Icon = TrendingUp; } else if (change < 0) { colorClass = isCost ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'; Icon = TrendingDown; } const displayValue = formatPercentage(change, true); return ( <TableCell className={cn("text-center whitespace-nowrap text-xs py-1.5 px-2", colorClass)}> <div className="flex items-center justify-center gap-0.5"> <Icon className="h-3 w-3" /> {displayValue} </div> </TableCell> ); };
+  const renderSortableTableHead = (label: string, columnKey: SortableNganhDocColumnKey, isSticky: boolean = false, minWidth?: string, align: 'left' | 'center' | 'right' = 'center') => { const isSorted = sortConfig.key === columnKey; const SortIcon = isSorted ? (sortConfig.direction === 'ascending' ? ArrowUp : ArrowDown) : ArrowUpDown; return ( <TableHead className={cn( "py-1.5 px-2 text-xs font-medium whitespace-nowrap cursor-pointer hover:bg-muted/50", `text-${align}`, isSticky && "sticky left-0 bg-card z-20", minWidth && `min-w-[${minWidth}]` )} style={isSticky ? { minWidth: minWidth || '180px' } : { minWidth : minWidth }} onClick={() => requestSort(columnKey)} > <div className={cn("flex items-center gap-1", `justify-${align === 'center' ? 'center' : align === 'left' ? 'start' : 'end'}`)}> {label} <SortIcon className={cn("h-3 w-3 shrink-0", isSorted ? "opacity-100" : "opacity-50")} /> </div> </TableHead> ); };
 
-  const sortedComparisonData = useMemo(() => {
-    let sortableItems = [...comparisonData];
-    if (sortConfig.key !== null) {
-      sortableItems.sort((a, b) => {
-        const valA = a[sortConfig.key!];
-        const valB = b[sortConfig.key!];
-
-        if (valA === null && valB === null) return 0;
-        if (valA === null) return sortConfig.direction === 'ascending' ? -1 : 1; 
-        if (valB === null) return sortConfig.direction === 'ascending' ? 1 : -1; 
-        
-        if (valA === Infinity) return sortConfig.direction === 'ascending' ? 1 : -1;
-        if (valB === Infinity) return sortConfig.direction === 'ascending' ? -1 : 1;
-        if (valA === -Infinity) return sortConfig.direction === 'ascending' ? -1 : 1;
-        if (valB === -Infinity) return sortConfig.direction === 'ascending' ? 1 : -1;
-
-        if (typeof valA === 'number' && typeof valB === 'number') {
-          return sortConfig.direction === 'ascending' ? valA - valB : valB - valA;
-        } else if (typeof valA === 'string' && typeof valB === 'string') {
-          return sortConfig.direction === 'ascending' ? valA.localeCompare(valB) : valB.localeCompare(valA);
-        }
-        return 0;
-      });
-    }
-    return sortableItems;
-  }, [comparisonData, sortConfig]);
-
-
-  const formatCurrency = (value: number | null) => {
-    if (value === null || value === undefined) return 'N/A';
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
-  };
-
-  const formatPercentage = (value: number | null, forceSign = false) => {
-    if (value === null || value === undefined) return 'N/A';
-    if (value === Infinity) return 'Tăng ∞';
-    if (value === -Infinity) return 'Giảm ∞';
-    const sign = value > 0 && forceSign ? '+' : '';
-    return `${sign}${(value * 100).toFixed(1)}%`;
-  };
-  
-  const renderChangeCell = (change: number | null, isCost: boolean) => {
-    if (change === null || change === undefined) return <TableCell className="text-center text-muted-foreground text-xs py-1.5 px-2">N/A</TableCell>;
-    
-    let colorClass = 'text-muted-foreground';
-    let Icon = Minus;
-
-    if (change === Infinity) {
-      colorClass = isCost ? 'text-red-600 dark:text-red-500' : 'text-green-600 dark:text-green-500';
-      Icon = TrendingUp;
-    } else if (change === -Infinity) {
-      colorClass = isCost ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500';
-      Icon = TrendingDown;
-    } else if (change > 0) {
-      colorClass = isCost ? 'text-red-600 dark:text-red-500' : 'text-green-600 dark:text-green-500';
-      Icon = TrendingUp;
-    } else if (change < 0) {
-      colorClass = isCost ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500';
-      Icon = TrendingDown;
-    }
-
-    const displayValue = formatPercentage(change, true);
-
-    return (
-      <TableCell className={cn("text-center whitespace-nowrap text-xs py-1.5 px-2", colorClass)}>
-        <div className="flex items-center justify-center gap-0.5">
-          <Icon className="h-3 w-3" />
-          {displayValue}
-        </div>
-      </TableCell>
-    );
-  };
-
-  const renderSortableTableHead = (label: string, columnKey: SortableNganhDocColumnKey, isSticky: boolean = false, minWidth?: string, align: 'left' | 'center' | 'right' = 'center') => {
-    const isSorted = sortConfig.key === columnKey;
-    const SortIcon = isSorted ? (sortConfig.direction === 'ascending' ? ArrowUp : ArrowDown) : ArrowUpDown;
-    
-    return (
-      <TableHead 
-        className={cn(
-          "py-1.5 px-2 text-xs font-medium whitespace-nowrap cursor-pointer hover:bg-muted/50",
-          `text-${align}`,
-          isSticky && "sticky left-0 bg-card z-20", 
-          minWidth && `min-w-[${minWidth}]`
-        )}
-        style={isSticky ? { minWidth: minWidth || '180px' } : { minWidth : minWidth }} 
-        onClick={() => requestSort(columnKey)}
-      >
-        <div className={cn("flex items-center gap-1", `justify-${align === 'center' ? 'center' : align === 'left' ? 'start' : 'end'}`)}>
-          {label}
-          <SortIcon className={cn("h-3 w-3 shrink-0", isSorted ? "opacity-100" : "opacity-50")} />
-        </div>
-      </TableHead>
-    );
-  };
-
-
-  if (isLoading) {
-    return (
-      <Card className="mt-4 flex-grow flex flex-col">
-        <CardHeader className="pb-2 pt-3">
-          <CardTitle className="text-base font-semibold flex items-center gap-1.5"><BarChart3 className="h-4 w-4 text-primary" />Bảng so sánh theo Ngành dọc (Hà Nội FT) & Đơn vị 2 (PT)</CardTitle>
-          <CardDescription className="text-xs truncate">Đang tải dữ liệu so sánh chi tiết...</CardDescription>
-        </CardHeader>
-        <CardContent className="pt-2 flex items-center justify-center flex-grow">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (error) {
-    return (
-      <Card className="mt-4 border-destructive/50 flex-grow flex flex-col">
-        <CardHeader className="pb-2 pt-3">
-          <CardTitle className="text-base font-semibold text-destructive flex items-center gap-1.5">
-            <AlertTriangle className="h-4 w-4" /> Lỗi Tải Bảng Ngành Dọc/Đơn Vị 2
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-2 flex-grow">
-           <p className="text-xs text-destructive whitespace-pre-line">{error.message}</p>
-            {(error.message.includes(CRITICAL_SETUP_ERROR_PREFIX) || error.type === 'rpcMissing' || error.message.toLowerCase().includes("does not exist") || error.message.includes("RPC")) && (
-                <p className="text-xs text-muted-foreground mt-1 whitespace-pre-line">
-                  {CRITICAL_SETUP_ERROR_PREFIX} Đây là một lỗi cấu hình quan trọng. Vui lòng kiểm tra kỹ các hàm RPC `get_nganhdoc_ft_salary_hanoi` và `get_donvi2_pt_salary` trong Supabase theo hướng dẫn tại README.md. Đảm bảo các bảng `Fulltime` (với cột `nganh_doc`, `hn_or_note`) và `Parttime` (với cột `Don_vi_2`) tồn tại và có dữ liệu.
-                </p>
-            )}
-        </CardContent>
-      </Card>
-    );
-  }
-  
-  if (comparisonData.length === 0) {
-    return (
-       <Card className="mt-4 flex-grow flex flex-col">
-        <CardHeader className="pb-2 pt-3">
-            <CardTitle className="text-base font-semibold text-muted-foreground flex items-center gap-1.5"><BarChart3 className="h-4 w-4" />Bảng so sánh theo Ngành dọc (Hà Nội FT) & Đơn vị 2 (PT)</CardTitle>
-            <CardDescription className="text-xs truncate">
-                {filterDescription}.
-            </CardDescription>
-        </CardHeader>
-         <CardContent className="pt-2 flex items-center justify-center flex-grow">
-           <p className="text-sm text-muted-foreground">Không có dữ liệu nào cho kỳ đã chọn hoặc sau khi loại trừ các nhóm không có số liệu.</p>
-         </CardContent>
-       </Card>
-    );
-  }
+  if (isLoading) { return ( <Card className="mt-4 flex-grow flex flex-col"> <CardHeader className="pb-2 pt-3"> <CardTitle className="text-base font-semibold flex items-center gap-1.5"><BarChart3 className="h-4 w-4 text-primary" />Bảng so sánh theo Ngành dọc (Hà Nội FT) & Đơn vị 2 (PT)</CardTitle> <CardDescription className="text-xs truncate">Đang tải dữ liệu so sánh chi tiết...</CardDescription> </CardHeader> <CardContent className="pt-2 flex items-center justify-center flex-grow"> <Loader2 className="h-8 w-8 animate-spin text-primary" /> </CardContent> </Card> ); }
+  if (error) { return ( <Card className="mt-4 border-destructive/50 flex-grow flex flex-col"> <CardHeader className="pb-2 pt-3"> <CardTitle className="text-base font-semibold text-destructive flex items-center gap-1.5"> <AlertTriangle className="h-4 w-4" /> Lỗi Tải Bảng Ngành Dọc/Đơn Vị 2 </CardTitle> </CardHeader> <CardContent className="pt-2 flex-grow"> <p className="text-xs text-destructive whitespace-pre-line">{error.message}</p> {(error.message.includes(CRITICAL_SETUP_ERROR_PREFIX) || error.type === 'rpcMissing' || error.message.toLowerCase().includes("does not exist") || error.message.includes("RPC")) && ( <p className="text-xs text-muted-foreground mt-1 whitespace-pre-line"> {CRITICAL_SETUP_ERROR_PREFIX} Đây là một lỗi cấu hình quan trọng. Vui lòng kiểm tra kỹ các hàm RPC `get_nganhdoc_ft_salary_hanoi` và `get_donvi2_pt_salary` trong Supabase theo hướng dẫn tại README.md. Đảm bảo các bảng `Fulltime` (với cột `nganh_doc`, `hn_or_note`) và `Parttime` (với cột `Don_vi_2`) tồn tại và có dữ liệu. </p> )} </CardContent> </Card> ); }
+  if (comparisonData.length === 0) { return ( <Card className="mt-4 flex-grow flex flex-col"> <CardHeader className="pb-2 pt-3"> <CardTitle className="text-base font-semibold text-muted-foreground flex items-center gap-1.5"><BarChart3 className="h-4 w-4" />Bảng so sánh theo Ngành dọc (Hà Nội FT) & Đơn vị 2 (PT)</CardTitle> <CardDescription className="text-xs truncate" title={filterDescription}> {filterDescription}. </CardDescription> </CardHeader> <CardContent className="pt-2 flex items-center justify-center flex-grow"> <p className="text-sm text-muted-foreground">Không có dữ liệu nào cho kỳ đã chọn hoặc sau khi loại trừ các nhóm không có số liệu.</p> </CardContent> </Card> ); }
 
   return (
     <Card className="mt-4 flex-grow flex flex-col h-[500px]">
       <CardHeader className="pb-2 pt-3">
         <CardTitle className="text-base font-semibold flex items-center gap-1.5"><BarChart3 className="h-4 w-4 text-primary" />Bảng so sánh theo Ngành dọc (Hà Nội FT) & Đơn vị 2 (PT)</CardTitle>
-        <CardDescription className="text-xs truncate">
+        <CardDescription className="text-xs truncate" title={filterDescription}>
             {filterDescription}.
         </CardDescription>
       </CardHeader>
@@ -389,7 +261,3 @@ export default function NganhDocComparisonTable({ selectedMonths }: NganhDocComp
     </Card>
   );
 }
-
-    
-
-    

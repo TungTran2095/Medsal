@@ -15,7 +15,8 @@ import {
 interface TotalSalaryParttimeCardProps {
   selectedMonths?: number[];
   selectedYear?: number | null;
-  selectedDepartments?: string[]; // Added
+  selectedDepartmentsForDiadiem?: string[]; 
+  selectedDonVi2?: string[]; // New prop for Don_vi_2 filter
 }
 
 interface ChartError {
@@ -23,7 +24,7 @@ interface ChartError {
   message: string;
 }
 
-export default function TotalSalaryParttimeCard({ selectedMonths, selectedYear, selectedDepartments }: TotalSalaryParttimeCardProps) {
+export default function TotalSalaryParttimeCard({ selectedMonths, selectedYear, selectedDepartmentsForDiadiem, selectedDonVi2 }: TotalSalaryParttimeCardProps) {
   const [totalSalary, setTotalSalary] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<ChartError | null>(null);
@@ -33,62 +34,43 @@ export default function TotalSalaryParttimeCard({ selectedMonths, selectedYear, 
     setIsLoading(true);
     setError(null);
 
-    const departmentNames = selectedDepartments?.map(depId => depId.split('__')[1]).filter(Boolean) || [];
-
-    let finalFilterDescription: string;
     const yearSegment = selectedYear ? `Năm ${selectedYear}` : "Tất cả các năm";
-    
     let monthSegment: string;
     if (selectedMonths && selectedMonths.length > 0) {
-      if (selectedMonths.length === 12) {
-        monthSegment = "tất cả các tháng";
-      } else if (selectedMonths.length === 1) {
-        monthSegment = `Tháng ${String(selectedMonths[0]).padStart(2, '0')}`;
-      } else {
-        monthSegment = `các tháng ${selectedMonths.map(m => String(m).padStart(2, '0')).join(', ')}`;
-      }
+      if (selectedMonths.length === 12) monthSegment = "tất cả các tháng";
+      else if (selectedMonths.length === 1) monthSegment = `Tháng ${String(selectedMonths[0]).padStart(2, '0')}`;
+      else monthSegment = `các tháng ${selectedMonths.map(m => String(m).padStart(2, '0')).join(', ')}`;
     } else {
       monthSegment = "tất cả các tháng";
     }
 
-    let locationSegment: string;
-    if (departmentNames.length > 0) {
-      if (departmentNames.length <= 2) {
-        locationSegment = departmentNames.join(' & ');
-      } else {
-        locationSegment = `${departmentNames.length} địa điểm`;
-      }
-    } else {
-      locationSegment = "tất cả địa điểm";
+    let locationSegment = "tất cả địa điểm";
+    if (selectedDepartmentsForDiadiem && selectedDepartmentsForDiadiem.length > 0) {
+      locationSegment = selectedDepartmentsForDiadiem.length <= 2 ? selectedDepartmentsForDiadiem.join(' & ') : `${selectedDepartmentsForDiadiem.length} địa điểm (theo Loại/Pban)`;
     }
     
-    if (selectedYear) {
-      finalFilterDescription = `${monthSegment} của ${yearSegment} tại ${locationSegment}`;
-    } else {
-      if (selectedMonths && selectedMonths.length > 0 && selectedMonths.length < 12) {
-        finalFilterDescription = `${monthSegment} (mọi năm) tại ${locationSegment}`;
-      } else {
-        finalFilterDescription = `tất cả các kỳ tại ${locationSegment}`;
-      }
+    let donVi2Segment = "";
+    if (selectedDonVi2 && selectedDonVi2.length > 0) {
+      donVi2Segment = selectedDonVi2.length <=2 ? selectedDonVi2.join(' & ') : `${selectedDonVi2.length} đơn vị 2`;
+      if (locationSegment !== "tất cả địa điểm") locationSegment += " và " + donVi2Segment;
+      else locationSegment = donVi2Segment;
     }
-    setFilterDescription(finalFilterDescription);
-
+    
+    setFilterDescription(`${monthSegment} của ${yearSegment} tại ${locationSegment}`);
 
     try {
-      const rpcArgs: { filter_year?: number; filter_months?: number[] | null; filter_locations?: string[] | null } = {}; // Added filter_locations
-      if (selectedYear !== null) {
-        rpcArgs.filter_year = selectedYear;
-      }
-      if (selectedMonths && selectedMonths.length > 0) {
-        rpcArgs.filter_months = selectedMonths;
-      } else {
-        rpcArgs.filter_months = null;
-      }
-      if (departmentNames.length > 0) {
-        rpcArgs.filter_locations = departmentNames;
-      } else {
-        rpcArgs.filter_locations = null;
-      }
+      const rpcArgs: { 
+        filter_year?: number; 
+        filter_months?: number[] | null; 
+        filter_locations?: string[] | null;
+        filter_donvi2?: string[] | null; // New parameter for RPC
+      } = {};
+      
+      if (selectedYear !== null) rpcArgs.filter_year = selectedYear;
+      rpcArgs.filter_months = (selectedMonths && selectedMonths.length > 0) ? selectedMonths : null;
+      rpcArgs.filter_locations = (selectedDepartmentsForDiadiem && selectedDepartmentsForDiadiem.length > 0) ? selectedDepartmentsForDiadiem : null;
+      rpcArgs.filter_donvi2 = (selectedDonVi2 && selectedDonVi2.length > 0) ? selectedDonVi2 : null;
+
 
       const functionName = 'get_total_salary_parttime';
       const { data, error: rpcError } = await supabase.rpc(
@@ -108,8 +90,14 @@ export default function TotalSalaryParttimeCard({ selectedMonths, selectedYear, 
         if (isFunctionMissingError) {
           throw {
             type: 'rpcMissing' as 'rpcMissing',
-            message: `Hàm RPC '${functionName}' bị thiếu. Vui lòng tạo hoặc cập nhật nó trong SQL Editor của Supabase theo README.md.`
+            message: `Hàm RPC '${functionName}' bị thiếu hoặc chưa hỗ trợ 'filter_donvi2'. Vui lòng tạo/cập nhật theo README.md.`
           };
+        }
+        if (rpcMessageText.includes("filter_donvi2") && rpcMessageText.includes("does not exist")){
+             throw {
+                type: 'rpcMissing' as 'rpcMissing',
+                message: `Tham số 'filter_donvi2' không tồn tại trong hàm RPC '${functionName}'. Vui lòng cập nhật hàm RPC.`
+             };
         }
         if (isTableMissingError) {
            throw {
@@ -138,7 +126,7 @@ export default function TotalSalaryParttimeCard({ selectedMonths, selectedYear, 
     } finally {
       setIsLoading(false);
     }
-  }, [selectedMonths, selectedYear, selectedDepartments]);
+  }, [selectedMonths, selectedYear, selectedDepartmentsForDiadiem, selectedDonVi2]);
 
   useEffect(() => {
     fetchTotalSalaryParttime();
@@ -174,7 +162,7 @@ export default function TotalSalaryParttimeCard({ selectedMonths, selectedYear, 
           <p className="text-xs text-destructive">{error.message}</p>
           {error.type === 'rpcMissing' && (
             <p className="text-xs text-muted-foreground mt-1">
-              Vui lòng tạo/cập nhật hàm `get_total_salary_parttime` trong SQL Editor của Supabase. Tham khảo README.md.
+              Vui lòng tạo/cập nhật hàm `get_total_salary_parttime` trong SQL Editor của Supabase để hỗ trợ các tham số lọc mới. Tham khảo README.md.
             </p>
           )}
           {error.type === 'generic' && (
@@ -198,7 +186,7 @@ export default function TotalSalaryParttimeCard({ selectedMonths, selectedYear, 
            <div className="text-xl font-bold text-muted-foreground">
             0 VND
           </div>
-          <CardDescription className="text-xs text-muted-foreground mt-0.5 truncate">
+          <CardDescription className="text-xs text-muted-foreground mt-0.5 truncate" title={filterDescription}>
             Không có dữ liệu cho: {filterDescription}.
           </CardDescription>
         </CardContent>
@@ -223,11 +211,10 @@ export default function TotalSalaryParttimeCard({ selectedMonths, selectedYear, 
          <div className="text-xl font-bold text-primary">
             {formattedTotalSalary}
           </div>
-          <CardDescription className="text-xs text-muted-foreground truncate">
+          <CardDescription className="text-xs text-muted-foreground truncate" title={filterDescription}>
             Cho: {filterDescription}
           </CardDescription>
       </CardContent>
     </Card>
   );
 }
-
