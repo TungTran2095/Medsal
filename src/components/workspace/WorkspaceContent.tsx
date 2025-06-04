@@ -8,12 +8,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, ChevronDown, FilterIcon, GanttChartSquare, MapPin, Settings2, Circle, Percent, Target, FolderKanban, BarChart3, Filter as FilterIconLucide } from "lucide-react"; // Renamed Filter to FilterIconLucide
-import type { PayrollEntry, OrgNode, FlatOrgUnit } from '@/types';
+import type { PayrollEntry, FlatOrgUnit } from '@/types'; // OrgNode removed as HierarchicalOrgFilter is removed
 import { supabase } from '@/lib/supabaseClient';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import SupabaseTableList from './SupabaseTableList';
 import AiToolsViewer from './AiToolsViewer';
-import HierarchicalOrgFilter from './HierarchicalOrgFilter'; // Added
+// import HierarchicalOrgFilter from './HierarchicalOrgFilter'; // Temporarily removed
 import { Separator } from '@/components/ui/separator';
 import TotalSalaryCard from '@/components/dashboard/TotalSalaryCard';
 import TotalSalaryParttimeCard from '@/components/dashboard/TotalSalaryParttimeCard';
@@ -97,11 +97,12 @@ export default function WorkspaceContent() {
   const [isLoadingLocationFilters, setIsLoadingLocationFilters] = useState<boolean>(false);
   const [locationFilterError, setLocationFilterError] = useState<string | null>(null);
 
-  const [orgHierarchyData, setOrgHierarchyData] = useState<OrgNode[]>([]);
-  const [selectedOrgUnitIds, setSelectedOrgUnitIds] = useState<string[]>([]);
-  const [isLoadingOrgHierarchy, setIsLoadingOrgHierarchy] = useState<boolean>(false);
-  const [orgHierarchyError, setOrgHierarchyError] = useState<string | null>(null);
-  const [flatOrgUnits, setFlatOrgUnits] = useState<FlatOrgUnit[]>([]);
+  // States for HierarchicalOrgFilter temporarily removed
+  // const [orgHierarchyData, setOrgHierarchyData] = useState<OrgNode[]>([]);
+  // const [selectedOrgUnitIds, setSelectedOrgUnitIds] = useState<string[]>([]);
+  // const [isLoadingOrgHierarchy, setIsLoadingOrgHierarchy] = useState<boolean>(false);
+  // const [orgHierarchyError, setOrgHierarchyError] = useState<string | null>(null);
+  // const [flatOrgUnits, setFlatOrgUnits] = useState<FlatOrgUnit[]>([]);
 
 
   const [activeDashboardTab, setActiveDashboardTab] = useState<DashboardTab>('payrollOverview');
@@ -228,7 +229,9 @@ export default function WorkspaceContent() {
     }
   }, [activeView, toast]);
 
-  const buildTree = (items: FlatOrgUnit[], parentId: string | null = "1"): OrgNode[] => {
+  // fetchAndBuildOrgHierarchy and buildTree functions temporarily removed
+  /*
+  const buildTree = useCallback((items: FlatOrgUnit[], parentId: string | null = "1"): OrgNode[] => {
     const children = items
       .filter(item => item.Parent_ID === parentId)
       .map(item => ({
@@ -239,7 +242,7 @@ export default function WorkspaceContent() {
         children: buildTree(items, String(item.ID))
       }));
     return children.sort((a,b) => a.name.localeCompare(b.name)); 
-  };
+  }, []);
 
 
   const fetchAndBuildOrgHierarchy = useCallback(async () => {
@@ -255,9 +258,10 @@ export default function WorkspaceContent() {
         .select('ID, Parent_ID, Department, Loai');
 
       if (error) {
-        if (String(error.message).toLowerCase().includes("ms_org_nganhdoc") && String(error.message).toLowerCase().includes("does not exist")) {
-            throw new Error("Bảng 'MS_Org_nganhdoc' không tồn tại. Vui lòng tạo bảng này để sử dụng bộ lọc cơ cấu tổ chức.");
-        }
+        // Temporarily throw original error to see details
+        // if (String(error.message).toLowerCase().includes("ms_org_nganhdoc") && String(error.message).toLowerCase().includes("does not exist")) {
+        //     throw new Error("Bảng 'MS_Org_nganhdoc' không tồn tại. Vui lòng tạo bảng này để sử dụng bộ lọc cơ cấu tổ chức.");
+        // }
         throw error;
       }
       
@@ -303,33 +307,37 @@ export default function WorkspaceContent() {
     } finally {
       setIsLoadingOrgHierarchy(false);
     }
-  }, [activeView, toast]);
-
+  }, [activeView, toast, buildTree]);
+  */
 
   useEffect(() => {
     if (activeView === 'dashboard') {
       fetchDistinctYears();
       fetchLocationFilterOptions();
-      fetchAndBuildOrgHierarchy();
+      // fetchAndBuildOrgHierarchy(); // Temporarily removed
     }
-  }, [activeView, fetchDistinctYears, fetchLocationFilterOptions, fetchAndBuildOrgHierarchy]);
+  //}, [activeView, fetchDistinctYears, fetchLocationFilterOptions, fetchAndBuildOrgHierarchy]);
+  }, [activeView, fetchDistinctYears, fetchLocationFilterOptions]);
+
 
   const finalSelectedDepartmentNames = useMemo(() => {
     const namesFromLoaiFilter = new Set(selectedDepartmentsByLoai.map(id => id.split('__')[1]));
     
-    const namesFromOrgFilter = new Set<string>();
-    if (selectedOrgUnitIds.length > 0 && flatOrgUnits.length > 0) {
-        selectedOrgUnitIds.forEach(id => {
-            const unit = flatOrgUnits.find(u => String(u.ID) === String(id));
-            if (unit && unit.Department) {
-                namesFromOrgFilter.add(unit.Department);
-            }
-        });
-    }
+    // Logic for org filter temporarily removed
+    // const namesFromOrgFilter = new Set<string>();
+    // if (selectedOrgUnitIds.length > 0 && flatOrgUnits.length > 0) {
+    //     selectedOrgUnitIds.forEach(id => {
+    //         const unit = flatOrgUnits.find(u => String(u.ID) === String(id));
+    //         if (unit && unit.Department) {
+    //             namesFromOrgFilter.add(unit.Department);
+    //         }
+    //     });
+    // }
     
-    const combined = new Set([...namesFromLoaiFilter, ...namesFromOrgFilter]);
-    return Array.from(combined);
-  }, [selectedDepartmentsByLoai, selectedOrgUnitIds, flatOrgUnits]);
+    // const combined = new Set([...namesFromLoaiFilter, ...namesFromOrgFilter]);
+    // return Array.from(combined);
+    return Array.from(namesFromLoaiFilter); // Only use Loai filter for now
+  }, [selectedDepartmentsByLoai /*, selectedOrgUnitIds, flatOrgUnits*/]);
 
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -932,6 +940,7 @@ export default function WorkspaceContent() {
                         )}
                         </DropdownMenuContent>
                     </DropdownMenu>
+                    {/* HierarchicalOrgFilter temporarily removed
                     <HierarchicalOrgFilter
                         hierarchy={orgHierarchyData}
                         selectedIds={selectedOrgUnitIds}
@@ -940,6 +949,7 @@ export default function WorkspaceContent() {
                         error={orgHierarchyError}
                         triggerButtonLabel="Cơ Cấu Tổ Chức"
                     />
+                    */}
                   </div>
                 </div>
               </CardHeader>
@@ -1017,3 +1027,4 @@ export default function WorkspaceContent() {
   );
 }
 
+    
