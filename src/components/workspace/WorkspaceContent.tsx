@@ -1028,7 +1028,7 @@ export default function WorkspaceContent() {
                     </div>
                   </TabsContent>
                   <TabsContent value="salaryWorkloadAnalysis" className="flex-grow overflow-y-auto space-y-3 mt-2">
-                     <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3"> {/* Row 1 of cards */}
+                     <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-5">
                         <EmployeeCountCard 
                             selectedMonths={selectedMonths} 
                             selectedYear={selectedYear} 
@@ -1047,8 +1047,6 @@ export default function WorkspaceContent() {
                             selectedDepartmentsForDiadiem={selectedDepartmentsFromLoaiFilter}
                             selectedNganhDoc={selectedNganhDocForFilter}
                         />
-                    </div>
-                    <div className="grid gap-3 md:grid-cols-2 mt-3"> {/* Row 2 of cards */}
                         <AverageSalaryPerWorkdayCard
                              selectedMonths={selectedMonths}
                              selectedYear={selectedYear}
@@ -1062,7 +1060,7 @@ export default function WorkspaceContent() {
                              selectedNganhDoc={selectedNganhDocForFilter}
                         />
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3"> {/* Row of charts */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
                          <MonthlyEmployeeTrendChart 
                             selectedYear={selectedYear} 
                             selectedMonths={selectedMonths} 
@@ -1094,6 +1092,7 @@ export default function WorkspaceContent() {
     </SidebarProvider>
   );
 }
+
 
 
 

@@ -43,25 +43,18 @@ export default function RevenuePerWorkdayCard({
     setRevenuePerWorkday(null);
     let currentDebugMessages: string[] = [];
 
-    let periodType = "Tổng";
     const yearSegment = selectedYear ? `Năm ${selectedYear}` : "Tất cả các năm";
     let monthSegment: string;
-    let numberOfMonthsForAverage = 0;
 
     if (selectedMonths && selectedMonths.length > 0) {
-      numberOfMonthsForAverage = selectedMonths.length;
       if (selectedMonths.length === 12) monthSegment = "cả năm";
       else if (selectedMonths.length === 1) monthSegment = `Tháng ${String(selectedMonths[0]).padStart(2, '0')}`;
       else monthSegment = `các tháng ${selectedMonths.map(m => String(m).padStart(2, '0')).join(', ')}`;
-      periodType = "TB tháng";
     } else if (selectedYear) {
       monthSegment = "cả năm";
-      numberOfMonthsForAverage = 12;
-      periodType = "TB tháng";
     } else {
       monthSegment = "tất cả các tháng";
     }
-    currentDebugMessages.push(`NumMonthsForAvg: ${numberOfMonthsForAverage}, PeriodType: ${periodType}`);
 
     let locationSegment = "tất cả địa điểm";
     let appliedFilters: string[] = [];
@@ -73,7 +66,7 @@ export default function RevenuePerWorkdayCard({
       appliedFilters.push(selectedNganhDoc.length <= 2 ? selectedNganhDoc.join(' & ') : `${selectedNganhDoc.length} ngành dọc`);
     }
     if (appliedFilters.length > 0) locationSegment = appliedFilters.join(' và ');
-    setFilterDescription(`${periodType} cho ${monthSegment} của ${yearSegment} tại ${locationSegment}`);
+    setFilterDescription(`Cho ${monthSegment} của ${yearSegment} tại ${locationSegment}`);
 
     try {
       const rpcArgsRevenue = {
@@ -150,11 +143,7 @@ export default function RevenuePerWorkdayCard({
         } else {
           let rawAveragePerWorkdayOverPeriod = totalRevenue / totalWorkdays;
           currentDebugMessages.push(`Raw Avg/Workday (Period): ${rawAveragePerWorkdayOverPeriod.toFixed(0)}`);
-          if (periodType === "TB tháng" && numberOfMonthsForAverage > 0) {
-            setRevenuePerWorkday(rawAveragePerWorkdayOverPeriod / numberOfMonthsForAverage);
-          } else {
-            setRevenuePerWorkday(rawAveragePerWorkdayOverPeriod);
-          }
+          setRevenuePerWorkday(rawAveragePerWorkdayOverPeriod); // Directly use the raw average for the period
         }
       } else {
          setError({ type: 'generic', message: 'Không thể lấy đủ dữ liệu để tính doanh thu / công.' });
@@ -236,3 +225,4 @@ export default function RevenuePerWorkdayCard({
     </Card>
   );
 }
+

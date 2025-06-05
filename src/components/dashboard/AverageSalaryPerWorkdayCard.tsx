@@ -43,25 +43,18 @@ export default function AverageSalaryPerWorkdayCard({
     setAverageSalaryPerWorkday(null);
     let currentDebugMessages: string[] = [];
 
-    let periodType = "Tổng";
     const yearSegment = selectedYear ? `Năm ${selectedYear}` : "Tất cả các năm";
     let monthSegment: string;
-    let numberOfMonthsForAverage = 0;
 
     if (selectedMonths && selectedMonths.length > 0) {
-      numberOfMonthsForAverage = selectedMonths.length;
       if (selectedMonths.length === 12) monthSegment = "cả năm";
       else if (selectedMonths.length === 1) monthSegment = `Tháng ${String(selectedMonths[0]).padStart(2, '0')}`;
       else monthSegment = `các tháng ${selectedMonths.map(m => String(m).padStart(2, '0')).join(', ')}`;
-      periodType = "TB tháng";
     } else if (selectedYear) {
       monthSegment = "cả năm";
-      numberOfMonthsForAverage = 12;
-      periodType = "TB tháng";
     } else {
       monthSegment = "tất cả các tháng";
     }
-    currentDebugMessages.push(`NumMonthsForAvg: ${numberOfMonthsForAverage}, PeriodType: ${periodType}`);
 
     let locationSegment = "tất cả địa điểm";
     let appliedFilters: string[] = [];
@@ -72,7 +65,7 @@ export default function AverageSalaryPerWorkdayCard({
       appliedFilters.push(selectedNganhDoc.length <= 2 ? selectedNganhDoc.join(' & ') : `${selectedNganhDoc.length} ngành dọc`);
     }
     if (appliedFilters.length > 0) locationSegment = appliedFilters.join(' và ');
-    setFilterDescription(`${periodType} cho ${monthSegment} của ${yearSegment} tại ${locationSegment}`);
+    setFilterDescription(`Cho ${monthSegment} của ${yearSegment} tại ${locationSegment}`);
 
     try {
       const rpcArgsSalaryAndWorkdays = {
@@ -112,8 +105,8 @@ export default function AverageSalaryPerWorkdayCard({
             let errorType: FetchError['type'] = 'generic';
             let specificMsg = `Lỗi tải Tổng Công FT: ${e.message}`;
             if (e.code === '42883' || e.message.includes(workdaysRpcName)) errorType = 'rpcMissing';
-            if (e.message.includes("column") && e.message.includes("does not exist")) {
-                 errorType = 'rpcMissing'; // Treat as setup issue
+             if (e.message.includes("column") && e.message.includes("does not exist")) {
+                 errorType = 'rpcMissing'; 
                  specificMsg = `Một hoặc nhiều cột công (ví dụ: ngay_thuong_chinh_thuc) không tồn tại trong bảng Fulltime. Vui lòng kiểm tra RPC '${workdaysRpcName}' và bảng.`;
             }
             currentError = { type: errorType, message: specificMsg };
@@ -144,11 +137,7 @@ export default function AverageSalaryPerWorkdayCard({
         } else {
           let rawAveragePerWorkdayOverPeriod = totalSalary / totalWorkdays;
           currentDebugMessages.push(`Raw Avg/Workday (Period): ${rawAveragePerWorkdayOverPeriod.toFixed(0)}`);
-          if (periodType === "TB tháng" && numberOfMonthsForAverage > 0) {
-            setAverageSalaryPerWorkday(rawAveragePerWorkdayOverPeriod / numberOfMonthsForAverage);
-          } else {
-            setAverageSalaryPerWorkday(rawAveragePerWorkdayOverPeriod);
-          }
+          setAverageSalaryPerWorkday(rawAveragePerWorkdayOverPeriod); // Directly use the raw average for the period
         }
       } else {
         setError({ type: 'generic', message: 'Không thể lấy đủ dữ liệu để tính lương / công.' });
@@ -189,7 +178,7 @@ export default function AverageSalaryPerWorkdayCard({
     <Card className={`h-full ${cardState === 'error' ? 'border-destructive/50' : ''}`}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-3">
         <CardTitle className={`text-sm font-semibold ${cardState === 'error' ? 'text-destructive' : 'text-muted-foreground'}`}>
-          Lương TB / Công (Full-time)
+          Lương / Công (Full-time)
         </CardTitle>
         <div className="flex items-center">
           <Banknote className={`h-3 w-3 mr-0.5 ${cardState === 'error' ? 'text-destructive' : 'text-muted-foreground'}`} />
@@ -230,3 +219,4 @@ export default function AverageSalaryPerWorkdayCard({
     </Card>
   );
 }
+
