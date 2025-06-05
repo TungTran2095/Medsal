@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from "@/lib/utils";
-import type { OrgNode, FlatOrgUnit } from '@/types'; // Added FlatOrgUnit
+import type { OrgNode, FlatOrgUnit } from '@/types'; 
 
 interface NganhDocMetric {
   key: string; 
@@ -36,6 +36,7 @@ interface FetchError {
 }
 
 const CRITICAL_SETUP_ERROR_PREFIX = "LỖI CÀI ĐẶT QUAN TRỌNG:";
+const EXCLUDED_NGANHDOC_KEYS = ["Med Pharma", "0", "Medon"];
 
 const calculateChange = (valNew: number | null, valOld: number | null): number | null => {
     if (valNew === null || valOld === null) return null;
@@ -48,8 +49,8 @@ interface NganhDocComparisonTableProps {
   selectedMonths?: number[];
   selectedNganhDoc?: string[];
   selectedDonVi2?: string[];
-  orgHierarchyData: OrgNode[]; // For tree structure
-  flatOrgUnits: FlatOrgUnit[]; // For lookups, if needed elsewhere
+  orgHierarchyData: OrgNode[]; 
+  flatOrgUnits: FlatOrgUnit[]; 
 }
 
 interface RenderTableRowProps {
@@ -60,6 +61,7 @@ interface RenderTableRowProps {
   toggleExpand: (key: string) => void;
   formatCurrency: (value: number | null) => string;
   renderChangeCell: (change: number | null, isCost: boolean) => JSX.Element;
+  allFilteredKeys: Set<string>;
 }
 
 const RenderTableRow: React.FC<RenderTableRowProps> = ({ 
@@ -69,26 +71,18 @@ const RenderTableRow: React.FC<RenderTableRowProps> = ({
   expandedKeys,
   toggleExpand,
   formatCurrency,
-  renderChangeCell
+  renderChangeCell,
+  allFilteredKeys
 }) => {
   const nodeData = dataMap.get(node.name);
   const isExpanded = expandedKeys.has(node.id);
   const hasChildren = node.children && node.children.length > 0;
 
-  // Only render if there's data for this node OR if it's a parent node with children (to allow expansion)
-  // OR if this node itself is an ancestor of a node that has data.
-  // For simplicity now, we'll render if nodeData exists or it has children that might have data.
-  // A more sophisticated check would see if any descendant has data.
-  const shouldRenderRow = !!nodeData || hasChildren;
-
-  if (!shouldRenderRow) {
-     // If a node has no data and no children, and we are strictly showing data-bearing nodes or their parents,
-     // we might not render it. However, for full hierarchy display, we might always render.
-     // For now, let's assume we want to see the structure even if intermediate parents have no direct data.
-     // Let's render the row if it has children, or if it has data.
-     // If a node has no data and no children, it will not be rendered by this logic if we strict-check nodeData
+  const shouldRenderRow = !!nodeData || (hasChildren && node.children.some(child => allFilteredKeys.has(child.name) || dataMap.has(child.name)));
+  
+  if (EXCLUDED_NGANHDOC_KEYS.includes(node.name)) {
+    return null;
   }
-
 
   const rowContent = nodeData ? (
     <>
@@ -103,7 +97,6 @@ const RenderTableRow: React.FC<RenderTableRowProps> = ({
       {renderChangeCell(nodeData.total_salary_change_val, true)}
     </>
   ) : (
-    // Render empty cells if no data but it's a parent that might be expanded
     <>
       <TableCell className="text-right py-1.5 px-2 text-xs whitespace-nowrap text-muted-foreground">-</TableCell>
       <TableCell className="text-right py-1.5 px-2 text-xs whitespace-nowrap text-muted-foreground">-</TableCell>
@@ -116,31 +109,35 @@ const RenderTableRow: React.FC<RenderTableRowProps> = ({
       <TableCell className="text-center py-1.5 px-2 text-xs whitespace-nowrap text-muted-foreground">-</TableCell>
     </>
   );
+  
+  if (!shouldRenderRow && !nodeData && !hasChildren) return null; // Don't render if no data and no children with data
 
   return (
     <>
-      <TableRow>
-        <TableCell 
-          className="py-1.5 px-2 text-xs font-medium sticky left-0 bg-card z-10 whitespace-nowrap min-w-[200px] text-left"
-          style={{ paddingLeft: `${0.5 + level * 1.25}rem` }}
-        >
-          <div className="flex items-center">
-            {hasChildren ? (
-              <button
-                onClick={() => toggleExpand(node.id)}
-                className="mr-1 p-0.5 rounded hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                title={isExpanded ? "Thu gọn" : "Mở rộng"}
-              >
-                {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-              </button>
-            ) : (
-              <span className="inline-block w-[calc(0.875rem+0.125rem+0.25rem)] mr-1"></span> 
-            )}
-            <span className="truncate" title={node.name}>{node.name}</span>
-          </div>
-        </TableCell>
-        {rowContent}
-      </TableRow>
+       {(shouldRenderRow || nodeData) && (
+        <TableRow>
+            <TableCell 
+            className="py-1.5 px-2 text-xs font-medium sticky left-0 bg-card z-10 whitespace-nowrap min-w-[200px] text-left"
+            style={{ paddingLeft: `${0.5 + level * 1.25}rem` }}
+            >
+            <div className="flex items-center">
+                {hasChildren ? (
+                <button
+                    onClick={() => toggleExpand(node.id)}
+                    className="mr-1 p-0.5 rounded hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    title={isExpanded ? "Thu gọn" : "Mở rộng"}
+                >
+                    {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                </button>
+                ) : (
+                <span className="inline-block w-[calc(0.875rem+0.125rem+0.25rem)] mr-1"></span> 
+                )}
+                <span className="truncate" title={node.name}>{node.name}</span>
+            </div>
+            </TableCell>
+            {rowContent}
+        </TableRow>
+      )}
       {isExpanded && hasChildren && node.children.map(childNode => (
         <RenderTableRow
           key={childNode.id}
@@ -151,6 +148,7 @@ const RenderTableRow: React.FC<RenderTableRowProps> = ({
           toggleExpand={toggleExpand}
           formatCurrency={formatCurrency}
           renderChangeCell={renderChangeCell}
+          allFilteredKeys={allFilteredKeys}
         />
       ))}
     </>
@@ -163,7 +161,6 @@ export default function NganhDocComparisonTable({
   selectedNganhDoc, 
   selectedDonVi2, 
   orgHierarchyData,
-  // flatOrgUnits prop is now available if needed for other logic later
   flatOrgUnits 
 }: NganhDocComparisonTableProps) {
   const [comparisonData, setComparisonData] = useState<MergedNganhDocData[]>([]);
@@ -301,14 +298,16 @@ export default function NganhDocComparisonTable({
         });
     });
 
-    const finalData = Array.from(mergedMap.values()).map(item => ({
+    const calculatedData = Array.from(mergedMap.values()).map(item => ({
         ...item,
         ft_salary_change_val: calculateChange(item.ft_salary_2025, item.ft_salary_2024),
         pt_salary_change_val: calculateChange(item.pt_salary_2025, item.pt_salary_2024),
         total_salary_change_val: calculateChange(item.total_salary_2025, item.total_salary_2024),
     }));
+
+    const filteredData = calculatedData.filter(item => !EXCLUDED_NGANHDOC_KEYS.includes(item.grouping_key));
     
-    setComparisonData(finalData);
+    setComparisonData(filteredData);
     setIsLoading(false);
   }, [selectedMonths, fetchDataForYear, selectedNganhDoc, selectedDonVi2]); 
 
@@ -322,9 +321,23 @@ export default function NganhDocComparisonTable({
     return map;
   }, [comparisonData]);
 
+  const allFilteredKeysInHierarchy = useMemo(() => {
+    const keys = new Set<string>();
+    const traverse = (nodes: OrgNode[]) => {
+      nodes.forEach(node => {
+        if (!EXCLUDED_NGANHDOC_KEYS.includes(node.name)) {
+          keys.add(node.name);
+          if (node.children) {
+            traverse(node.children);
+          }
+        }
+      });
+    };
+    traverse(orgHierarchyData);
+    return keys;
+  }, [orgHierarchyData]);
+
   const totals = useMemo(() => {
-    // Calculate totals based on the flat comparisonData before hierarchical transformation
-    // This ensures all filtered data contributes to the total, regardless of tree visibility
     if (!comparisonData || comparisonData.length === 0) {
       return {
         ft_salary_2024: 0, ft_salary_2025: 0,
@@ -399,6 +412,7 @@ export default function NganhDocComparisonTable({
                   toggleExpand={toggleExpand}
                   formatCurrency={formatCurrency}
                   renderChangeCell={renderChangeCell}
+                  allFilteredKeys={allFilteredKeysInHierarchy}
                 />
               ))}
             </TableBody>
