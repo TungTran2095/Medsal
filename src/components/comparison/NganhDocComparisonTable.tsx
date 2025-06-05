@@ -36,7 +36,7 @@ interface FetchError {
 }
 
 const CRITICAL_SETUP_ERROR_PREFIX = "LỖI CÀI ĐẶT QUAN TRỌNG:";
-const EXCLUDED_NGANHDOC_KEYS = ["Med Pharma", "0", "Medon", "Medaz", "Medcom", "Medicons", "Medim"];
+const EXCLUDED_NGANHDOC_KEYS_SET = new Set(["Med Pharma", "0", "Medon", "Medaz", "Medcom", "Medicons", "Medim"]);
 
 const calculateChange = (valNew: number | null, valOld: number | null): number | null => {
     if (valNew === null || valOld === null) return null;
@@ -53,15 +53,72 @@ interface NganhDocComparisonTableProps {
   flatOrgUnits: FlatOrgUnit[]; 
 }
 
+// Helper function to get aggregated data for a node and its descendants
+const getAggregatedDataForNode = (
+  node: OrgNode,
+  dataMap: Map<string, MergedNganhDocData>
+): MergedNganhDocData | null => {
+  if (EXCLUDED_NGANHDOC_KEYS_SET.has(node.name)) {
+    return null;
+  }
+
+  let aggregated: MergedNganhDocData = {
+    grouping_key: node.name,
+    ft_salary_2024: 0, ft_salary_2025: 0,
+    pt_salary_2024: 0, pt_salary_2025: 0,
+    total_salary_2024: 0, total_salary_2025: 0,
+    ft_salary_change_val: null, pt_salary_change_val: null, total_salary_change_val: null,
+  };
+
+  const directData = dataMap.get(node.name);
+  if (directData) {
+    aggregated.ft_salary_2024 += directData.ft_salary_2024;
+    aggregated.ft_salary_2025 += directData.ft_salary_2025;
+    aggregated.pt_salary_2024 += directData.pt_salary_2024;
+    aggregated.pt_salary_2025 += directData.pt_salary_2025;
+    aggregated.total_salary_2024 += directData.total_salary_2024;
+    aggregated.total_salary_2025 += directData.total_salary_2025;
+  }
+
+  if (node.children && node.children.length > 0) {
+    for (const childNode of node.children) {
+      const childAggregatedData = getAggregatedDataForNode(childNode, dataMap);
+      if (childAggregatedData) {
+        aggregated.ft_salary_2024 += childAggregatedData.ft_salary_2024;
+        aggregated.ft_salary_2025 += childAggregatedData.ft_salary_2025;
+        aggregated.pt_salary_2024 += childAggregatedData.pt_salary_2024;
+        aggregated.pt_salary_2025 += childAggregatedData.pt_salary_2025;
+        aggregated.total_salary_2024 += childAggregatedData.total_salary_2024;
+        aggregated.total_salary_2025 += childAggregatedData.total_salary_2025;
+      }
+    }
+  }
+  
+  const hasData = 
+    aggregated.ft_salary_2024 !== 0 || aggregated.ft_salary_2025 !== 0 ||
+    aggregated.pt_salary_2024 !== 0 || aggregated.pt_salary_2025 !== 0 ||
+    aggregated.total_salary_2024 !== 0 || aggregated.total_salary_2025 !== 0;
+
+  if (!hasData) {
+    return null; 
+  }
+
+  aggregated.ft_salary_change_val = calculateChange(aggregated.ft_salary_2025, aggregated.ft_salary_2024);
+  aggregated.pt_salary_change_val = calculateChange(aggregated.pt_salary_2025, aggregated.pt_salary_2024);
+  aggregated.total_salary_change_val = calculateChange(aggregated.total_salary_2025, aggregated.total_salary_2024);
+  
+  return aggregated;
+};
+
+
 interface RenderTableRowProps {
   node: OrgNode;
   level: number;
-  dataMap: Map<string, MergedNganhDocData>;
+  dataMap: Map<string, MergedNganhDocData>; // This map contains ALREADY FILTERED data for leaf/individual nodes
   expandedKeys: Set<string>;
   toggleExpand: (key: string) => void;
   formatCurrency: (value: number | null) => string;
   renderChangeCell: (change: number | null, isCost: boolean) => JSX.Element;
-  allFilteredKeys: Set<string>;
 }
 
 const RenderTableRow: React.FC<RenderTableRowProps> = ({ 
@@ -72,29 +129,34 @@ const RenderTableRow: React.FC<RenderTableRowProps> = ({
   toggleExpand,
   formatCurrency,
   renderChangeCell,
-  allFilteredKeys
 }) => {
-  if (EXCLUDED_NGANHDOC_KEYS.includes(node.name)) {
-    return null;
-  }
 
-  const nodeData = dataMap.get(node.name);
-  const isExpanded = expandedKeys.has(node.id);
-  const hasChildren = node.children && node.children.length > 0 && node.children.some(child => !EXCLUDED_NGANHDOC_KEYS.includes(child.name));
-
-  const shouldRenderRow = !!nodeData || (hasChildren && node.children.some(child => allFilteredKeys.has(child.name) || dataMap.has(child.name) && !EXCLUDED_NGANHDOC_KEYS.includes(child.name)));
+  const aggregatedNodeData = useMemo(() => getAggregatedDataForNode(node, dataMap), [node, dataMap]);
   
-  const rowContent = nodeData ? (
+  const isExpanded = expandedKeys.has(node.id);
+
+  const validChildren = useMemo(() => 
+    node.children?.filter(child => !EXCLUDED_NGANHDOC_KEYS_SET.has(child.name) && getAggregatedDataForNode(child, dataMap) !== null) || [],
+    [node.children, dataMap]
+  );
+  const hasDisplayableChildren = validChildren.length > 0;
+
+  // Render the row if it has aggregated data OR if it's a parent with valid, expandable children that might have data.
+  const shouldRenderRow = !!aggregatedNodeData || hasDisplayableChildren;
+
+  if (!shouldRenderRow) return null;
+  
+  const rowContent = aggregatedNodeData ? (
     <>
-      <TableCell className="text-right py-1.5 px-2 text-xs whitespace-nowrap">{formatCurrency(nodeData.ft_salary_2024)}</TableCell>
-      <TableCell className="text-right py-1.5 px-2 text-xs whitespace-nowrap">{formatCurrency(nodeData.ft_salary_2025)}</TableCell>
-      {renderChangeCell(nodeData.ft_salary_change_val, true)}
-      <TableCell className="text-right py-1.5 px-2 text-xs whitespace-nowrap">{formatCurrency(nodeData.pt_salary_2024)}</TableCell>
-      <TableCell className="text-right py-1.5 px-2 text-xs whitespace-nowrap">{formatCurrency(nodeData.pt_salary_2025)}</TableCell>
-      {renderChangeCell(nodeData.pt_salary_change_val, true)}
-      <TableCell className="text-right py-1.5 px-2 text-xs whitespace-nowrap font-semibold">{formatCurrency(nodeData.total_salary_2024)}</TableCell>
-      <TableCell className="text-right py-1.5 px-2 text-xs whitespace-nowrap font-semibold">{formatCurrency(nodeData.total_salary_2025)}</TableCell>
-      {renderChangeCell(nodeData.total_salary_change_val, true)}
+      <TableCell className="text-right py-1.5 px-2 text-xs whitespace-nowrap">{formatCurrency(aggregatedNodeData.ft_salary_2024)}</TableCell>
+      <TableCell className="text-right py-1.5 px-2 text-xs whitespace-nowrap">{formatCurrency(aggregatedNodeData.ft_salary_2025)}</TableCell>
+      {renderChangeCell(aggregatedNodeData.ft_salary_change_val, true)}
+      <TableCell className="text-right py-1.5 px-2 text-xs whitespace-nowrap">{formatCurrency(aggregatedNodeData.pt_salary_2024)}</TableCell>
+      <TableCell className="text-right py-1.5 px-2 text-xs whitespace-nowrap">{formatCurrency(aggregatedNodeData.pt_salary_2025)}</TableCell>
+      {renderChangeCell(aggregatedNodeData.pt_salary_change_val, true)}
+      <TableCell className="text-right py-1.5 px-2 text-xs whitespace-nowrap font-semibold">{formatCurrency(aggregatedNodeData.total_salary_2024)}</TableCell>
+      <TableCell className="text-right py-1.5 px-2 text-xs whitespace-nowrap font-semibold">{formatCurrency(aggregatedNodeData.total_salary_2025)}</TableCell>
+      {renderChangeCell(aggregatedNodeData.total_salary_change_val, true)}
     </>
   ) : (
     <>
@@ -110,18 +172,15 @@ const RenderTableRow: React.FC<RenderTableRowProps> = ({
     </>
   );
   
-  if (!shouldRenderRow && !nodeData && !hasChildren) return null;
-
   return (
     <>
-       {(shouldRenderRow || nodeData) && (
         <TableRow>
             <TableCell 
             className="py-1.5 px-2 text-xs font-medium sticky left-0 bg-card z-10 whitespace-nowrap min-w-[200px] text-left"
             style={{ paddingLeft: `${0.5 + level * 1.25}rem` }}
             >
             <div className="flex items-center">
-                {hasChildren ? (
+                {hasDisplayableChildren ? (
                 <button
                     onClick={() => toggleExpand(node.id)}
                     className="mr-1 p-0.5 rounded hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
@@ -137,8 +196,7 @@ const RenderTableRow: React.FC<RenderTableRowProps> = ({
             </TableCell>
             {rowContent}
         </TableRow>
-      )}
-      {isExpanded && hasChildren && node.children.map(childNode => (
+      {isExpanded && hasDisplayableChildren && validChildren.map(childNode => (
         <RenderTableRow
           key={childNode.id}
           node={childNode}
@@ -148,7 +206,6 @@ const RenderTableRow: React.FC<RenderTableRowProps> = ({
           toggleExpand={toggleExpand}
           formatCurrency={formatCurrency}
           renderChangeCell={renderChangeCell}
-          allFilteredKeys={allFilteredKeys}
         />
       ))}
     </>
@@ -161,7 +218,7 @@ export default function NganhDocComparisonTable({
   selectedNganhDoc, 
   selectedDonVi2, 
   orgHierarchyData,
-  flatOrgUnits 
+  flatOrgUnits // Not directly used here now, but kept for potential future use or consistency
 }: NganhDocComparisonTableProps) {
   const [comparisonData, setComparisonData] = useState<MergedNganhDocData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -267,7 +324,7 @@ export default function NganhDocComparisonTable({
     data2025Result.ptData.forEach(item => allKeys.add(item.key));
 
     allKeys.forEach(key => {
-        if (EXCLUDED_NGANHDOC_KEYS.includes(key)) return;
+        if (EXCLUDED_NGANHDOC_KEYS_SET.has(key)) return;
 
         const ft2024 = data2024Result.ftData.find(d => d.key === key)?.ft_salary || 0;
         const pt2024 = data2024Result.ptData.find(d => d.key === key)?.pt_salary || 0;
@@ -281,7 +338,7 @@ export default function NganhDocComparisonTable({
         const finalFt2025 = passesNganhDocFilter ? ft2025 : 0;
         const finalPt2024 = passesDonVi2Filter ? pt2024 : 0;
         const finalPt2025 = passesDonVi2Filter ? pt2025 : 0;
-
+        
         if (finalFt2024 === 0 && finalPt2024 === 0 && finalFt2025 === 0 && finalPt2025 === 0) {
             return; 
         }
@@ -321,21 +378,6 @@ export default function NganhDocComparisonTable({
     return map;
   }, [comparisonData]);
 
-  const allFilteredKeysInHierarchy = useMemo(() => {
-    const keys = new Set<string>();
-    const traverse = (nodes: OrgNode[]) => {
-      nodes.forEach(node => {
-        if (!EXCLUDED_NGANHDOC_KEYS.includes(node.name)) {
-          keys.add(node.name);
-          if (node.children) {
-            traverse(node.children);
-          }
-        }
-      });
-    };
-    traverse(orgHierarchyData);
-    return keys;
-  }, [orgHierarchyData]);
 
   const medlatecGroupNode = useMemo(() => {
     if (!orgHierarchyData || orgHierarchyData.length === 0) return null;
@@ -354,60 +396,28 @@ export default function NganhDocComparisonTable({
   }, [orgHierarchyData]);
 
   const nodesToRender = useMemo(() => {
-    return medlatecGroupNode ? medlatecGroupNode.children.filter(child => !EXCLUDED_NGANHDOC_KEYS.includes(child.name)) : [];
+    return medlatecGroupNode ? medlatecGroupNode.children.filter(child => !EXCLUDED_NGANHDOC_KEYS_SET.has(child.name)) : [];
   }, [medlatecGroupNode]);
 
 
   const totals = useMemo(() => {
-    const relevantData = comparisonData.filter(item => {
-      // Check if this item's key is part of the rendered hierarchy (children of Medlatec Group, excluding excluded keys)
-      let isInRenderedTree = false;
-      const checkNode = (node: OrgNode): boolean => {
-        if (node.name === item.grouping_key) return true;
-        if (node.children) {
-          for (const child of node.children) {
-            if (checkNode(child)) return true;
-          }
-        }
-        return false;
-      };
-      if (medlatecGroupNode && medlatecGroupNode.children) {
-        for (const childOfMedlatec of medlatecGroupNode.children) {
-            if (!EXCLUDED_NGANHDOC_KEYS.includes(childOfMedlatec.name) && checkNode(childOfMedlatec)) {
-                isInRenderedTree = true;
-                break;
-            }
-        }
-      }
-      return isInRenderedTree;
-    });
-
-
-    if (relevantData.length === 0) {
-      return {
-        ft_salary_2024: 0, ft_salary_2025: 0,
-        pt_salary_2024: 0, pt_salary_2025: 0,
+    if (!medlatecGroupNode) return {
+        ft_salary_2024: 0, ft_salary_2025: 0, pt_salary_2024: 0, pt_salary_2025: 0,
         total_salary_2024: 0, total_salary_2025: 0,
         ft_salary_change_val: null, pt_salary_change_val: null, total_salary_change_val: null,
       };
-    }
 
-    const ft_salary_2024 = relevantData.reduce((sum, item) => sum + item.ft_salary_2024, 0);
-    const ft_salary_2025 = relevantData.reduce((sum, item) => sum + item.ft_salary_2025, 0);
-    const pt_salary_2024 = relevantData.reduce((sum, item) => sum + item.pt_salary_2024, 0);
-    const pt_salary_2025 = relevantData.reduce((sum, item) => sum + item.pt_salary_2025, 0);
-    const total_salary_2024 = relevantData.reduce((sum, item) => sum + item.total_salary_2024, 0);
-    const total_salary_2025 = relevantData.reduce((sum, item) => sum + item.total_salary_2025, 0);
-
-    return {
-      ft_salary_2024, ft_salary_2025,
-      pt_salary_2024, pt_salary_2025,
-      total_salary_2024, total_salary_2025,
-      ft_salary_change_val: calculateChange(ft_salary_2025, ft_salary_2024),
-      pt_salary_change_val: calculateChange(pt_salary_2025, pt_salary_2024),
-      total_salary_change_val: calculateChange(total_salary_2025, total_salary_2024),
+    const aggregatedTotalData = getAggregatedDataForNode(medlatecGroupNode, dataMapForHierarchy);
+    
+    if (!aggregatedTotalData) return {
+        ft_salary_2024: 0, ft_salary_2025: 0, pt_salary_2024: 0, pt_salary_2025: 0,
+        total_salary_2024: 0, total_salary_2025: 0,
+        ft_salary_change_val: null, pt_salary_change_val: null, total_salary_change_val: null,
     };
-  }, [comparisonData, medlatecGroupNode]);
+
+    return aggregatedTotalData;
+
+  }, [medlatecGroupNode, dataMapForHierarchy]);
 
 
   const formatCurrency = (value: number | null) => { if (value === null || value === undefined) return 'N/A'; return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value); };
@@ -441,18 +451,18 @@ export default function NganhDocComparisonTable({
   if (error) { return ( <Card className="mt-4 border-destructive/50 flex-grow flex flex-col"> <CardHeader className="pb-2 pt-3"> <CardTitle className="text-base font-semibold text-destructive flex items-center gap-1.5"> <AlertTriangle className="h-4 w-4" /> Lỗi Tải Bảng Ngành Dọc/Đơn Vị 2 </CardTitle> </CardHeader> <CardContent className="pt-2 flex-grow"> <p className="text-xs text-destructive whitespace-pre-line">{error.message}</p> {(error.message.includes(CRITICAL_SETUP_ERROR_PREFIX) || error.type === 'rpcMissing' || error.message.toLowerCase().includes("does not exist") || error.message.includes("RPC")) && ( <p className="text-xs text-muted-foreground mt-1 whitespace-pre-line"> {CRITICAL_SETUP_ERROR_PREFIX} Đây là một lỗi cấu hình quan trọng. Vui lòng kiểm tra kỹ các hàm RPC `get_nganhdoc_ft_salary_hanoi` và `get_donvi2_pt_salary` trong Supabase theo hướng dẫn tại README.md. Đảm bảo các bảng `Fulltime` (với cột `nganh_doc`, `hn_or_note`) và `Parttime` (với cột `Don_vi_2`) tồn tại và có dữ liệu. </p> )} </CardContent> </Card> ); }
   
   const noDataForMedlatecGroup = !medlatecGroupNode;
-  const noRenderableChildren = nodesToRender.length === 0;
-  const noDataMatchingFilters = dataMapForHierarchy.size === 0 && !noRenderableChildren;
+  
+  const hasRenderableNodes = useMemo(() => {
+      if (!medlatecGroupNode || !medlatecGroupNode.children) return false;
+      return medlatecGroupNode.children.some(childNode => getAggregatedDataForNode(childNode, dataMapForHierarchy) !== null);
+  }, [medlatecGroupNode, dataMapForHierarchy]);
 
 
   if (noDataForMedlatecGroup && !isLoading) {
      return ( <Card className="mt-4 flex-grow flex flex-col"> <CardHeader className="pb-2 pt-3"> <CardTitle className="text-base font-semibold text-muted-foreground flex items-center gap-1.5"><BarChart3 className="h-4 w-4" />Bảng so sánh theo Ngành dọc (Hà Nội FT) & Đơn vị 2 (PT)</CardTitle> <CardDescription className="text-xs truncate" title={filterDescription}> {filterDescription}. </CardDescription> </CardHeader> <CardContent className="pt-2 flex items-center justify-center flex-grow"> <p className="text-sm text-muted-foreground">Không tìm thấy "Medlatec Group" trong dữ liệu cơ cấu tổ chức.</p> </CardContent> </Card> );
   }
-  if (noRenderableChildren && !isLoading && medlatecGroupNode) {
-     return ( <Card className="mt-4 flex-grow flex flex-col"> <CardHeader className="pb-2 pt-3"> <CardTitle className="text-base font-semibold text-muted-foreground flex items-center gap-1.5"><BarChart3 className="h-4 w-4" />Bảng so sánh theo Ngành dọc (Hà Nội FT) & Đơn vị 2 (PT)</CardTitle> <CardDescription className="text-xs truncate" title={filterDescription}> {filterDescription}. </CardDescription> </CardHeader> <CardContent className="pt-2 flex items-center justify-center flex-grow"> <p className="text-sm text-muted-foreground">Không có đơn vị con nào để hiển thị thuộc "Medlatec Group" sau khi loại trừ.</p> </CardContent> </Card> );
-  }
-   if (noDataMatchingFilters && !isLoading) {
-     return ( <Card className="mt-4 flex-grow flex flex-col"> <CardHeader className="pb-2 pt-3"> <CardTitle className="text-base font-semibold text-muted-foreground flex items-center gap-1.5"><BarChart3 className="h-4 w-4" />Bảng so sánh theo Ngành dọc (Hà Nội FT) & Đơn vị 2 (PT)</CardTitle> <CardDescription className="text-xs truncate" title={filterDescription}> {filterDescription}. </CardDescription> </CardHeader> <CardContent className="pt-2 flex items-center justify-center flex-grow"> <p className="text-sm text-muted-foreground">Không có dữ liệu nào khớp với bộ lọc hiện tại cho các đơn vị thuộc "Medlatec Group".</p> </CardContent> </Card> );
+  if (!hasRenderableNodes && !isLoading && medlatecGroupNode) {
+     return ( <Card className="mt-4 flex-grow flex flex-col"> <CardHeader className="pb-2 pt-3"> <CardTitle className="text-base font-semibold text-muted-foreground flex items-center gap-1.5"><BarChart3 className="h-4 w-4" />Bảng so sánh theo Ngành dọc (Hà Nội FT) & Đơn vị 2 (PT)</CardTitle> <CardDescription className="text-xs truncate" title={filterDescription}> {filterDescription}. </CardDescription> </CardHeader> <CardContent className="pt-2 flex items-center justify-center flex-grow"> <p className="text-sm text-muted-foreground">Không có đơn vị con nào thuộc "Medlatec Group" có dữ liệu để hiển thị sau khi lọc.</p> </CardContent> </Card> );
   }
 
 
@@ -482,7 +492,7 @@ export default function NganhDocComparisonTable({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {nodesToRender.map(rootNode => (
+              {medlatecGroupNode && medlatecGroupNode.children.map(rootNode => (
                 <RenderTableRow 
                   key={rootNode.id}
                   node={rootNode}
@@ -492,7 +502,6 @@ export default function NganhDocComparisonTable({
                   toggleExpand={toggleExpand}
                   formatCurrency={formatCurrency}
                   renderChangeCell={renderChangeCell}
-                  allFilteredKeys={allFilteredKeysInHierarchy}
                 />
               ))}
             </TableBody>
@@ -517,3 +526,5 @@ export default function NganhDocComparisonTable({
   );
 }
 
+
+    
