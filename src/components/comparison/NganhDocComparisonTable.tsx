@@ -39,7 +39,7 @@ const CRITICAL_SETUP_ERROR_PREFIX = "LỖI CÀI ĐẶT QUAN TRỌNG:";
 const DYNAMIC_CHILDREN_NAMES = ["Med Ba Đình", "Med Thanh Xuân", "Med Tây Hồ", "Med Cầu Giấy"];
 const EXCLUDED_NGANHDOC_KEYS_SET = new Set([
     "Med Pharma", "0", "Medon", "Medaz", "Medcom", "Medicons", "Medim",
-    ...DYNAMIC_CHILDREN_NAMES
+    ...DYNAMIC_CHILDREN_NAMES 
 ]);
 
 const HETHONG_KHAMCHUABENH_ID = "2";
@@ -64,9 +64,13 @@ interface NganhDocComparisonTableProps {
 const getAggregatedDataForNode = (
   node: OrgNode,
   dataMap: Map<string, MergedNganhDocData>,
-  specificChildrenDataForHTKCB: Map<string, MergedNganhDocData> | null = null // Data for Ba Đình, Thanh Xuân etc. if node is HTKCB
+  specificChildrenDataForHTKCB: Map<string, MergedNganhDocData> | null = null
 ): MergedNganhDocData | null => {
-  if (EXCLUDED_NGANHDOC_KEYS_SET.has(node.name.trim()) && node.id !== HETHONG_KHAMCHUABENH_ID) { // Allow HTKCB itself
+  const nodeNameTrimmed = node.name.trim();
+
+  // Explicitly exclude these nodes if they are encountered in the hierarchy,
+  // UNLESS it's the HTKCB node itself which has special rendering.
+  if (node.id !== HETHONG_KHAMCHUABENH_ID && EXCLUDED_NGANHDOC_KEYS_SET.has(nodeNameTrimmed)) {
     return null;
   }
 
@@ -90,15 +94,13 @@ const getAggregatedDataForNode = (
 
   if (node.children && node.children.length > 0) {
     for (const childNode of node.children) {
-      // For HTKCB, its dynamic children are handled separately and their data is already part of specificChildrenDataForHTKCB,
-      // so we don't aggregate them from dataMap again here.
-      // We only aggregate hierarchical children from dataMap.
+      // For HTKCB, its dynamic children are handled separately.
+      // Hierarchical children under HTKCB (if any and not excluded) are aggregated here.
       if (node.id === HETHONG_KHAMCHUABENH_ID && DYNAMIC_CHILDREN_NAMES.includes(childNode.name.trim())) {
-        // Skip dynamic children here, they are handled by specificChildrenDataForHTKCB for HTKCB's total display
         continue;
       }
 
-      const childAggregatedData = getAggregatedDataForNode(childNode, dataMap, null); // Pass null for specificChildren map for deeper levels
+      const childAggregatedData = getAggregatedDataForNode(childNode, dataMap, null);
       if (childAggregatedData) {
         aggregated.ft_salary_2024 += childAggregatedData.ft_salary_2024;
         aggregated.ft_salary_2025 += childAggregatedData.ft_salary_2025;
@@ -109,42 +111,20 @@ const getAggregatedDataForNode = (
     }
   }
   
-  // If this IS the HTKCB node, add the sums from its dynamic children
-  if (node.id === HETHONG_KHAMCHUABENH_ID && specificChildrenDataForHTKCB) {
-    specificChildrenDataForHTKCB.forEach(childData => {
-        // These children are part of HTKCB's total.
-        // The directData for HTKCB (if any from dataMap) might be for "Nganh Doc = HTKCB" itself,
-        // and these dynamic children are specific locations for FT/PT *within* that overall HTKCB context.
-        // We will let the specificChildrenFinancialData fetch define what parts of HTKCB these dynamic children represent.
-        // The aggregated total for HTKCB will be its direct data + its *hierarchical* children data
-        // + sums from these dynamic children.
-        // However, to avoid double counting if HTKCB's direct data already includes these,
-        // we should primarily rely on the fetchSpecificChildrenFinancialData to get the precise numbers for these dynamic children
-        // and *getAggregatedDataForNode* for HTKCB should represent its *hierarchical role's sum*.
-        // The dynamic children are more of a breakdown.
-        // For the purpose of the *parent HTKCB row display*, we sum what `getAggregatedDataForNode` calculated for its *hierarchical* children
-        // and its *own data* from the main RPCs (get_nganhdoc_ft_salary_hanoi & get_donvi2_pt_salary for key "Hệ thống khám chữa bệnh").
-        // The dynamic children are an *additional display*, not necessarily summed into the HTKCB parent displayed row unless explicitly designed.
-        // Based on the last request, the dynamic children's data *is* a breakdown of HTKCB's salary *at those specific locations*.
-        // So, for the parent HTKCB row, its data should reflect *its own* data (from `dataMap.get("Hệ thống khám chữa bệnh")`)
-        // PLUS sums of its *hierarchical* children (those not in DYNAMIC_CHILDREN_NAMES).
-        // The DYNAMIC_CHILDREN_NAMES are displayed separately using their own fetched data.
-        // The current logic for `directData` and summing `childAggregatedData` (which excludes DYNAMIC_CHILDREN_NAMES for HTKCB's children) should be correct
-        // for the HTKCB parent row representing its "nganh doc" or "don vi 2" identity.
-    });
-  }
-
-
   aggregated.total_salary_2024 = aggregated.ft_salary_2024 + aggregated.pt_salary_2024;
   aggregated.total_salary_2025 = aggregated.ft_salary_2025 + aggregated.pt_salary_2025;
 
-  const hasDirectData = directData && (directData.ft_salary_2024 !== 0 || directData.ft_salary_2025 !== 0 || directData.pt_salary_2024 !== 0 || directData.pt_salary_2025 !== 0);
+  const hasDirectAggregatableData = directData && (directData.total_salary_2024 !== 0 || directData.total_salary_2025 !== 0);
 
-  if (!hasDirectData && !hasAnyChildData) {
-    // If node itself has no data from dataMap or its hierarchical children,
-    // and it's not HTKCB which might have dynamic children to display, return null.
+  if (!hasDirectAggregatableData && !hasAnyChildData) {
+    // If node itself has no direct data from dataMap (after filters) or its hierarchical children have no data,
+    // and it's not HTKCB (which might have dynamic children to display via specificChildrenDataForHTKCB), return null.
     if (node.id !== HETHONG_KHAMCHUABENH_ID || !specificChildrenDataForHTKCB || specificChildrenDataForHTKCB.size === 0) {
-       return null;
+       // For HTKCB, if it has specific children data, we might still want to render it even if direct/hierarchical sum is 0.
+       // This check is more about whether the node itself contributes anything or has children contributing.
+       // If it's HTKCB AND has specific children, the row should render (handled by RenderTableRow's logic).
+       // If not HTKCB, and no data, then null.
+       if(node.id !== HETHONG_KHAMCHUABENH_ID) return null;
     }
   }
   
@@ -159,8 +139,8 @@ const getAggregatedDataForNode = (
 interface RenderTableRowProps {
   node: OrgNode;
   level: number;
-  dataMap: Map<string, MergedNganhDocData>; // Filtered data for leaves
-  specificChildrenData: Map<string, MergedNganhDocData>; // Data for HTKCB's dynamic children
+  dataMap: Map<string, MergedNganhDocData>;
+  specificChildrenData: Map<string, MergedNganhDocData>;
   isLoadingSpecificChildren: boolean;
   expandedKeys: Set<string>;
   toggleExpand: (key: string) => void;
@@ -179,36 +159,47 @@ const RenderTableRow: React.FC<RenderTableRowProps> = ({
   formatCurrency,
   renderChangeCell,
 }) => {
-  // Get aggregated data for the current node (sum of itself + its hierarchical children)
+
+  // CRITICAL FIX: Prevent independent rendering of DYNAMIC_CHILDREN_NAMES
+  // They should only appear as dynamic children of HETHONG_KHAMCHUABENH_ID
+  if (node.id !== HETHONG_KHAMCHUABENH_ID && DYNAMIC_CHILDREN_NAMES.includes(node.name.trim())) {
+    return null;
+  }
+  // Also, respect general exclusions if not HTKCB
+  if (node.id !== HETHONG_KHAMCHUABENH_ID && EXCLUDED_NGANHDOC_KEYS_SET.has(node.name.trim())) {
+      return null;
+  }
+
   const aggregatedNodeData = useMemo(() => getAggregatedDataForNode(node, dataMap, node.id === HETHONG_KHAMCHUABENH_ID ? specificChildrenData : null), [node, dataMap, specificChildrenData]);
   const isExpanded = expandedKeys.has(node.id);
 
-  // Filter out excluded keys from hierarchical children before determining if node can expand
   const hierarchicalChildren = useMemo(() =>
-    node.children?.filter(child => !EXCLUDED_NGANHDOC_KEYS_SET.has(child.name.trim())) || [],
-    [node.children]
+    node.children?.filter(child => 
+        !(node.id === HETHONG_KHAMCHUABENH_ID && DYNAMIC_CHILDREN_NAMES.includes(child.name.trim())) && // Exclude dynamic if parent is HTKCB
+        !EXCLUDED_NGANHDOC_KEYS_SET.has(child.name.trim()) // General exclusion
+    ) || [],
+    [node.children, node.id]
   );
   
   const hasDisplayableHierarchicalChildrenWithData = useMemo(() => 
     hierarchicalChildren.some(child => {
-        const aggData = getAggregatedDataForNode(child, dataMap, child.id === HETHONG_KHAMCHUABENH_ID ? specificChildrenData : null);
-        // A child is displayable if it has its own aggregated data
+        const aggData = getAggregatedDataForNode(child, dataMap, null);
         return aggData !== null && (aggData.total_salary_2024 !== 0 || aggData.total_salary_2025 !== 0);
     }),
-    [hierarchicalChildren, dataMap, specificChildrenData]
+    [hierarchicalChildren, dataMap]
   );
 
   const isHTKCBNode = node.id === HETHONG_KHAMCHUABENH_ID;
   const displayableDynamicChildrenNames = isHTKCBNode ? DYNAMIC_CHILDREN_NAMES : [];
   
-  // HTKCB can expand if it has dynamic children to show, even if specificChildrenData is still loading or empty initially
   const hasDynamicChildrenToPotentiallyShow = isHTKCBNode && displayableDynamicChildrenNames.length > 0;
 
   const canExpand = hasDisplayableHierarchicalChildrenWithData || hasDynamicChildrenToPotentiallyShow;
 
   const shouldRenderRow = 
-    (aggregatedNodeData && (aggregatedNodeData.total_salary_2024 !== 0 || aggregatedNodeData.total_salary_2025 !== 0)) || // Has its own data
-    canExpand; // Or can expand to show children with data
+    (aggregatedNodeData && (aggregatedNodeData.total_salary_2024 !== 0 || aggregatedNodeData.total_salary_2025 !== 0)) ||
+    (isHTKCBNode && hasDynamicChildrenToPotentiallyShow) || // HTKCB should render if it has dynamic children to show, even if its own sum is 0
+    canExpand; // Or can expand to show hierarchical children with data
 
   if (!shouldRenderRow) {
     return null;
@@ -260,7 +251,8 @@ const RenderTableRow: React.FC<RenderTableRowProps> = ({
       </TableRow>
 
       {isExpanded && hasDisplayableHierarchicalChildrenWithData && hierarchicalChildren.map(childNode => {
-          const childAggData = getAggregatedDataForNode(childNode, dataMap, childNode.id === HETHONG_KHAMCHUABENH_ID ? specificChildrenData : null);
+          const childAggData = getAggregatedDataForNode(childNode, dataMap, null); // Pass null for specificChildren map for deeper levels
+          // Render child only if it's not explicitly excluded and has data or is a parent itself
           if (childAggData && (childAggData.total_salary_2024 !== 0 || childAggData.total_salary_2025 !== 0)) {
              return (
                 <RenderTableRow
@@ -268,7 +260,7 @@ const RenderTableRow: React.FC<RenderTableRowProps> = ({
                 node={childNode}
                 level={level + 1}
                 dataMap={dataMap}
-                specificChildrenData={specificChildrenData}
+                specificChildrenData={specificChildrenData} // This will be empty for non-HTKCB children
                 isLoadingSpecificChildren={isLoadingSpecificChildren}
                 expandedKeys={expandedKeys}
                 toggleExpand={toggleExpand}
@@ -295,7 +287,6 @@ const RenderTableRow: React.FC<RenderTableRowProps> = ({
           )}
           {!isLoadingSpecificChildren && displayableDynamicChildrenNames.map(childName => {
             const childData = specificChildrenData.get(childName);
-            // Render dynamic child only if it has data
             if (!childData || (childData.total_salary_2024 === 0 && childData.total_salary_2025 === 0)) {
                 return null;
             }
@@ -421,13 +412,13 @@ export default function NganhDocComparisonTable({
                 filter_year: year,
                 filter_months: (selectedMonths && selectedMonths.length > 0) ? selectedMonths : null,
                 filter_locations: [childName], 
-                filter_nganh_docs: [HETHONG_KHAMCHUABENH_NAME], // Filter by parent's nganh_doc
+                filter_nganh_docs: [HETHONG_KHAMCHUABENH_NAME],
             };
             const rpcArgsPt = {
                 filter_year: year,
                 filter_months: (selectedMonths && selectedMonths.length > 0) ? selectedMonths : null,
                 filter_locations: [childName], 
-                filter_donvi2: [HETHONG_KHAMCHUABENH_NAME], // Filter by parent's Don_vi_2
+                filter_donvi2: [HETHONG_KHAMCHUABENH_NAME], 
             };
 
             try {
@@ -501,14 +492,11 @@ export default function NganhDocComparisonTable({
     data2025Result.ptData.forEach(item => allKeys.add(item.key));
 
     allKeys.forEach(key => {
-        // This initial merging from RPC is for potential leaf nodes or nodes that are keys in FT/PT RPCs.
-        // EXCLUDED_NGANHDOC_KEYS_SET will be checked by getAggregatedDataForNode.
         const ft2024 = data2024Result.ftData.find(d => d.key === key)?.ft_salary || 0;
         const pt2024 = data2024Result.ptData.find(d => d.key === key)?.pt_salary || 0;
         const ft2025 = data2025Result.ftData.find(d => d.key === key)?.ft_salary || 0;
         const pt2025 = data2025Result.ptData.find(d => d.key === key)?.pt_salary || 0;
 
-        // Apply global nganh_doc/don_vi_2 filters here for the direct data from RPCs
         const passesNganhDocFilter = !selectedNganhDoc || selectedNganhDoc.length === 0 || selectedNganhDoc.includes(key);
         const passesDonVi2Filter = !selectedDonVi2 || selectedDonVi2.length === 0 || selectedDonVi2.includes(key);
 
@@ -518,7 +506,6 @@ export default function NganhDocComparisonTable({
         const finalPt2025 = passesDonVi2Filter ? pt2025 : 0;
         
         if (finalFt2024 === 0 && finalPt2024 === 0 && finalFt2025 === 0 && finalPt2025 === 0) {
-            // If no data after filtering, don't add to map unless it's HTKCB which might have dynamic children
             if (key !== HETHONG_KHAMCHUABENH_NAME) return;
         }
 
@@ -536,10 +523,7 @@ export default function NganhDocComparisonTable({
         });
     });
     
-    // We don't setComparisonData directly here with mergedMap values.
-    // comparisonData is not directly used for rendering anymore; dataMapForHierarchy is.
-    // The important thing is that mergedMap (which becomes dataMapForHierarchy) is populated correctly.
-    setComparisonData(Array.from(mergedMap.values())); // Still useful for the overall total calculation logic, though not directly rendered.
+    setComparisonData(Array.from(mergedMap.values())); 
 
     await fetchSpecificChildrenFinancialData();
 
@@ -553,11 +537,7 @@ export default function NganhDocComparisonTable({
 
   const dataMapForHierarchy = useMemo(() => {
     const map = new Map<string, MergedNganhDocData>();
-    // Populate with data from the main RPCs (get_nganhdoc_ft_salary_hanoi, get_donvi2_pt_salary)
-    // This data is already filtered by selectedNganhDoc/selectedDonVi2
     comparisonData.forEach(item => {
-      // Ensure EXCLUDED_NGANHDOC_KEYS_SET isn't strictly applied here if item is HTKCB.
-      // getAggregatedDataForNode will handle exclusions more granularly.
       if (item.grouping_key === HETHONG_KHAMCHUABENH_NAME || !EXCLUDED_NGANHDOC_KEYS_SET.has(item.grouping_key.trim())) {
            map.set(item.grouping_key, item);
       }
@@ -568,7 +548,7 @@ export default function NganhDocComparisonTable({
 
   const medlatecGroupNode = useMemo(() => {
     if (!orgHierarchyData || orgHierarchyData.length === 0) return null;
-    return orgHierarchyData.find(node => node.id === "1" || node.name === "Medlatec Group");
+    return orgHierarchyData.find(node => String(node.id) === "1" || node.name.trim() === "Medlatec Group");
   }, [orgHierarchyData]);
 
 
@@ -586,8 +566,6 @@ export default function NganhDocComparisonTable({
       };
     if (!medlatecGroupNode) return defaultTotals;
     
-    // The total for Medlatec Group should be the sum of its aggregated children,
-    // including the special handling for HTKCB and its dynamic children.
     const aggregatedTotalData = getAggregatedDataForNode(medlatecGroupNode, dataMapForHierarchy, specificChildrenData);
     return aggregatedTotalData || defaultTotals;
 
@@ -625,7 +603,6 @@ export default function NganhDocComparisonTable({
   
   const hasRenderableNodes = useMemo(() => {
       if (!medlatecGroupNode || !medlatecGroupNode.children) return false;
-      // Check if any of the direct children of MedlatecGroup (after exclusion) have aggregated data
       return nodesToRender.some(childNode => {
          const aggData = getAggregatedDataForNode(childNode, dataMapForHierarchy, childNode.id === HETHONG_KHAMCHUABENH_ID ? specificChildrenData : null);
          return aggData !== null && (aggData.total_salary_2024 !== 0 || aggData.total_salary_2025 !== 0);
