@@ -114,7 +114,7 @@ export default function WorkspaceContent() {
   const [flatOrgUnits, setFlatOrgUnits] = useState<FlatOrgUnit[]>([]);
 
 
-  const [activeDashboardTab, setActiveDashboardTab] = useState<DashboardTab>('payrollOverview');
+  const [activeDashboardTab, setActiveDashboardTab] = useState<DashboardTab>('salaryWorkloadAnalysis');
 
   const [isMounted, setIsMounted] = useState(false);
 
@@ -1075,13 +1075,17 @@ export default function WorkspaceContent() {
                             selectedNganhDoc={selectedNganhDocForFilter}
                         />
                     </div>
-                    <div className="grid grid-cols-1 gap-3 mt-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
                         <LocationWorkloadEfficiencyScatterChart
                             selectedYear={selectedYear}
                             selectedMonths={selectedMonths}
                             selectedDepartmentsForDiadiem={selectedDepartmentsFromLoaiFilter}
                             selectedNganhDoc={selectedNganhDocForFilter}
                         />
+                        {/* Placeholder for the next chart */}
+                        {/* <Card className="h-[400px] mt-3 flex items-center justify-center">
+                           <p className="text-muted-foreground">Biểu đồ tiếp theo...</p>
+                        </Card> */}
                     </div>
                   </TabsContent>
                   <TabsContent value="detailedSalary" className="flex-grow overflow-y-auto space-y-3 mt-2">
@@ -1101,6 +1105,7 @@ export default function WorkspaceContent() {
     </SidebarProvider>
   );
 }
+
 
 
 

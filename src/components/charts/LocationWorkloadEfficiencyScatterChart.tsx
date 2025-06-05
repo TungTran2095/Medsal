@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { supabase } from '@/lib/supabaseClient';
 import { Loader2, AlertTriangle, ScatterChart as ScatterChartIcon, Banknote, TrendingUp } from 'lucide-react';
-import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Scatter, ZAxis } from 'recharts';
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Scatter, ZAxis, LabelList } from 'recharts';
 import {
   Card,
   CardContent,
@@ -62,6 +62,19 @@ const currencyLabelFormatter = (value: number | null | undefined) => {
     notation: 'compact',
     compactDisplay: 'short'
   }).format(value);
+};
+
+// Custom label component for the scatter plot points
+const CustomScatterDataLabel = (props: any) => {
+  const { x, y, index, payload } = props;
+  if (!payload || !payload.location_name) return null;
+
+  // Simple positioning above the dot. Adjust dx, dy as needed for better appearance.
+  return (
+    <text x={x} y={y} dy={-7} fill="hsl(var(--muted-foreground))" fontSize={9} textAnchor="middle">
+      {payload.location_name}
+    </text>
+  );
 };
 
 
@@ -225,7 +238,9 @@ export default function LocationWorkloadEfficiencyScatterChart({
                 name="Hiệu suất Địa điểm" 
                 data={chartData} 
                 fill="hsl(var(--chart-3))" 
-              />
+              >
+                <LabelList dataKey="location_name" content={<CustomScatterDataLabel />} />
+              </Scatter>
             </DynamicScatterChart>
           </ResponsiveContainer>
         </ChartContainer>
