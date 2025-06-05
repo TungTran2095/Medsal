@@ -36,10 +36,15 @@ interface FetchError {
 }
 
 const CRITICAL_SETUP_ERROR_PREFIX = "LỖI CÀI ĐẶT QUAN TRỌNG:";
-const EXCLUDED_NGANHDOC_KEYS_SET = new Set(["Med Pharma", "0", "Medon", "Medaz", "Medcom", "Medicons", "Medim"]);
-const HETHONG_KHAMCHUABENH_ID = "2"; // Assuming 'Hệ thống khám chữa bệnh' has ID '2'
-const HETHONG_KHAMCHUABENH_NAME = "Hệ thống khám chữa bệnh";
 const DYNAMIC_CHILDREN_NAMES = ["Med Ba Đình", "Med Thanh Xuân", "Med Tây Hồ", "Med Cầu Giấy"];
+const EXCLUDED_NGANHDOC_KEYS_SET = new Set([
+    "Med Pharma", "0", "Medon", "Medaz", "Medcom", "Medicons", "Medim",
+    ...DYNAMIC_CHILDREN_NAMES // Ensure these are excluded from top-level rendering if they exist in orgHierarchy
+]);
+
+const HETHONG_KHAMCHUABENH_ID = "2";
+const HETHONG_KHAMCHUABENH_NAME = "Hệ thống khám chữa bệnh";
+
 
 const calculateChange = (valNew: number | null, valOld: number | null): number | null => {
     if (valNew === null || valOld === null) return null;
@@ -60,7 +65,7 @@ interface NganhDocComparisonTableProps {
 const getAggregatedDataForNode = (
   node: OrgNode,
   dataMap: Map<string, MergedNganhDocData>,
-  dynamicChildrenDataForParent: Map<string, MergedNganhDocData> | null = null // Data for specific children like Med Ba Dinh etc.
+  dynamicChildrenDataForParent: Map<string, MergedNganhDocData> | null = null
 ): MergedNganhDocData | null => {
   if (EXCLUDED_NGANHDOC_KEYS_SET.has(node.name)) {
     return null;
@@ -74,7 +79,6 @@ const getAggregatedDataForNode = (
     ft_salary_change_val: null, pt_salary_change_val: null, total_salary_change_val: null,
   };
 
-  // Get direct data for the node itself from the main RPC calls (nganh_doc / Don_vi_2 level)
   const directData = dataMap.get(node.name);
   if (directData) {
     aggregated.ft_salary_2024 += directData.ft_salary_2024;
@@ -83,17 +87,12 @@ const getAggregatedDataForNode = (
     aggregated.pt_salary_2025 += directData.pt_salary_2025;
   }
   
-  // Aggregate from hierarchical children (ms_org_nganhdoc structure)
   if (node.children && node.children.length > 0) {
     for (const childNode of node.children) {
-      // If this node is HTKCB, its hierarchical children's data is already part of its `directData` from `dataMap`
-      // So, we only aggregate from non-HTKCB children here to avoid double counting from dataMap perspective
-      if (node.id === HETHONG_KHAMCHUABENH_ID) {
-         // For HTKCB, its total is already in `dataMap.get(HETHONG_KHAMCHUABENH_NAME)`.
-         // The dynamic children ("Med Ba Dinh", etc.) are displayed separately and are *components* of this total,
-         // not additive to it in this aggregation function for the parent row.
-      } else {
-        const childAggregatedData = getAggregatedDataForNode(childNode, dataMap);
+      // For HTKCB, its dynamic children are handled separately and should not be aggregated here from dataMap again.
+      // For other nodes, aggregate their children as usual.
+      if (node.id !== HETHONG_KHAMCHUABENH_ID) {
+        const childAggregatedData = getAggregatedDataForNode(childNode, dataMap); // Pass null for dynamicChildrenMap
         if (childAggregatedData) {
             aggregated.ft_salary_2024 += childAggregatedData.ft_salary_2024;
             aggregated.ft_salary_2025 += childAggregatedData.ft_salary_2025;
@@ -112,11 +111,13 @@ const getAggregatedDataForNode = (
     aggregated.pt_salary_2024 !== 0 || aggregated.pt_salary_2025 !== 0;
 
   if (!hasData) {
-    // If node itself has no data, check if it's HTKCB and has dynamic children with data
-    if (node.id === HETHONG_KHAMCHUABENH_ID && dynamicChildrenDataForParent && dynamicChildrenDataForParent.size > 0) {
-        // Keep the node, its data will be shown as 0 but it can be expanded
+     // If node itself has no data from dataMap or its hierarchical children,
+     // check if it's HTKCB and it's supposed to have dynamic children (even if they have 0 data).
+    if (node.id === HETHONG_KHAMCHUABENH_ID && dynamicChildrenDataForParent) {
+        // HTKCB row should still render if dynamic children are expected,
+        // its own values might be 0 if no direct data from `get_nganhdoc_ft_salary_hanoi` etc.
     } else {
-        return null;
+        return null; // Don't render if no data and not HTKCB with dynamic children context
     }
   }
 
@@ -154,18 +155,26 @@ const RenderTableRow: React.FC<RenderTableRowProps> = ({
   const aggregatedNodeData = useMemo(() => getAggregatedDataForNode(node, dataMap, node.id === HETHONG_KHAMCHUABENH_ID ? specificChildrenData : null), [node, dataMap, specificChildrenData]);
   const isExpanded = expandedKeys.has(node.id);
 
+  // Filter out excluded keys from hierarchical children before determining if node can expand
   const hierarchicalChildren = useMemo(() =>
-    node.children?.filter(child => !EXCLUDED_NGANHDOC_KEYS_SET.has(child.name) && getAggregatedDataForNode(child, dataMap) !== null) || [],
-    [node.children, dataMap]
+    node.children?.filter(child => !EXCLUDED_NGANHDOC_KEYS_SET.has(child.name)) || [],
+    [node.children]
+  );
+  
+  // Check if any of these non-excluded hierarchical children actually have data
+  const hasDisplayableHierarchicalChildrenWithData = useMemo(() => 
+    hierarchicalChildren.some(child => getAggregatedDataForNode(child, dataMap) !== null),
+    [hierarchicalChildren, dataMap]
   );
 
   const isHTKCBNode = node.id === HETHONG_KHAMCHUABENH_ID;
-  const displayableDynamicChildrenNames = isHTKCBNode ? DYNAMIC_CHILDREN_NAMES.filter(name => !EXCLUDED_NGANHDOC_KEYS_SET.has(name)) : [];
+  // Dynamic children for HTKCB are predefined
+  const displayableDynamicChildrenNames = isHTKCBNode ? DYNAMIC_CHILDREN_NAMES : [];
   
-  const hasDisplayableHierarchicalChildren = hierarchicalChildren.length > 0;
   const hasDisplayableDynamicChildren = isHTKCBNode && displayableDynamicChildrenNames.length > 0;
-  const canExpand = hasDisplayableHierarchicalChildren || (isHTKCBNode && hasDisplayableDynamicChildren);
+  const canExpand = hasDisplayableHierarchicalChildrenWithData || (isHTKCBNode && hasDisplayableDynamicChildren);
 
+  // A row should render if it has aggregated data itself OR if it's an expandable parent
   const shouldRenderRow = !!aggregatedNodeData || canExpand;
 
   if (!shouldRenderRow) return null;
@@ -182,9 +191,9 @@ const RenderTableRow: React.FC<RenderTableRowProps> = ({
       <TableCell className="text-right py-1.5 px-2 text-xs whitespace-nowrap font-semibold">{formatCurrency(aggregatedNodeData.total_salary_2025)}</TableCell>
       {renderChangeCell(aggregatedNodeData.total_salary_change_val, true)}
     </>
-  ) : (
+  ) : ( // Case where aggregatedNodeData is null but canExpand is true (parent with only expandable children)
     Array(9).fill(null).map((_, idx) => (
-      <TableCell key={`empty-${idx}`} className="text-center py-1.5 px-2 text-xs whitespace-nowrap text-muted-foreground">-</TableCell>
+      <TableCell key={`empty-${node.id}-${idx}`} className="text-center py-1.5 px-2 text-xs whitespace-nowrap text-muted-foreground">-</TableCell>
     ))
   );
 
@@ -215,19 +224,22 @@ const RenderTableRow: React.FC<RenderTableRowProps> = ({
         {rowContent}
       </TableRow>
 
-      {isExpanded && hasDisplayableHierarchicalChildren && hierarchicalChildren.map(childNode => (
-        <RenderTableRow
-          key={childNode.id}
-          node={childNode}
-          level={level + 1}
-          dataMap={dataMap}
-          specificChildrenData={specificChildrenData}
-          isLoadingSpecificChildren={isLoadingSpecificChildren}
-          expandedKeys={expandedKeys}
-          toggleExpand={toggleExpand}
-          formatCurrency={formatCurrency}
-          renderChangeCell={renderChangeCell}
-        />
+      {isExpanded && hasDisplayableHierarchicalChildrenWithData && hierarchicalChildren.map(childNode => (
+        // Only render hierarchical child if it passes aggregation check too
+        getAggregatedDataForNode(childNode, dataMap) !== null && (
+            <RenderTableRow
+            key={childNode.id}
+            node={childNode}
+            level={level + 1}
+            dataMap={dataMap}
+            specificChildrenData={specificChildrenData} // Pass down, though not directly used by non-HTKCB children
+            isLoadingSpecificChildren={isLoadingSpecificChildren}
+            expandedKeys={expandedKeys}
+            toggleExpand={toggleExpand}
+            formatCurrency={formatCurrency}
+            renderChangeCell={renderChangeCell}
+            />
+        )
       ))}
 
       {isExpanded && isHTKCBNode && hasDisplayableDynamicChildren && (
@@ -286,13 +298,13 @@ export default function NganhDocComparisonTable({
   selectedNganhDoc,
   selectedDonVi2,
   orgHierarchyData,
-  flatOrgUnits
+  flatOrgUnits // This prop might not be strictly needed if all name lookups are from orgHierarchyData
 }: NganhDocComparisonTableProps) {
   const [comparisonData, setComparisonData] = useState<MergedNganhDocData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<FetchError | null>(null);
   const [filterDescription, setFilterDescription] = useState<string>("kỳ được chọn");
-  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set([HETHONG_KHAMCHUABENH_ID])); // Expand HTKCB by default
+  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set([HETHONG_KHAMCHUABENH_ID]));
 
   const [specificChildrenData, setSpecificChildrenData] = useState<Map<string, MergedNganhDocData>>(new Map());
   const [isLoadingSpecificChildren, setIsLoadingSpecificChildren] = useState(false);
@@ -360,44 +372,43 @@ export default function NganhDocComparisonTable({
     const newSpecificChildrenData = new Map<string, MergedNganhDocData>();
 
     for (const childName of DYNAMIC_CHILDREN_NAMES) {
-        if (EXCLUDED_NGANHDOC_KEYS_SET.has(childName)) continue;
+        // No need to check EXCLUDED_NGANHDOC_KEYS_SET here, as these are specifically fetched.
+        // They are excluded from the main hierarchy rendering if they happen to be there.
 
         let ft2024 = 0, ft2025 = 0, pt2024 = 0, pt2025 = 0;
-        let childError = false;
+        // let childError = false; // Not used currently, but can be for more granular error handling
 
         for (const year of [2024, 2025]) {
             const rpcArgsFt = {
                 filter_year: year,
                 filter_months: (selectedMonths && selectedMonths.length > 0) ? selectedMonths : null,
-                filter_locations: [childName], // Filter by dia_diem
-                filter_nganh_docs: null, // Do not filter by parent's nganh_doc for this specific child sum
+                filter_locations: [childName],
+                filter_nganh_docs: [HETHONG_KHAMCHUABENH_NAME], // Filter by parent's nganh_doc
             };
             const rpcArgsPt = {
                 filter_year: year,
                 filter_months: (selectedMonths && selectedMonths.length > 0) ? selectedMonths : null,
-                filter_locations: [childName], // Filter by Don vi
-                filter_donvi2: null, // Do not filter by parent's Don_vi_2 for this specific child sum
+                filter_locations: [childName],
+                filter_donvi2: [HETHONG_KHAMCHUABENH_NAME], // Filter by parent's Don_vi_2
             };
 
             try {
                 const { data: ftData, error: ftErr } = await supabase.rpc('get_total_salary_fulltime', rpcArgsFt);
-                if (ftErr) { console.warn(`Error fetching FT for ${childName} ${year}:`, ftErr); childError = true; }
+                if (ftErr) { console.warn(`Error fetching FT for ${childName} ${year} (as child of HTKCB):`, ftErr); /* childError = true; */ }
                 else if (year === 2024) ft2024 = Number(ftData) || 0;
                 else ft2025 = Number(ftData) || 0;
 
                 const { data: ptData, error: ptErr } = await supabase.rpc('get_total_salary_parttime', rpcArgsPt);
-                if (ptErr) { console.warn(`Error fetching PT for ${childName} ${year}:`, ptErr); childError = true; }
+                if (ptErr) { console.warn(`Error fetching PT for ${childName} ${year} (as child of HTKCB):`, ptErr); /* childError = true; */ }
                 else if (year === 2024) pt2024 = Number(ptData) || 0;
                 else pt2025 = Number(ptData) || 0;
 
             } catch (e) {
-                console.warn(`Exception fetching data for ${childName} ${year}:`, e);
-                childError = true;
+                console.warn(`Exception fetching data for ${childName} ${year} (as child of HTKCB):`, e);
+                // childError = true;
             }
         }
         
-        // if (childError) continue; // Optionally skip if any year fails, or proceed with partial data
-
         newSpecificChildrenData.set(childName, {
             grouping_key: childName,
             ft_salary_2024: ft2024, ft_salary_2025: ft2025,
@@ -436,7 +447,6 @@ export default function NganhDocComparisonTable({
 
     setFilterDescription(`${monthSegment}${appliedFiltersDesc ? ` cho ${appliedFiltersDesc}` : ''} (2024 vs 2025)`);
 
-    // Fetch main data for nganh_doc/Don_vi_2 level
     const [data2024Result, data2025Result] = await Promise.all([
       fetchDataForYear(2024),
       fetchDataForYear(2025),
@@ -454,6 +464,8 @@ export default function NganhDocComparisonTable({
     data2025Result.ptData.forEach(item => allKeys.add(item.key));
 
     allKeys.forEach(key => {
+        if (EXCLUDED_NGANHDOC_KEYS_SET.has(key)) return;
+
         const ft2024 = data2024Result.ftData.find(d => d.key === key)?.ft_salary || 0;
         const pt2024 = data2024Result.ptData.find(d => d.key === key)?.pt_salary || 0;
         const ft2025 = data2025Result.ftData.find(d => d.key === key)?.ft_salary || 0;
@@ -466,7 +478,7 @@ export default function NganhDocComparisonTable({
         const finalFt2025 = passesNganhDocFilter ? ft2025 : 0;
         const finalPt2024 = passesDonVi2Filter ? pt2024 : 0;
         const finalPt2025 = passesDonVi2Filter ? pt2025 : 0;
-
+        
         if (finalFt2024 === 0 && finalPt2024 === 0 && finalFt2025 === 0 && finalPt2025 === 0) {
             return;
         }
@@ -493,7 +505,6 @@ export default function NganhDocComparisonTable({
     }));
     setComparisonData(calculatedData);
     
-    // Fetch data for specific children of HTKCB
     await fetchSpecificChildrenFinancialData();
 
     setIsLoading(false);
@@ -512,24 +523,7 @@ export default function NganhDocComparisonTable({
 
   const medlatecGroupNode = useMemo(() => {
     if (!orgHierarchyData || orgHierarchyData.length === 0) return null;
-    const findNode = (nodes: OrgNode[], id: string): OrgNode | null => {
-        for (const node of nodes) {
-            if (node.id === id) return node;
-            if (node.children && node.children.length > 0) {
-                const foundInChildren = findNode(node.children, id);
-                if (foundInChildren) return foundInChildren;
-            }
-        }
-        return null;
-    };
-    // Find "Medlatec Group" which is assumed to be a root or near-root node.
-    // If its ID is known, use it. Otherwise, search by name if IDs are not stable.
-    // For now, let's assume "Medlatec Group" is a top-level entry in orgHierarchyData or its direct child.
-    // This might need adjustment based on actual orgHierarchyData structure.
-    return orgHierarchyData.find(node => node.name === "Medlatec Group" || node.id === "1") || 
-           orgHierarchyData.reduce((acc, curr) => acc || findNode(curr.children, "1"), null as OrgNode | null) ||
-           orgHierarchyData.reduce((acc, curr) => acc || curr.children.find(c => c.name === "Medlatec Group"), null as OrgNode | null);
-
+    return orgHierarchyData.find(node => node.name === "Medlatec Group" || node.id === "1");
   }, [orgHierarchyData]);
 
 
@@ -547,7 +541,6 @@ export default function NganhDocComparisonTable({
       };
     if (!medlatecGroupNode) return defaultTotals;
     
-    // Aggregate data for Medlatec Group itself and its hierarchical children (excluding dynamic ones here)
     const aggregatedTotalData = getAggregatedDataForNode(medlatecGroupNode, dataMapForHierarchy, specificChildrenData);
     return aggregatedTotalData || defaultTotals;
 
@@ -581,8 +574,8 @@ export default function NganhDocComparisonTable({
     return ( <TableCell className={cn("text-center whitespace-nowrap text-xs py-1.5 px-2", colorClass)}> <div className="flex items-center justify-center gap-0.5"> <Icon className="h-3 w-3" /> {displayVal} </div> </TableCell> );
   };
 
-  const noDataForMedlatecGroupOverall = !medlatecGroupNode || (medlatecGroupNode.children.length === 0 && !dataMapForHierarchy.has(medlatecGroupNode.name) );
-
+  const noDataForMedlatecGroup = !medlatecGroupNode;
+  
   const hasRenderableNodes = useMemo(() => {
       if (!medlatecGroupNode || !medlatecGroupNode.children) return false;
       return medlatecGroupNode.children.some(childNode => {
@@ -596,7 +589,7 @@ export default function NganhDocComparisonTable({
   if (isLoading) { return ( <Card className="mt-4 flex-grow flex flex-col"> <CardHeader className="pb-2 pt-3"> <CardTitle className="text-base font-semibold flex items-center gap-1.5"><BarChart3 className="h-4 w-4 text-primary" />Bảng so sánh theo Ngành dọc (Hà Nội FT) & Đơn vị 2 (PT)</CardTitle> <CardDescription className="text-xs truncate">Đang tải dữ liệu so sánh chi tiết...</CardDescription> </CardHeader> <CardContent className="pt-2 flex items-center justify-center flex-grow"> <Loader2 className="h-8 w-8 animate-spin text-primary" /> </CardContent> </Card> ); }
   if (error) { return ( <Card className="mt-4 border-destructive/50 flex-grow flex flex-col"> <CardHeader className="pb-2 pt-3"> <CardTitle className="text-base font-semibold text-destructive flex items-center gap-1.5"> <AlertTriangle className="h-4 w-4" /> Lỗi Tải Bảng Ngành Dọc/Đơn Vị 2 </CardTitle> </CardHeader> <CardContent className="pt-2 flex-grow"> <p className="text-xs text-destructive whitespace-pre-line">{error.message}</p> {(error.message.includes(CRITICAL_SETUP_ERROR_PREFIX) || error.type === 'rpcMissing' || error.message.toLowerCase().includes("does not exist") || error.message.includes("RPC")) && ( <p className="text-xs text-muted-foreground mt-1 whitespace-pre-line"> {CRITICAL_SETUP_ERROR_PREFIX} Đây là một lỗi cấu hình quan trọng. Vui lòng kiểm tra kỹ các hàm RPC `get_nganhdoc_ft_salary_hanoi` và `get_donvi2_pt_salary` trong Supabase theo hướng dẫn tại README.md. Đảm bảo các bảng `Fulltime` (với cột `nganh_doc`, `hn_or_note`) và `Parttime` (với cột `Don_vi_2`) tồn tại và có dữ liệu. </p> )} </CardContent> </Card> ); }
 
-  if (noDataForMedlatecGroupOverall) {
+  if (noDataForMedlatecGroup) {
      return ( <Card className="mt-4 flex-grow flex flex-col"> <CardHeader className="pb-2 pt-3"> <CardTitle className="text-base font-semibold text-muted-foreground flex items-center gap-1.5"><BarChart3 className="h-4 w-4" />Bảng so sánh theo Ngành dọc (Hà Nội FT) & Đơn vị 2 (PT)</CardTitle> <CardDescription className="text-xs truncate" title={filterDescription}> {filterDescription}. </CardDescription> </CardHeader> <CardContent className="pt-2 flex items-center justify-center flex-grow"> <p className="text-sm text-muted-foreground">Không tìm thấy "Medlatec Group" trong dữ liệu cơ cấu tổ chức hoặc không có dữ liệu cho nhóm này.</p> </CardContent> </Card> );
   }
   if (!hasRenderableNodes && (!dataMapForHierarchy.has(HETHONG_KHAMCHUABENH_NAME) || specificChildrenData.size === 0) ) {
