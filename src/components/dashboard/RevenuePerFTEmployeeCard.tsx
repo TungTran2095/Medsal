@@ -35,14 +35,14 @@ export default function RevenuePerFTEmployeeCard({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<FetchError | null>(null);
   const [filterDescription, setFilterDescription] = useState<string>("tất cả các kỳ và địa điểm");
-  // const [debugMessages, setDebugMessages] = useState<string[]>([]);
+  const [debugMessages, setDebugMessages] = useState<string[]>([]);
 
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     setRevenuePerEmployee(null);
-    // setDebugMessages([]);
+    let currentDebugMessages: string[] = [];
 
     let periodType = "Tổng";
     const yearSegment = selectedYear ? `Năm ${selectedYear}` : "Tất cả các năm";
@@ -57,13 +57,16 @@ export default function RevenuePerFTEmployeeCard({
       periodType = "TB tháng";
     } else if (selectedYear) {
       monthSegment = "cả năm";
-      numberOfMonthsForAverage = 12;
+      numberOfMonthsForAverage = 12; 
       periodType = "TB tháng";
     }
      else {
       monthSegment = "tất cả các tháng";
       // numberOfMonthsForAverage remains 0 for "all time"
+      // periodType remains "Tổng"
     }
+    currentDebugMessages.push(`NumMonthsForAvg: ${numberOfMonthsForAverage}, PeriodType: ${periodType}`);
+
 
     let locationSegment = "tất cả địa điểm";
     let appliedFilters: string[] = [];
@@ -84,6 +87,7 @@ export default function RevenuePerFTEmployeeCard({
       const rpcArgsRevenue = {
         ...rpcArgsBase,
         filter_locations: (selectedDepartmentsForDiadiem && selectedDepartmentsForDiadiem.length > 0) ? selectedDepartmentsForDiadiem : null,
+        // Note: get_total_revenue does not take filter_nganh_docs by default. If it should, its SQL needs update.
       };
       const rpcArgsEmployeeCount = {
         ...rpcArgsBase,
@@ -113,7 +117,7 @@ export default function RevenuePerFTEmployeeCard({
       } else {
         currentError = { type: 'generic', message: `Lỗi mạng khi tải Tổng Doanh Thu: ${revenueRes.reason?.message}` };
       }
-      // setDebugMessages(prev => [...prev, `Total Revenue: ${totalRevenue ?? 'Error'}`]);
+      currentDebugMessages.push(`Total Revenue: ${totalRevenue ?? 'Error'}`);
 
       if (!currentError) {
         if (empCountRes.status === 'fulfilled') {
@@ -128,10 +132,11 @@ export default function RevenuePerFTEmployeeCard({
           currentError = { type: 'generic', message: `Lỗi mạng khi tải Số Lượng NV: ${empCountRes.reason?.message}` };
         }
       }
-      // setDebugMessages(prev => [...prev, `Employee Count FT: ${employeeCount ?? 'Error or 0'}`]);
+      currentDebugMessages.push(`Employee Count FT: ${employeeCount ?? 'Error or 0'}`);
 
       if (currentError) {
         setError(currentError);
+        setDebugMessages(currentDebugMessages);
         return;
       }
 
@@ -144,11 +149,13 @@ export default function RevenuePerFTEmployeeCard({
             setRevenuePerEmployee(0); 
           }
         } else {
-          let avgRev = totalRevenue / employeeCount;
-          if (numberOfMonthsForAverage > 0) {
-            avgRev = avgRev / numberOfMonthsForAverage;
+          let rawAveragePerEmployeeOverPeriod = totalRevenue / employeeCount;
+          currentDebugMessages.push(`Raw Avg/Emp (Period): ${rawAveragePerEmployeeOverPeriod.toFixed(0)}`);
+          if (periodType === "TB tháng" && numberOfMonthsForAverage > 0) {
+            setRevenuePerEmployee(rawAveragePerEmployeeOverPeriod / numberOfMonthsForAverage);
+          } else { // Handles "Tổng" period type or if numberOfMonthsForAverage is 0 (all time)
+            setRevenuePerEmployee(rawAveragePerEmployeeOverPeriod);
           }
-          setRevenuePerEmployee(avgRev);
         }
       } else {
          setError({ type: 'generic', message: 'Không thể lấy đủ dữ liệu để tính doanh thu / nhân viên.' });
@@ -157,6 +164,7 @@ export default function RevenuePerFTEmployeeCard({
     } catch (err: any) {
       setError({ type: 'generic', message: err.message || 'Lỗi không xác định khi tải dữ liệu.' });
     } finally {
+      setDebugMessages(currentDebugMessages);
       setIsLoading(false);
     }
   }, [selectedYear, selectedMonths, selectedDepartmentsForDiadiem, selectedNganhDoc]);

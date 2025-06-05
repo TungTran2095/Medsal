@@ -41,7 +41,7 @@ export default function AverageFTSalaryPerEmployeeCard({
     setIsLoading(true);
     setError(null);
     setAverageSalary(null);
-    setDebugMessages([]);
+    let currentDebugMessages: string[] = [];
 
     let periodType = "Tổng";
     const yearSegment = selectedYear ? `Năm ${selectedYear}` : "Tất cả các năm";
@@ -61,8 +61,10 @@ export default function AverageFTSalaryPerEmployeeCard({
     }
     else {
       monthSegment = "tất cả các tháng";
-      // numberOfMonthsForAverage remains 0, will not divide by months for "all time"
+      // numberOfMonthsForAverage remains 0 for "all time"
+      // periodType remains "Tổng"
     }
+    currentDebugMessages.push(`NumMonthsForAvg: ${numberOfMonthsForAverage}, PeriodType: ${periodType}`);
 
     let locationSegment = "tất cả địa điểm";
     let appliedFilters: string[] = [];
@@ -109,7 +111,7 @@ export default function AverageFTSalaryPerEmployeeCard({
       } else {
         currentError = { type: 'generic', message: `Lỗi mạng khi tải Tổng Lương FT: ${salaryRes.reason?.message}` };
       }
-      setDebugMessages(prev => [...prev, `Total Salary FT: ${totalSalary ?? 'Error'}`]);
+      currentDebugMessages.push(`Total Salary FT: ${totalSalary ?? 'Error'}`);
 
 
       if (!currentError) { 
@@ -125,11 +127,12 @@ export default function AverageFTSalaryPerEmployeeCard({
           currentError = { type: 'generic', message: `Lỗi mạng khi tải Số Lượng NV: ${empCountRes.reason?.message}` };
         }
       }
-      setDebugMessages(prev => [...prev, `Employee Count FT: ${employeeCount ?? 'Error or 0'}`]);
+      currentDebugMessages.push(`Employee Count FT: ${employeeCount ?? 'Error or 0'}`);
 
 
       if (currentError) {
         setError(currentError);
+        setDebugMessages(currentDebugMessages);
         return;
       }
 
@@ -142,11 +145,13 @@ export default function AverageFTSalaryPerEmployeeCard({
             setAverageSalary(0); 
           }
         } else {
-          let avgSal = totalSalary / employeeCount;
-          if (numberOfMonthsForAverage > 0) {
-            avgSal = avgSal / numberOfMonthsForAverage;
+          let rawAveragePerEmployeeOverPeriod = totalSalary / employeeCount;
+          currentDebugMessages.push(`Raw Avg/Emp (Period): ${rawAveragePerEmployeeOverPeriod.toFixed(0)}`);
+          if (periodType === "TB tháng" && numberOfMonthsForAverage > 0) {
+            setAverageSalary(rawAveragePerEmployeeOverPeriod / numberOfMonthsForAverage);
+          } else { // Handles "Tổng" period type or if numberOfMonthsForAverage is 0 (all time)
+            setAverageSalary(rawAveragePerEmployeeOverPeriod);
           }
-          setAverageSalary(avgSal);
         }
       } else {
         setError({ type: 'generic', message: 'Không thể lấy đủ dữ liệu để tính lương trung bình.' });
@@ -155,6 +160,7 @@ export default function AverageFTSalaryPerEmployeeCard({
     } catch (err: any) {
       setError({ type: 'generic', message: err.message || 'Lỗi không xác định khi tải dữ liệu.' });
     } finally {
+      setDebugMessages(currentDebugMessages);
       setIsLoading(false);
     }
   }, [selectedYear, selectedMonths, selectedDepartmentsForDiadiem, selectedNganhDoc]);
@@ -182,7 +188,6 @@ export default function AverageFTSalaryPerEmployeeCard({
     displayValue = "N/A";
   } else if (!isLoading && averageSalary === 0 && error === null) {
     // This case implies either no salary and no employees, or salary is 0 with some employees.
-    // Displaying "0 VND" is fine.
   }
 
 
@@ -225,12 +230,10 @@ export default function AverageFTSalaryPerEmployeeCard({
                  </p>
             )}
             {/* <pre className="text-[10px] text-muted-foreground mt-1 max-h-12 overflow-y-auto">{debugMessages.join('\n')}</pre> */}
-
           </>
         )}
       </CardContent>
     </Card>
   );
 }
-
     
