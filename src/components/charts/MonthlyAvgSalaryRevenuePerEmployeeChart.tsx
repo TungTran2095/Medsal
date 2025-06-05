@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { supabase } from '@/lib/supabaseClient';
 import { Loader2, AlertTriangle, LineChart as LineChartIcon, Banknote, TrendingUp as RevenueIcon } from 'lucide-react';
-import { Line, XAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import {
   Card,
   CardContent,
@@ -169,6 +169,11 @@ export default function MonthlyAvgSalaryRevenuePerEmployeeChart({ selectedYear, 
     fetchData();
   }, [fetchData]);
 
+  const yAxisFormatter = (value: number) => {
+    if (value === null || value === undefined) return '';
+    return new Intl.NumberFormat('vi-VN', { notation: 'compact', compactDisplay: 'short' }).format(value);
+  };
+
 
   if (isLoading) { return ( <Card className="h-full"> <CardHeader className="pb-2 pt-3"> <CardTitle className="text-base font-semibold flex items-center gap-1.5"><LineChartIcon className="h-4 w-4" />Biến Động Lương TB & DT TB / NV</CardTitle> <CardDescription className="text-xs truncate">Đang tải dữ liệu...</CardDescription> </CardHeader> <CardContent className="flex items-center justify-center h-[280px] pt-2"> <Loader2 className="h-8 w-8 animate-spin text-primary" /> </CardContent> </Card> ); }
   if (error) { return ( <Card className="border-destructive/50 h-full"> <CardHeader className="pb-2 pt-3"> <CardTitle className="text-base font-semibold text-destructive flex items-center gap-1"> <AlertTriangle className="h-4 w-4" /> Lỗi Biểu Đồ </CardTitle> </CardHeader> <CardContent className="pt-2"> <p className="text-xs text-destructive whitespace-pre-line">{error}</p> {(error.includes(CRITICAL_SETUP_ERROR_PREFIX)) && ( <p className="text-xs text-muted-foreground mt-1 whitespace-pre-line"> Đây là một lỗi cấu hình quan trọng. Vui lòng kiểm tra kỹ các mục đã liệt kê trong thông báo lỗi và đảm bảo các hàm RPC, bảng và cột liên quan đã được thiết lập đúng theo README.md. </p> )} </CardContent> </Card> ); }
@@ -185,10 +190,19 @@ export default function MonthlyAvgSalaryRevenuePerEmployeeChart({ selectedYear, 
       <CardContent className="pt-2">
         <ChartContainer config={chartConfig} className="aspect-auto h-[280px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <DynamicComposedChart data={chartData} margin={{ top: 15, right: 10, left: -20, bottom: 5 }}> {/* Adjusted left margin */}
+            <DynamicComposedChart data={chartData} margin={{ top: 15, right: 10, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} className="text-xs" />
-              {/* YAxis removed as per request */}
+              <YAxis 
+                yAxisId="left" 
+                tickLine={false} 
+                axisLine={false} 
+                tickFormatter={yAxisFormatter} 
+                className="text-xs" 
+                width={30}
+                domain={['auto', 'auto']}
+                allowDataOverflow={true}
+              />
               <Tooltip
                 content={
                   <ChartTooltipContent
