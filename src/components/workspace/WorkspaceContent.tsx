@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, ChevronDown, FilterIcon, GanttChartSquare, MapPin, Settings2, Circle, Percent, Target, FolderKanban, BarChart3, Filter as FilterIconLucide, Briefcase, ListChecks, UserCheck, Users, LineChart } from "lucide-react";
+import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, ChevronDown, FilterIcon, GanttChartSquare, MapPin, Settings2, Circle, Percent, Target, FolderKanban, BarChart3, Filter as FilterIconLucide, Briefcase, ListChecks, UserCheck, Users, LineChart, Banknote } from "lucide-react"; // Added Banknote
 import type { PayrollEntry, FlatOrgUnit, OrgNode } from '@/types';
 import { supabase } from '@/lib/supabaseClient';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -33,7 +33,10 @@ import AverageFTSalaryPerEmployeeCard from '@/components/dashboard/AverageFTSala
 import RevenuePerFTEmployeeCard from '@/components/dashboard/RevenuePerFTEmployeeCard';
 import EmployeeCountCard from '@/components/dashboard/EmployeeCountCard';
 import MonthlyEmployeeTrendChart from '@/components/charts/MonthlyEmployeeTrendChart';
-import MonthlyAvgSalaryRevenuePerEmployeeChart from '@/components/charts/MonthlyAvgSalaryRevenuePerEmployeeChart'; // New chart
+import MonthlyAvgSalaryRevenuePerEmployeeChart from '@/components/charts/MonthlyAvgSalaryRevenuePerEmployeeChart';
+import AverageSalaryPerWorkdayCard from '@/components/dashboard/AverageSalaryPerWorkdayCard'; // New card
+import RevenuePerWorkdayCard from '@/components/dashboard/RevenuePerWorkdayCard'; // New card
+
 
 import {
   DropdownMenu,
@@ -1025,7 +1028,7 @@ export default function WorkspaceContent() {
                     </div>
                   </TabsContent>
                   <TabsContent value="salaryWorkloadAnalysis" className="flex-grow overflow-y-auto space-y-3 mt-2">
-                     <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3"> {/* Adjusted grid columns */}
+                     <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3"> {/* Row 1 of cards */}
                         <EmployeeCountCard 
                             selectedMonths={selectedMonths} 
                             selectedYear={selectedYear} 
@@ -1045,7 +1048,21 @@ export default function WorkspaceContent() {
                             selectedNganhDoc={selectedNganhDocForFilter}
                         />
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                    <div className="grid gap-3 md:grid-cols-2 mt-3"> {/* Row 2 of cards */}
+                        <AverageSalaryPerWorkdayCard
+                             selectedMonths={selectedMonths}
+                             selectedYear={selectedYear}
+                             selectedDepartmentsForDiadiem={selectedDepartmentsFromLoaiFilter}
+                             selectedNganhDoc={selectedNganhDocForFilter}
+                        />
+                        <RevenuePerWorkdayCard
+                             selectedMonths={selectedMonths}
+                             selectedYear={selectedYear}
+                             selectedDepartmentsForDiadiem={selectedDepartmentsFromLoaiFilter}
+                             selectedNganhDoc={selectedNganhDocForFilter}
+                        />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3"> {/* Row of charts */}
                          <MonthlyEmployeeTrendChart 
                             selectedYear={selectedYear} 
                             selectedMonths={selectedMonths} 
@@ -1077,6 +1094,7 @@ export default function WorkspaceContent() {
     </SidebarProvider>
   );
 }
+
 
 
 

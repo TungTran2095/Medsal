@@ -17,6 +17,7 @@ import {
   getTotalSalaryFulltimeTool,
   getTotalSalaryParttimeTool,
   getTotalRevenueTool,
+  getTotalWorkdaysFulltimeTool, // Added new tool
   getMonthlySalaryTrendFulltimeTool,
   getMonthlySalaryTrendParttimeTool,
   getMonthlyRevenueTrendTool,
@@ -25,7 +26,7 @@ import {
   getNganhDocFTSalaryHanoiTool, 
   getDonVi2PTSalaryTool, 
   getMonthlyEmployeeTrendFulltimeTool,
-  getMonthlyFTSalaryRevenuePerEmployeeTrendTool, // Added new tool
+  getMonthlyFTSalaryRevenuePerEmployeeTrendTool,
 } from '@/ai/tools/dashboardQueryTools';
 
 const EchoUserInputInputSchema = z.object({
@@ -55,11 +56,12 @@ const prompt = ai.definePrompt({
     getTotalSalaryFulltimeTool,
     getTotalSalaryParttimeTool,
     getTotalRevenueTool,
+    getTotalWorkdaysFulltimeTool, // Added new tool
     getMonthlySalaryTrendFulltimeTool,
     getMonthlySalaryTrendParttimeTool,
     getMonthlyRevenueTrendTool,
     getMonthlyEmployeeTrendFulltimeTool,
-    getMonthlyFTSalaryRevenuePerEmployeeTrendTool, // Added new tool
+    getMonthlyFTSalaryRevenuePerEmployeeTrendTool,
     getLocationSalaryRevenueRatiosTool,
     getLocationComparisonMetricsTool,
     getNganhDocFTSalaryHanoiTool, 
@@ -76,6 +78,7 @@ You have several tools available:
     *   'getTotalSalaryFulltimeTool': Get total full-time salary. Input: { filter_year?: number, filter_months?: number[], filter_locations?: string[], filter_nganh_docs?: string[] }.
     *   'getTotalSalaryParttimeTool': Get total part-time salary. Input: { filter_year?: number, filter_months?: number[], filter_locations?: string[], filter_donvi2?: string[] }.
     *   'getTotalRevenueTool': Get total revenue. Input: { filter_year?: number, filter_months?: number[], filter_locations?: string[] }.
+    *   'getTotalWorkdaysFulltimeTool': Get total full-time workdays (sum of specific columns). Input: { filter_year?: number, filter_months?: number[], filter_locations?: string[], filter_nganh_docs?: string[] }.
     *   'getMonthlySalaryTrendFulltimeTool': Get monthly full-time salary trend. Input: { p_filter_year?: number, p_filter_locations?: string[], p_filter_nganh_docs?: string[] }.
     *   'getMonthlySalaryTrendParttimeTool': Get monthly part-time salary trend. Input: { p_filter_year?: number, p_filter_locations?: string[], p_filter_donvi2?: string[] }.
     *   'getMonthlyRevenueTrendTool': Get monthly revenue trend. Input: { p_filter_year?: number, p_filter_locations?: string[] }.
@@ -96,7 +99,7 @@ Instructions for using tools:
 Interpreting Tool Results (CRITICAL: ALL RESPONSES IN VIETNAMESE):
 -   When you decide to use a tool, your response to the user MUST clearly state the tool name you are using (e.g., "Sử dụng công cụ 'toolName': ..."), followed by the information derived *directly* from that tool's output.
 -   When a specific dashboard tool returns data (e.g., 'value' for totals, 'data' array for trends/ratios):
-    *   Your response MUST directly use this 'value' or 'data'. Format numbers with commas for thousands (e.g., "1.234.500 VND").
+    *   Your response MUST directly use this 'value' or 'data'. Format numbers with commas for thousands (e.g., "1.234.500 VND"). For workdays, simply state the number (e.g., "1500 ngày công").
     *   If the tool's 'value' or 'data' field is null, you MUST use the 'message' field from the tool's output in your response. DO NOT invent data or say 'Tôi đang kiểm tra lại' if the tool provides a specific message like "Không có dữ liệu...".
     *   For trend data (an array from 'data' field), describe the trend or list key data points. Don't just output the raw array.
     *   For location ratios or comparison metrics, list top locations or summarize based on components/values.
@@ -155,4 +158,5 @@ const echoUserInputFlow = ai.defineFlow(
     
 
     
+
 

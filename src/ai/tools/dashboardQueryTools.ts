@@ -20,6 +20,19 @@ const DashboardQueryFilterSchema = z.object({
 });
 export type DashboardQueryFilterInput = z.infer<typeof DashboardQueryFilterSchema>;
 
+// Extended Dashboard Query Filter Schema that also includes nganh_docs
+const DashboardQueryFilterWithNganhDocSchema = DashboardQueryFilterSchema.extend({
+  filter_nganh_docs: z.array(z.string()).optional().describe('An array of "nganh_doc" names to filter by.'),
+});
+export type DashboardQueryFilterWithNganhDocInput = z.infer<typeof DashboardQueryFilterWithNganhDocSchema>;
+
+// Extended Dashboard Query Filter Schema that also includes donvi2
+const DashboardQueryFilterWithDonVi2Schema = DashboardQueryFilterSchema.extend({
+  filter_donvi2: z.array(z.string()).optional().describe('An array of "Don_vi_2" names to filter by.'),
+});
+export type DashboardQueryFilterWithDonVi2Input = z.infer<typeof DashboardQueryFilterWithDonVi2Schema>;
+
+
 // Common Trend Input Schema that take year and locations
 const TrendQueryFilterSchema = z.object({
   p_filter_year: z.number().optional().describe('The year to filter trends by (e.g., 2023).'),
@@ -137,8 +150,8 @@ export type MonthlyFTSalaryRevenuePerEmployeeTrendOutput = z.infer<typeof Monthl
 export const getTotalSalaryFulltimeTool = ai.defineTool(
   {
     name: 'getTotalSalaryFulltimeTool',
-    description: 'Fetches the total full-time salary based on optional year, month, and/or location filters. Use this for queries like "tổng lương nhân viên full-time".',
-    inputSchema: DashboardQueryFilterSchema,
+    description: 'Fetches the total full-time salary based on optional year, month, location, and/or "nganh_doc" filters. Use this for queries like "tổng lương nhân viên full-time".',
+    inputSchema: DashboardQueryFilterWithNganhDocSchema,
     outputSchema: SingleValueOutputSchema,
   },
   async (input) => {
@@ -147,9 +160,10 @@ export const getTotalSalaryFulltimeTool = ai.defineTool(
         filter_year: input.filter_year,
         filter_months: input.filter_months,
         filter_locations: input.filter_locations,
+        filter_nganh_docs: input.filter_nganh_docs,
       });
       if (error) throw error;
-      if (data === null || data === undefined) return { value: null, message: 'Không có dữ liệu lương full-time cho kỳ và địa điểm đã chọn.' };
+      if (data === null || data === undefined) return { value: null, message: 'Không có dữ liệu lương full-time cho kỳ và bộ lọc đã chọn.' };
       return { value: Number(data), message: 'Truy vấn tổng lương full-time thành công.' };
     } catch (e: any) {
       console.error('Error in getTotalSalaryFulltimeTool:', e);
@@ -162,8 +176,8 @@ export const getTotalSalaryFulltimeTool = ai.defineTool(
 export const getTotalSalaryParttimeTool = ai.defineTool(
   {
     name: 'getTotalSalaryParttimeTool',
-    description: 'Fetches the total part-time salary based on optional year, month, and/or location filters. Use for queries like "tổng lương nhân viên part-time".',
-    inputSchema: DashboardQueryFilterSchema,
+    description: 'Fetches the total part-time salary based on optional year, month, location, and/or "Don_vi_2" filters. Use for queries like "tổng lương nhân viên part-time".',
+    inputSchema: DashboardQueryFilterWithDonVi2Schema, // Use schema with DonVi2
     outputSchema: SingleValueOutputSchema,
   },
   async (input) => {
@@ -172,9 +186,10 @@ export const getTotalSalaryParttimeTool = ai.defineTool(
         filter_year: input.filter_year,
         filter_months: input.filter_months,
         filter_locations: input.filter_locations,
+        filter_donvi2: input.filter_donvi2, // Pass donvi2 filter
       });
       if (error) throw error;
-      if (data === null || data === undefined) return { value: null, message: 'Không có dữ liệu lương part-time cho kỳ và địa điểm đã chọn.' };
+      if (data === null || data === undefined) return { value: null, message: 'Không có dữ liệu lương part-time cho kỳ và bộ lọc đã chọn.' };
       return { value: Number(data), message: 'Truy vấn tổng lương part-time thành công.' };
     } catch (e: any) {
       console.error('Error in getTotalSalaryParttimeTool:', e);
@@ -187,8 +202,8 @@ export const getTotalSalaryParttimeTool = ai.defineTool(
 export const getTotalRevenueTool = ai.defineTool(
   {
     name: 'getTotalRevenueTool',
-    description: 'Fetches the total revenue based on optional year, month, and/or location filters. Use for queries like "tổng doanh thu".',
-    inputSchema: DashboardQueryFilterSchema,
+    description: 'Fetches the total revenue based on optional year, month, and/or location filters. Use for queries like "tổng doanh thu". (Note: This RPC does not filter by "nganh_doc" or "Don_vi_2").',
+    inputSchema: DashboardQueryFilterSchema, // Standard filter, no nganh_doc or donvi2
     outputSchema: SingleValueOutputSchema,
   },
   async (input) => {
@@ -208,12 +223,39 @@ export const getTotalRevenueTool = ai.defineTool(
   }
 );
 
+// Tool for get_total_workdays_fulltime
+export const getTotalWorkdaysFulltimeTool = ai.defineTool(
+  {
+    name: 'getTotalWorkdaysFulltimeTool',
+    description: 'Fetches the total workdays for full-time employees based on optional year, month, location, and/or "nganh_doc" filters. Workdays are summed from specific columns in the Fulltime table.',
+    inputSchema: DashboardQueryFilterWithNganhDocSchema, // Uses nganh_doc
+    outputSchema: SingleValueOutputSchema,
+  },
+  async (input) => {
+    try {
+      const { data, error } = await supabase.rpc('get_total_workdays_fulltime', {
+        filter_year: input.filter_year,
+        filter_months: input.filter_months,
+        filter_locations: input.filter_locations,
+        filter_nganh_docs: input.filter_nganh_docs,
+      });
+      if (error) throw error;
+      if (data === null || data === undefined) return { value: null, message: 'Không có dữ liệu tổng công full-time cho kỳ và bộ lọc đã chọn.' };
+      return { value: Number(data), message: 'Truy vấn tổng công full-time thành công.' };
+    } catch (e: any) {
+      console.error('Error in getTotalWorkdaysFulltimeTool:', e);
+      return { value: null, message: `Lỗi khi lấy tổng công full-time: ${e.message}` };
+    }
+  }
+);
+
+
 // Tool for get_monthly_salary_trend_fulltime
 export const getMonthlySalaryTrendFulltimeTool = ai.defineTool(
   {
     name: 'getMonthlySalaryTrendFulltimeTool',
-    description: 'Fetches the monthly salary trend for full-time employees for a given year and optional locations. Use for "xu hướng lương full-time hàng tháng".',
-    inputSchema: TrendQueryFilterSchema,
+    description: 'Fetches the monthly salary trend for full-time employees for a given year and optional locations and "nganh_doc". Use for "xu hướng lương full-time hàng tháng".',
+    inputSchema: TrendQueryFilterSchema.extend({ p_filter_nganh_docs: z.array(z.string()).optional().describe('An array of "nganh_doc" names to filter trends by.') }),
     outputSchema: TrendDataOutputSchema,
   },
   async (input) => {
@@ -221,9 +263,10 @@ export const getMonthlySalaryTrendFulltimeTool = ai.defineTool(
       const { data, error } = await supabase.rpc('get_monthly_salary_trend_fulltime', {
         p_filter_year: input.p_filter_year,
         p_filter_locations: input.p_filter_locations,
+        p_filter_nganh_docs: input.p_filter_nganh_docs,
       });
       if (error) throw error;
-      if (!data || data.length === 0) return { data: null, message: 'Không có dữ liệu xu hướng lương full-time cho năm và địa điểm đã chọn.' };
+      if (!data || data.length === 0) return { data: null, message: 'Không có dữ liệu xu hướng lương full-time cho bộ lọc đã chọn.' };
       return { data, message: 'Truy vấn xu hướng lương full-time thành công.' };
     } catch (e: any) {
       console.error('Error in getMonthlySalaryTrendFulltimeTool:', e);
@@ -236,8 +279,8 @@ export const getMonthlySalaryTrendFulltimeTool = ai.defineTool(
 export const getMonthlySalaryTrendParttimeTool = ai.defineTool(
   {
     name: 'getMonthlySalaryTrendParttimeTool',
-    description: 'Fetches the monthly salary trend for part-time employees for a given year and optional locations. Use for "xu hướng lương part-time hàng tháng".',
-    inputSchema: TrendQueryFilterSchema,
+    description: 'Fetches the monthly salary trend for part-time employees for a given year and optional locations and "Don_vi_2". Use for "xu hướng lương part-time hàng tháng".',
+    inputSchema: TrendQueryFilterSchema.extend({ p_filter_donvi2: z.array(z.string()).optional().describe('An array of "Don_vi_2" names to filter trends by.') }),
     outputSchema: TrendDataOutputSchema,
   },
   async (input) => {
@@ -245,9 +288,10 @@ export const getMonthlySalaryTrendParttimeTool = ai.defineTool(
       const { data, error } = await supabase.rpc('get_monthly_salary_trend_parttime', {
         p_filter_year: input.p_filter_year,
         p_filter_locations: input.p_filter_locations,
+        p_filter_donvi2: input.p_filter_donvi2,
       });
       if (error) throw error;
-      if (!data || data.length === 0) return { data: null, message: 'Không có dữ liệu xu hướng lương part-time cho năm và địa điểm đã chọn.' };
+      if (!data || data.length === 0) return { data: null, message: 'Không có dữ liệu xu hướng lương part-time cho bộ lọc đã chọn.' };
       return { data, message: 'Truy vấn xu hướng lương part-time thành công.' };
     } catch (e: any) {
       console.error('Error in getMonthlySalaryTrendParttimeTool:', e);
@@ -442,7 +486,9 @@ export const getMonthlyFTSalaryRevenuePerEmployeeTrendTool = ai.defineTool(
   }
 );
     
+
     
 
     
+
 
