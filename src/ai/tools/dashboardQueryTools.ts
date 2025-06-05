@@ -56,6 +56,14 @@ const MonthlyEmployeeTrendInputSchema = z.object({
 });
 export type MonthlyEmployeeTrendInput = z.infer<typeof MonthlyEmployeeTrendInputSchema>;
 
+// Input schema for Monthly FT Salary/Revenue Per Employee Trend Tool
+const MonthlyFTSalaryRevenuePerEmployeeTrendInputSchema = z.object({
+  p_filter_year: z.number().optional().describe('The year to filter trends by (e.g., 2023).'),
+  p_filter_locations: z.array(z.string()).optional().describe('An array of location names to filter trends by.'),
+  p_filter_nganh_docs: z.array(z.string()).optional().describe('An array of "nganh_doc" names to filter trends by.'),
+});
+export type MonthlyFTSalaryRevenuePerEmployeeTrendInput = z.infer<typeof MonthlyFTSalaryRevenuePerEmployeeTrendInputSchema>;
+
 
 // Generic Output Schema for single value results
 const SingleValueOutputSchema = z.object({
@@ -111,6 +119,18 @@ const MonthlyEmployeeTrendOutputSchema = z.object({
   message: z.string().optional().describe('A message describing the result, success, no data, or error.'),
 });
 export type MonthlyEmployeeTrendOutput = z.infer<typeof MonthlyEmployeeTrendOutputSchema>;
+
+// Output schema for Monthly FT Salary/Revenue Per Employee Trend Tool
+const MonthlyFTSalaryRevenuePerEmployeeTrendOutputSchema = z.object({
+  data: z.array(z.object({
+    month_label: z.string(),
+    year_val: z.number(),
+    avg_salary_per_employee: z.number().nullable(),
+    revenue_per_employee: z.number().nullable(),
+  })).nullable().describe('An array of monthly average salary per FT employee and revenue per FT employee, or null.'),
+  message: z.string().optional().describe('A message describing the result, success, no data, or error.'),
+});
+export type MonthlyFTSalaryRevenuePerEmployeeTrendOutput = z.infer<typeof MonthlyFTSalaryRevenuePerEmployeeTrendOutputSchema>;
 
 
 // Tool for get_total_salary_fulltime
@@ -396,7 +416,33 @@ export const getMonthlyEmployeeTrendFulltimeTool = ai.defineTool(
     }
   }
 );
+
+// Tool for get_monthly_ft_salary_revenue_per_employee_trend
+export const getMonthlyFTSalaryRevenuePerEmployeeTrendTool = ai.defineTool(
+  {
+    name: 'getMonthlyFTSalaryRevenuePerEmployeeTrendTool',
+    description: 'Fetches the monthly trend of average full-time salary per FT employee and revenue per FT employee. Supports filters for year, locations, and "nganh_doc". Use for "xu hướng lương và doanh thu trung bình mỗi nhân viên full-time".',
+    inputSchema: MonthlyFTSalaryRevenuePerEmployeeTrendInputSchema,
+    outputSchema: MonthlyFTSalaryRevenuePerEmployeeTrendOutputSchema,
+  },
+  async (input) => {
+    try {
+      const { data, error } = await supabase.rpc('get_monthly_ft_salary_revenue_per_employee_trend', {
+        p_filter_year: input.p_filter_year,
+        p_filter_locations: input.p_filter_locations,
+        p_filter_nganh_docs: input.p_filter_nganh_docs,
+      });
+      if (error) throw error;
+      if (!data || data.length === 0) return { data: null, message: 'Không có dữ liệu xu hướng lương/doanh thu TB/NV cho kỳ và bộ lọc đã chọn.' };
+      return { data, message: 'Truy vấn xu hướng lương/doanh thu TB/NV thành công.' };
+    } catch (e: any) {
+      console.error('Error in getMonthlyFTSalaryRevenuePerEmployeeTrendTool:', e);
+      return { data: null, message: `Lỗi khi lấy xu hướng lương/doanh thu TB/NV: ${e.message}` };
+    }
+  }
+);
     
     
 
     
+

@@ -33,6 +33,7 @@ import AverageFTSalaryPerEmployeeCard from '@/components/dashboard/AverageFTSala
 import RevenuePerFTEmployeeCard from '@/components/dashboard/RevenuePerFTEmployeeCard';
 import EmployeeCountCard from '@/components/dashboard/EmployeeCountCard';
 import MonthlyEmployeeTrendChart from '@/components/charts/MonthlyEmployeeTrendChart';
+import MonthlyAvgSalaryRevenuePerEmployeeChart from '@/components/charts/MonthlyAvgSalaryRevenuePerEmployeeChart'; // New chart
 
 import {
   DropdownMenu,
@@ -1024,7 +1025,7 @@ export default function WorkspaceContent() {
                     </div>
                   </TabsContent>
                   <TabsContent value="salaryWorkloadAnalysis" className="flex-grow overflow-y-auto space-y-3 mt-2">
-                     <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                     <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3"> {/* Adjusted grid columns */}
                         <EmployeeCountCard 
                             selectedMonths={selectedMonths} 
                             selectedYear={selectedYear} 
@@ -1044,12 +1045,18 @@ export default function WorkspaceContent() {
                             selectedNganhDoc={selectedNganhDocForFilter}
                         />
                     </div>
-                    <div className="grid grid-cols-1 gap-3 mt-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
                          <MonthlyEmployeeTrendChart 
                             selectedYear={selectedYear} 
                             selectedMonths={selectedMonths} 
                             selectedDepartmentsForDiadiem={selectedDepartmentsFromLoaiFilter} 
                             selectedNganhDoc={selectedNganhDocForFilter} 
+                        />
+                        <MonthlyAvgSalaryRevenuePerEmployeeChart
+                            selectedYear={selectedYear}
+                            selectedMonths={selectedMonths}
+                            selectedDepartmentsForDiadiem={selectedDepartmentsFromLoaiFilter}
+                            selectedNganhDoc={selectedNganhDocForFilter}
                         />
                     </div>
                   </TabsContent>
@@ -1070,5 +1077,6 @@ export default function WorkspaceContent() {
     </SidebarProvider>
   );
 }
+
 
 

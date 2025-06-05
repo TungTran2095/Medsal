@@ -24,7 +24,8 @@ import {
   getLocationComparisonMetricsTool,
   getNganhDocFTSalaryHanoiTool, 
   getDonVi2PTSalaryTool, 
-  getMonthlyEmployeeTrendFulltimeTool, // Added new tool
+  getMonthlyEmployeeTrendFulltimeTool,
+  getMonthlyFTSalaryRevenuePerEmployeeTrendTool, // Added new tool
 } from '@/ai/tools/dashboardQueryTools';
 
 const EchoUserInputInputSchema = z.object({
@@ -57,7 +58,8 @@ const prompt = ai.definePrompt({
     getMonthlySalaryTrendFulltimeTool,
     getMonthlySalaryTrendParttimeTool,
     getMonthlyRevenueTrendTool,
-    getMonthlyEmployeeTrendFulltimeTool, // Added new tool
+    getMonthlyEmployeeTrendFulltimeTool,
+    getMonthlyFTSalaryRevenuePerEmployeeTrendTool, // Added new tool
     getLocationSalaryRevenueRatiosTool,
     getLocationComparisonMetricsTool,
     getNganhDocFTSalaryHanoiTool, 
@@ -78,6 +80,7 @@ You have several tools available:
     *   'getMonthlySalaryTrendParttimeTool': Get monthly part-time salary trend. Input: { p_filter_year?: number, p_filter_locations?: string[], p_filter_donvi2?: string[] }.
     *   'getMonthlyRevenueTrendTool': Get monthly revenue trend. Input: { p_filter_year?: number, p_filter_locations?: string[] }.
     *   'getMonthlyEmployeeTrendFulltimeTool': Get monthly FT employee count trend. Input: { p_filter_year?: number, p_filter_locations?: string[], p_filter_nganh_docs?: string[] }.
+    *   'getMonthlyFTSalaryRevenuePerEmployeeTrendTool': Get monthly FT avg salary/employee and revenue/employee trend. Input: { p_filter_year?: number, p_filter_locations?: string[], p_filter_nganh_docs?: string[] }.
     *   'getLocationSalaryRevenueRatiosTool': Get salary/revenue ratios by location. Input: { p_filter_year?: number, p_filter_months?: number[], p_filter_locations?: string[] }.
     *   'getLocationComparisonMetricsTool': Get detailed salary (FT, PT) and revenue metrics for each location for a specific year. Input: { p_filter_year: number, p_filter_months?: number[], p_filter_locations?: string[] }.
     *   'getNganhDocFTSalaryHanoiTool': Get Full-time salary by "nganh_doc" in Hanoi. Input: { p_filter_year: number, p_filter_months?: number[] }.
@@ -152,3 +155,4 @@ const echoUserInputFlow = ai.defineFlow(
     
 
     
+
