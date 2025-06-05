@@ -36,7 +36,7 @@ interface FetchError {
 }
 
 const CRITICAL_SETUP_ERROR_PREFIX = "LỖI CÀI ĐẶT QUAN TRỌNG:";
-const EXCLUDED_NGANHDOC_KEYS = ["Med Pharma", "0", "Medon"];
+const EXCLUDED_NGANHDOC_KEYS = ["Med Pharma", "0", "Medon", "Medaz", "Medcom", "Medicons", "Medim"];
 
 const calculateChange = (valNew: number | null, valOld: number | null): number | null => {
     if (valNew === null || valOld === null) return null;
@@ -74,16 +74,16 @@ const RenderTableRow: React.FC<RenderTableRowProps> = ({
   renderChangeCell,
   allFilteredKeys
 }) => {
-  const nodeData = dataMap.get(node.name);
-  const isExpanded = expandedKeys.has(node.id);
-  const hasChildren = node.children && node.children.length > 0;
-
-  const shouldRenderRow = !!nodeData || (hasChildren && node.children.some(child => allFilteredKeys.has(child.name) || dataMap.has(child.name)));
-  
   if (EXCLUDED_NGANHDOC_KEYS.includes(node.name)) {
     return null;
   }
 
+  const nodeData = dataMap.get(node.name);
+  const isExpanded = expandedKeys.has(node.id);
+  const hasChildren = node.children && node.children.length > 0 && node.children.some(child => !EXCLUDED_NGANHDOC_KEYS.includes(child.name));
+
+  const shouldRenderRow = !!nodeData || (hasChildren && node.children.some(child => allFilteredKeys.has(child.name) || dataMap.has(child.name) && !EXCLUDED_NGANHDOC_KEYS.includes(child.name)));
+  
   const rowContent = nodeData ? (
     <>
       <TableCell className="text-right py-1.5 px-2 text-xs whitespace-nowrap">{formatCurrency(nodeData.ft_salary_2024)}</TableCell>
@@ -110,7 +110,7 @@ const RenderTableRow: React.FC<RenderTableRowProps> = ({
     </>
   );
   
-  if (!shouldRenderRow && !nodeData && !hasChildren) return null; // Don't render if no data and no children with data
+  if (!shouldRenderRow && !nodeData && !hasChildren) return null;
 
   return (
     <>
@@ -267,6 +267,8 @@ export default function NganhDocComparisonTable({
     data2025Result.ptData.forEach(item => allKeys.add(item.key));
 
     allKeys.forEach(key => {
+        if (EXCLUDED_NGANHDOC_KEYS.includes(key)) return;
+
         const ft2024 = data2024Result.ftData.find(d => d.key === key)?.ft_salary || 0;
         const pt2024 = data2024Result.ptData.find(d => d.key === key)?.pt_salary || 0;
         const ft2025 = data2025Result.ftData.find(d => d.key === key)?.ft_salary || 0;
@@ -304,10 +306,8 @@ export default function NganhDocComparisonTable({
         pt_salary_change_val: calculateChange(item.pt_salary_2025, item.pt_salary_2024),
         total_salary_change_val: calculateChange(item.total_salary_2025, item.total_salary_2024),
     }));
-
-    const filteredData = calculatedData.filter(item => !EXCLUDED_NGANHDOC_KEYS.includes(item.grouping_key));
     
-    setComparisonData(filteredData);
+    setComparisonData(calculatedData);
     setIsLoading(false);
   }, [selectedMonths, fetchDataForYear, selectedNganhDoc, selectedDonVi2]); 
 
@@ -337,8 +337,53 @@ export default function NganhDocComparisonTable({
     return keys;
   }, [orgHierarchyData]);
 
+  const medlatecGroupNode = useMemo(() => {
+    if (!orgHierarchyData || orgHierarchyData.length === 0) return null;
+    
+    const findNodeByName = (nodes: OrgNode[], name: string): OrgNode | null => {
+        for (const node of nodes) {
+            if (node.name === name) return node;
+            if (node.children && node.children.length > 0) {
+                const foundInChildren = findNodeByName(node.children, name);
+                if (foundInChildren) return foundInChildren;
+            }
+        }
+        return null;
+    };
+    return findNodeByName(orgHierarchyData, "Medlatec Group");
+  }, [orgHierarchyData]);
+
+  const nodesToRender = useMemo(() => {
+    return medlatecGroupNode ? medlatecGroupNode.children.filter(child => !EXCLUDED_NGANHDOC_KEYS.includes(child.name)) : [];
+  }, [medlatecGroupNode]);
+
+
   const totals = useMemo(() => {
-    if (!comparisonData || comparisonData.length === 0) {
+    const relevantData = comparisonData.filter(item => {
+      // Check if this item's key is part of the rendered hierarchy (children of Medlatec Group, excluding excluded keys)
+      let isInRenderedTree = false;
+      const checkNode = (node: OrgNode): boolean => {
+        if (node.name === item.grouping_key) return true;
+        if (node.children) {
+          for (const child of node.children) {
+            if (checkNode(child)) return true;
+          }
+        }
+        return false;
+      };
+      if (medlatecGroupNode && medlatecGroupNode.children) {
+        for (const childOfMedlatec of medlatecGroupNode.children) {
+            if (!EXCLUDED_NGANHDOC_KEYS.includes(childOfMedlatec.name) && checkNode(childOfMedlatec)) {
+                isInRenderedTree = true;
+                break;
+            }
+        }
+      }
+      return isInRenderedTree;
+    });
+
+
+    if (relevantData.length === 0) {
       return {
         ft_salary_2024: 0, ft_salary_2025: 0,
         pt_salary_2024: 0, pt_salary_2025: 0,
@@ -346,12 +391,13 @@ export default function NganhDocComparisonTable({
         ft_salary_change_val: null, pt_salary_change_val: null, total_salary_change_val: null,
       };
     }
-    const ft_salary_2024 = comparisonData.reduce((sum, item) => sum + item.ft_salary_2024, 0);
-    const ft_salary_2025 = comparisonData.reduce((sum, item) => sum + item.ft_salary_2025, 0);
-    const pt_salary_2024 = comparisonData.reduce((sum, item) => sum + item.pt_salary_2024, 0);
-    const pt_salary_2025 = comparisonData.reduce((sum, item) => sum + item.pt_salary_2025, 0);
-    const total_salary_2024 = comparisonData.reduce((sum, item) => sum + item.total_salary_2024, 0);
-    const total_salary_2025 = comparisonData.reduce((sum, item) => sum + item.total_salary_2025, 0);
+
+    const ft_salary_2024 = relevantData.reduce((sum, item) => sum + item.ft_salary_2024, 0);
+    const ft_salary_2025 = relevantData.reduce((sum, item) => sum + item.ft_salary_2025, 0);
+    const pt_salary_2024 = relevantData.reduce((sum, item) => sum + item.pt_salary_2024, 0);
+    const pt_salary_2025 = relevantData.reduce((sum, item) => sum + item.pt_salary_2025, 0);
+    const total_salary_2024 = relevantData.reduce((sum, item) => sum + item.total_salary_2024, 0);
+    const total_salary_2025 = relevantData.reduce((sum, item) => sum + item.total_salary_2025, 0);
 
     return {
       ft_salary_2024, ft_salary_2025,
@@ -361,27 +407,61 @@ export default function NganhDocComparisonTable({
       pt_salary_change_val: calculateChange(pt_salary_2025, pt_salary_2024),
       total_salary_change_val: calculateChange(total_salary_2025, total_salary_2024),
     };
-  }, [comparisonData]);
+  }, [comparisonData, medlatecGroupNode]);
 
 
   const formatCurrency = (value: number | null) => { if (value === null || value === undefined) return 'N/A'; return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value); };
-  const renderChangeCell = (change: number | null, isCost: boolean) => { if (change === null || change === undefined) return <TableCell className="text-center text-muted-foreground text-xs py-1.5 px-2">N/A</TableCell>; let colorClass = 'text-muted-foreground'; let Icon = Minus; if (change === Infinity) { colorClass = isCost ? 'text-red-600 dark:text-red-500' : 'text-green-600 dark:text-green-500'; Icon = TrendingUp; } else if (change === -Infinity) { colorClass = isCost ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'; Icon = TrendingDown; } else if (change > 0) { colorClass = isCost ? 'text-red-600 dark:text-red-500' : 'text-green-600 dark:text-green-500'; Icon = TrendingUp; } else if (change < 0) { colorClass = isCost ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'; Icon = TrendingDown; } const displayValue = (value: number | null, forceSign = false) => { if (value === null || value === undefined) return 'N/A'; if (value === Infinity) return 'Tăng ∞'; if (value === -Infinity) return 'Giảm ∞'; const sign = value > 0 && forceSign ? '+' : ''; return `${sign}${(value * 100).toFixed(1)}%`; }(change, true); return ( <TableCell className={cn("text-center whitespace-nowrap text-xs py-1.5 px-2", colorClass)}> <div className="flex items-center justify-center gap-0.5"> <Icon className="h-3 w-3" /> {displayValue} </div> </TableCell> ); };
+  
+  const formatChangeValue = (change: number | null, forceSign = false) => {
+    if (change === null || change === undefined) return 'N/A';
+    if (change === Infinity) return 'Tăng ∞';
+    if (change === -Infinity) return 'Giảm ∞';
+    const sign = change > 0 && forceSign ? '+' : '';
+    return `${sign}${(change * 100).toFixed(1)}%`;
+  };
+
+  const renderChangeCell = (change: number | null, isCost: boolean) => { 
+    if (change === null || change === undefined) return <TableCell className="text-center text-muted-foreground text-xs py-1.5 px-2">N/A</TableCell>; 
+    let colorClass = 'text-muted-foreground'; 
+    let Icon = Minus; 
+    if (change === Infinity) { 
+        colorClass = isCost ? 'text-red-600 dark:text-red-500' : 'text-green-600 dark:text-green-500'; Icon = TrendingUp; 
+    } else if (change === -Infinity) { 
+        colorClass = isCost ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'; Icon = TrendingDown; 
+    } else if (change > 0) { 
+        colorClass = isCost ? 'text-red-600 dark:text-red-500' : 'text-green-600 dark:text-green-500'; Icon = TrendingUp; 
+    } else if (change < 0) { 
+        colorClass = isCost ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'; Icon = TrendingDown; 
+    } 
+    const displayValue = formatChangeValue(change, true);
+    return ( <TableCell className={cn("text-center whitespace-nowrap text-xs py-1.5 px-2", colorClass)}> <div className="flex items-center justify-center gap-0.5"> <Icon className="h-3 w-3" /> {displayValue} </div> </TableCell> ); 
+  };
   
   if (isLoading) { return ( <Card className="mt-4 flex-grow flex flex-col"> <CardHeader className="pb-2 pt-3"> <CardTitle className="text-base font-semibold flex items-center gap-1.5"><BarChart3 className="h-4 w-4 text-primary" />Bảng so sánh theo Ngành dọc (Hà Nội FT) & Đơn vị 2 (PT)</CardTitle> <CardDescription className="text-xs truncate">Đang tải dữ liệu so sánh chi tiết...</CardDescription> </CardHeader> <CardContent className="pt-2 flex items-center justify-center flex-grow"> <Loader2 className="h-8 w-8 animate-spin text-primary" /> </CardContent> </Card> ); }
   if (error) { return ( <Card className="mt-4 border-destructive/50 flex-grow flex flex-col"> <CardHeader className="pb-2 pt-3"> <CardTitle className="text-base font-semibold text-destructive flex items-center gap-1.5"> <AlertTriangle className="h-4 w-4" /> Lỗi Tải Bảng Ngành Dọc/Đơn Vị 2 </CardTitle> </CardHeader> <CardContent className="pt-2 flex-grow"> <p className="text-xs text-destructive whitespace-pre-line">{error.message}</p> {(error.message.includes(CRITICAL_SETUP_ERROR_PREFIX) || error.type === 'rpcMissing' || error.message.toLowerCase().includes("does not exist") || error.message.includes("RPC")) && ( <p className="text-xs text-muted-foreground mt-1 whitespace-pre-line"> {CRITICAL_SETUP_ERROR_PREFIX} Đây là một lỗi cấu hình quan trọng. Vui lòng kiểm tra kỹ các hàm RPC `get_nganhdoc_ft_salary_hanoi` và `get_donvi2_pt_salary` trong Supabase theo hướng dẫn tại README.md. Đảm bảo các bảng `Fulltime` (với cột `nganh_doc`, `hn_or_note`) và `Parttime` (với cột `Don_vi_2`) tồn tại và có dữ liệu. </p> )} </CardContent> </Card> ); }
   
-  const noDataAvailable = orgHierarchyData.length === 0 || Array.from(dataMapForHierarchy.values()).every(
-    d => d.ft_salary_2024 === 0 && d.ft_salary_2025 === 0 && d.pt_salary_2024 === 0 && d.pt_salary_2025 === 0
-  );
+  const noDataForMedlatecGroup = !medlatecGroupNode;
+  const noRenderableChildren = nodesToRender.length === 0;
+  const noDataMatchingFilters = dataMapForHierarchy.size === 0 && !noRenderableChildren;
 
-  if (noDataAvailable && !isLoading) { return ( <Card className="mt-4 flex-grow flex flex-col"> <CardHeader className="pb-2 pt-3"> <CardTitle className="text-base font-semibold text-muted-foreground flex items-center gap-1.5"><BarChart3 className="h-4 w-4" />Bảng so sánh theo Ngành dọc (Hà Nội FT) & Đơn vị 2 (PT)</CardTitle> <CardDescription className="text-xs truncate" title={filterDescription}> {filterDescription}. </CardDescription> </CardHeader> <CardContent className="pt-2 flex items-center justify-center flex-grow"> <p className="text-sm text-muted-foreground">Không có dữ liệu nào cho kỳ đã chọn hoặc theo bộ lọc.</p> </CardContent> </Card> ); }
+
+  if (noDataForMedlatecGroup && !isLoading) {
+     return ( <Card className="mt-4 flex-grow flex flex-col"> <CardHeader className="pb-2 pt-3"> <CardTitle className="text-base font-semibold text-muted-foreground flex items-center gap-1.5"><BarChart3 className="h-4 w-4" />Bảng so sánh theo Ngành dọc (Hà Nội FT) & Đơn vị 2 (PT)</CardTitle> <CardDescription className="text-xs truncate" title={filterDescription}> {filterDescription}. </CardDescription> </CardHeader> <CardContent className="pt-2 flex items-center justify-center flex-grow"> <p className="text-sm text-muted-foreground">Không tìm thấy "Medlatec Group" trong dữ liệu cơ cấu tổ chức.</p> </CardContent> </Card> );
+  }
+  if (noRenderableChildren && !isLoading && medlatecGroupNode) {
+     return ( <Card className="mt-4 flex-grow flex flex-col"> <CardHeader className="pb-2 pt-3"> <CardTitle className="text-base font-semibold text-muted-foreground flex items-center gap-1.5"><BarChart3 className="h-4 w-4" />Bảng so sánh theo Ngành dọc (Hà Nội FT) & Đơn vị 2 (PT)</CardTitle> <CardDescription className="text-xs truncate" title={filterDescription}> {filterDescription}. </CardDescription> </CardHeader> <CardContent className="pt-2 flex items-center justify-center flex-grow"> <p className="text-sm text-muted-foreground">Không có đơn vị con nào để hiển thị thuộc "Medlatec Group" sau khi loại trừ.</p> </CardContent> </Card> );
+  }
+   if (noDataMatchingFilters && !isLoading) {
+     return ( <Card className="mt-4 flex-grow flex flex-col"> <CardHeader className="pb-2 pt-3"> <CardTitle className="text-base font-semibold text-muted-foreground flex items-center gap-1.5"><BarChart3 className="h-4 w-4" />Bảng so sánh theo Ngành dọc (Hà Nội FT) & Đơn vị 2 (PT)</CardTitle> <CardDescription className="text-xs truncate" title={filterDescription}> {filterDescription}. </CardDescription> </CardHeader> <CardContent className="pt-2 flex items-center justify-center flex-grow"> <p className="text-sm text-muted-foreground">Không có dữ liệu nào khớp với bộ lọc hiện tại cho các đơn vị thuộc "Medlatec Group".</p> </CardContent> </Card> );
+  }
+
 
   return (
     <Card className="mt-4 flex-grow flex flex-col h-[500px]">
       <CardHeader className="pb-2 pt-3">
         <CardTitle className="text-base font-semibold flex items-center gap-1.5"><BarChart3 className="h-4 w-4 text-primary" />Bảng so sánh theo Ngành dọc (Hà Nội FT) & Đơn vị 2 (PT)</CardTitle>
         <CardDescription className="text-xs truncate" title={filterDescription}>
-            {filterDescription}.
+            {filterDescription}. Chỉ hiển thị các đơn vị thuộc Medlatec Group.
         </CardDescription>
       </CardHeader>
       <CardContent className="pt-2 flex-grow overflow-hidden flex flex-col">
@@ -402,7 +482,7 @@ export default function NganhDocComparisonTable({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {orgHierarchyData.map(rootNode => (
+              {nodesToRender.map(rootNode => (
                 <RenderTableRow 
                   key={rootNode.id}
                   node={rootNode}
@@ -418,7 +498,7 @@ export default function NganhDocComparisonTable({
             </TableBody>
             <TableFooter className="sticky bottom-0 bg-card z-10">
               <TableRow>
-                <TableCell className="py-1.5 px-2 text-xs font-bold text-left sticky left-0 bg-card z-10">Tổng Cộng</TableCell>
+                <TableCell className="py-1.5 px-2 text-xs font-bold text-left sticky left-0 bg-card z-10">Tổng Cộng (Medlatec Group)</TableCell>
                 <TableCell className="text-right py-1.5 px-2 text-xs font-bold">{formatCurrency(totals.ft_salary_2024)}</TableCell>
                 <TableCell className="text-right py-1.5 px-2 text-xs font-bold">{formatCurrency(totals.ft_salary_2025)}</TableCell>
                 {renderChangeCell(totals.ft_salary_change_val, true)}
