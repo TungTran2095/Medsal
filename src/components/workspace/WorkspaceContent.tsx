@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, ChevronDown, FilterIcon, GanttChartSquare, MapPin, Settings2, Circle, Percent, Target, FolderKanban, BarChart3, Filter as FilterIconLucide, Briefcase } from "lucide-react";
+import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, ChevronDown, FilterIcon, GanttChartSquare, MapPin, Settings2, Circle, Percent, Target, FolderKanban, BarChart3, Filter as FilterIconLucide, Briefcase, ListChecks } from "lucide-react";
 import type { PayrollEntry, FlatOrgUnit, OrgNode } from '@/types';
 import { supabase } from '@/lib/supabaseClient';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -58,7 +58,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type WorkspaceView = 'dbManagement' | 'dashboard' | 'aiTools';
-type DashboardTab = 'payrollOverview' | 'comparison' | 'kpiComparison' | 'salaryWorkloadAnalysis' | 'detailedSalary';
+type DashboardTab = 'payrollOverview' | 'comparison' | 'kpiComparison' | 'salaryAnalysisTab' | 'salaryWorkloadAnalysis' | 'detailedSalary';
 
 interface NavItem {
   id: WorkspaceView;
@@ -955,11 +955,14 @@ export default function WorkspaceContent() {
                        <TabsTrigger value="kpiComparison" className="text-xs px-2.5 py-1.5 flex items-center gap-1">
                         <Target className="h-3.5 w-3.5"/> So sánh với Chỉ Tiêu
                       </TabsTrigger>
+                      <TabsTrigger value="salaryAnalysisTab" className="text-xs px-2.5 py-1.5 flex items-center gap-1">
+                        <FolderKanban className="h-3.5 w-3.5"/> Phân tích lương
+                      </TabsTrigger>
                        <TabsTrigger value="salaryWorkloadAnalysis" className="text-xs px-2.5 py-1.5 flex items-center gap-1">
-                        <Briefcase className="h-3.5 w-3.5"/> Phân tích Lương/Công
+                        <Briefcase className="h-3.5 w-3.5"/> Thống kê lương/công
                       </TabsTrigger>
                       <TabsTrigger value="detailedSalary" className="text-xs px-2.5 py-1.5 flex items-center gap-1">
-                        <FolderKanban className="h-3.5 w-3.5"/> Lương Chi Tiết
+                        <FileText className="h-3.5 w-3.5"/> Lương Chi Tiết
                       </TabsTrigger>
                     </TabsList>
                   </div>
@@ -1007,17 +1010,25 @@ export default function WorkspaceContent() {
                       <p className="text-sm text-center mt-1">Vui lòng quay lại sau để xem các so sánh với chỉ tiêu KPI của bạn.</p>
                     </div>
                   </TabsContent>
+                  <TabsContent value="salaryAnalysisTab" className="flex-grow overflow-y-auto space-y-3 mt-2">
+                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-6">
+                      <FolderKanban className="h-16 w-16 mb-4 opacity-50" />
+                      <h3 className="text-xl font-semibold mb-2">Phân tích lương</h3>
+                      <p className="text-sm text-center">Chức năng này đang được phát triển và sẽ sớm có mặt.</p>
+                      <p className="text-sm text-center mt-1">Tại đây bạn sẽ có thể xem các phân tích chi tiết về lương.</p>
+                    </div>
+                  </TabsContent>
                   <TabsContent value="salaryWorkloadAnalysis" className="flex-grow overflow-y-auto space-y-3 mt-2">
                     <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-6">
                       <Briefcase className="h-16 w-16 mb-4 opacity-50" />
-                      <h3 className="text-xl font-semibold mb-2">Phân Tích Lương/Công</h3>
+                      <h3 className="text-xl font-semibold mb-2">Thống kê lương/công</h3>
                       <p className="text-sm text-center">Chức năng này đang được phát triển và sẽ sớm có mặt.</p>
                       <p className="text-sm text-center mt-1">Tại đây bạn sẽ có thể phân tích mối quan hệ giữa chi phí lương và khối lượng công việc hoặc các chỉ số hiệu suất khác.</p>
                     </div>
                   </TabsContent>
                   <TabsContent value="detailedSalary" className="flex-grow overflow-y-auto space-y-3 mt-2">
                     <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-6">
-                      <FolderKanban className="h-16 w-16 mb-4 opacity-50" />
+                      <FileText className="h-16 w-16 mb-4 opacity-50" />
                       <h3 className="text-xl font-semibold mb-2">Lương Chi Tiết</h3>
                       <p className="text-sm text-center">Chức năng này đang được phát triển và sẽ sớm có mặt.</p>
                       <p className="text-sm text-center mt-1">Tại đây bạn sẽ có thể xem chi tiết lương theo từng nhân viên, phòng ban, v.v.</p>
