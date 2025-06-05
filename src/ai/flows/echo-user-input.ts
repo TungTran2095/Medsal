@@ -22,8 +22,9 @@ import {
   getMonthlyRevenueTrendTool,
   getLocationSalaryRevenueRatiosTool,
   getLocationComparisonMetricsTool,
-  getNganhDocFTSalaryHanoiTool, // Added new tool
-  getDonVi2PTSalaryTool, // Added new tool
+  getNganhDocFTSalaryHanoiTool, 
+  getDonVi2PTSalaryTool, 
+  getMonthlyEmployeeTrendFulltimeTool, // Added new tool
 } from '@/ai/tools/dashboardQueryTools';
 
 const EchoUserInputInputSchema = z.object({
@@ -56,10 +57,11 @@ const prompt = ai.definePrompt({
     getMonthlySalaryTrendFulltimeTool,
     getMonthlySalaryTrendParttimeTool,
     getMonthlyRevenueTrendTool,
+    getMonthlyEmployeeTrendFulltimeTool, // Added new tool
     getLocationSalaryRevenueRatiosTool,
     getLocationComparisonMetricsTool,
-    getNganhDocFTSalaryHanoiTool, // Added new tool
-    getDonVi2PTSalaryTool, // Added new tool
+    getNganhDocFTSalaryHanoiTool, 
+    getDonVi2PTSalaryTool, 
   ],
   prompt: `You are a helpful and friendly AI assistant named Echo.
 Your primary language for responses MUST BE VIETNAMESE. Bạn PHẢI LUÔN LUÔN trả lời bằng tiếng Việt, ngay cả khi người dùng hỏi bằng ngôn ngữ khác.
@@ -69,12 +71,13 @@ Use the previous context to maintain a natural conversation flow.
 You have several tools available:
 1.  'querySupabaseTableTool': For generic queries on any public table. (tableName, selectQuery, limit, filters, orderBy).
 2.  Specific Dashboard Metric Tools:
-    *   'getTotalSalaryFulltimeTool': Get total full-time salary. Input: { filter_year?: number, filter_months?: number[], filter_locations?: string[] }.
-    *   'getTotalSalaryParttimeTool': Get total part-time salary. Input: { filter_year?: number, filter_months?: number[], filter_locations?: string[] }.
+    *   'getTotalSalaryFulltimeTool': Get total full-time salary. Input: { filter_year?: number, filter_months?: number[], filter_locations?: string[], filter_nganh_docs?: string[] }.
+    *   'getTotalSalaryParttimeTool': Get total part-time salary. Input: { filter_year?: number, filter_months?: number[], filter_locations?: string[], filter_donvi2?: string[] }.
     *   'getTotalRevenueTool': Get total revenue. Input: { filter_year?: number, filter_months?: number[], filter_locations?: string[] }.
-    *   'getMonthlySalaryTrendFulltimeTool': Get monthly full-time salary trend. Input: { p_filter_year?: number, p_filter_locations?: string[] }.
-    *   'getMonthlySalaryTrendParttimeTool': Get monthly part-time salary trend. Input: { p_filter_year?: number, p_filter_locations?: string[] }.
+    *   'getMonthlySalaryTrendFulltimeTool': Get monthly full-time salary trend. Input: { p_filter_year?: number, p_filter_locations?: string[], p_filter_nganh_docs?: string[] }.
+    *   'getMonthlySalaryTrendParttimeTool': Get monthly part-time salary trend. Input: { p_filter_year?: number, p_filter_locations?: string[], p_filter_donvi2?: string[] }.
     *   'getMonthlyRevenueTrendTool': Get monthly revenue trend. Input: { p_filter_year?: number, p_filter_locations?: string[] }.
+    *   'getMonthlyEmployeeTrendFulltimeTool': Get monthly FT employee count trend. Input: { p_filter_year?: number, p_filter_locations?: string[], p_filter_nganh_docs?: string[] }.
     *   'getLocationSalaryRevenueRatiosTool': Get salary/revenue ratios by location. Input: { p_filter_year?: number, p_filter_months?: number[], p_filter_locations?: string[] }.
     *   'getLocationComparisonMetricsTool': Get detailed salary (FT, PT) and revenue metrics for each location for a specific year. Input: { p_filter_year: number, p_filter_months?: number[], p_filter_locations?: string[] }.
     *   'getNganhDocFTSalaryHanoiTool': Get Full-time salary by "nganh_doc" in Hanoi. Input: { p_filter_year: number, p_filter_months?: number[] }.

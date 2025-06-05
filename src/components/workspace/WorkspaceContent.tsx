@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, ChevronDown, FilterIcon, GanttChartSquare, MapPin, Settings2, Circle, Percent, Target, FolderKanban, BarChart3, Filter as FilterIconLucide, Briefcase, ListChecks, UserCheck, Users } from "lucide-react";
+import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, ChevronDown, FilterIcon, GanttChartSquare, MapPin, Settings2, Circle, Percent, Target, FolderKanban, BarChart3, Filter as FilterIconLucide, Briefcase, ListChecks, UserCheck, Users, LineChart } from "lucide-react";
 import type { PayrollEntry, FlatOrgUnit, OrgNode } from '@/types';
 import { supabase } from '@/lib/supabaseClient';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -32,6 +32,7 @@ import NganhDocComparisonTable from '@/components/comparison/NganhDocComparisonT
 import AverageFTSalaryPerEmployeeCard from '@/components/dashboard/AverageFTSalaryPerEmployeeCard';
 import RevenuePerFTEmployeeCard from '@/components/dashboard/RevenuePerFTEmployeeCard';
 import EmployeeCountCard from '@/components/dashboard/EmployeeCountCard';
+import MonthlyEmployeeTrendChart from '@/components/charts/MonthlyEmployeeTrendChart';
 
 import {
   DropdownMenu,
@@ -959,7 +960,7 @@ export default function WorkspaceContent() {
                        <TabsTrigger value="kpiComparison" className="text-xs px-2.5 py-1.5 flex items-center gap-1">
                         <Target className="h-3.5 w-3.5"/> So sánh với Chỉ Tiêu
                       </TabsTrigger>
-                      <TabsTrigger value="salaryAnalysisTab" className="text-xs px-2.5 py-1.5 flex items-center gap-1">
+                       <TabsTrigger value="salaryAnalysisTab" className="text-xs px-2.5 py-1.5 flex items-center gap-1">
                         <FolderKanban className="h-3.5 w-3.5"/> Phân tích lương
                       </TabsTrigger>
                        <TabsTrigger value="salaryWorkloadAnalysis" className="text-xs px-2.5 py-1.5 flex items-center gap-1">
@@ -1024,7 +1025,12 @@ export default function WorkspaceContent() {
                   </TabsContent>
                   <TabsContent value="salaryWorkloadAnalysis" className="flex-grow overflow-y-auto space-y-3 mt-2">
                      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                        <EmployeeCountCard selectedMonths={selectedMonths} selectedYear={selectedYear} />
+                        <EmployeeCountCard 
+                            selectedMonths={selectedMonths} 
+                            selectedYear={selectedYear} 
+                            selectedDepartmentsForDiadiem={selectedDepartmentsFromLoaiFilter} 
+                            selectedNganhDoc={selectedNganhDocForFilter} 
+                        />
                         <AverageFTSalaryPerEmployeeCard
                             selectedMonths={selectedMonths}
                             selectedYear={selectedYear}
@@ -1037,11 +1043,14 @@ export default function WorkspaceContent() {
                             selectedDepartmentsForDiadiem={selectedDepartmentsFromLoaiFilter}
                             selectedNganhDoc={selectedNganhDocForFilter}
                         />
-                        {/* Add more cards here as they are developed */}
                     </div>
-                    <div className="flex flex-col items-center justify-center text-muted-foreground p-6 pt-10">
-                      <Briefcase className="h-12 w-12 mb-3 opacity-30" />
-                      <p className="text-sm text-center">Các biểu đồ và bảng phân tích chi tiết hơn cho thống kê lương/công sẽ được bổ sung.</p>
+                    <div className="grid grid-cols-1 gap-3 mt-3">
+                         <MonthlyEmployeeTrendChart 
+                            selectedYear={selectedYear} 
+                            selectedMonths={selectedMonths} 
+                            selectedDepartmentsForDiadiem={selectedDepartmentsFromLoaiFilter} 
+                            selectedNganhDoc={selectedNganhDocForFilter} 
+                        />
                     </div>
                   </TabsContent>
                   <TabsContent value="detailedSalary" className="flex-grow overflow-y-auto space-y-3 mt-2">
@@ -1061,4 +1070,5 @@ export default function WorkspaceContent() {
     </SidebarProvider>
   );
 }
+
 

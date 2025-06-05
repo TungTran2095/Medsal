@@ -21,7 +21,7 @@ To create these functions:
         *   Ensure your selection is exact.
         *   **Before clicking RUN, visually inspect the pasted code in the Supabase SQL Editor. If the editor has automatically added any comments (lines starting with `--`, like `-- source: dashboard...`) at the very end of the function block (especially after the `END;` line but before the final `$$;`), you MUST manually delete those comments from the editor before running the SQL. Otherwise, you will get an "unterminated dollar-quoted string" error.**
 5.  Click **Run** for each function.
-    *   **For `get_monthly_salary_trend_fulltime`, `get_monthly_salary_trend_parttime`, `get_monthly_revenue_trend`, `get_salary_revenue_ratio_components_by_location`, `get_location_comparison_metrics`, `get_nganhdoc_ft_salary_hanoi`, or `get_donvi2_pt_salary`**: If you encounter an error like "cannot change return type of existing function" or "function with specified name and arguments already exists", you MUST first run `DROP FUNCTION function_name(parameters);` (e.g., `DROP FUNCTION get_monthly_salary_trend_fulltime(integer, text[], text[]);` or `DROP FUNCTION get_location_comparison_metrics(integer, integer[], text[]);` or `DROP FUNCTION get_nganhdoc_ft_salary_hanoi(INTEGER, INTEGER[]);`) and then run the `CREATE OR REPLACE FUNCTION` script for it.
+    *   **For `get_monthly_salary_trend_fulltime`, `get_monthly_salary_trend_parttime`, `get_monthly_revenue_trend`, `get_salary_revenue_ratio_components_by_location`, `get_location_comparison_metrics`, `get_nganhdoc_ft_salary_hanoi`, `get_donvi2_pt_salary`, or `get_monthly_employee_trend_fulltime`**: If you encounter an error like "cannot change return type of existing function" or "function with specified name and arguments already exists", you MUST first run `DROP FUNCTION function_name(parameters);` (e.g., `DROP FUNCTION get_monthly_salary_trend_fulltime(integer, text[], text[]);` or `DROP FUNCTION get_location_comparison_metrics(integer, integer[], text[]);` or `DROP FUNCTION get_nganhdoc_ft_salary_hanoi(INTEGER, INTEGER[]);` or `DROP FUNCTION get_monthly_employee_trend_fulltime(INTEGER, TEXT[], TEXT[]);`) and then run the `CREATE OR REPLACE FUNCTION` script for it.
 
 #### `get_public_tables`
 
@@ -352,6 +352,61 @@ END;
 $$;
 ```
 
+#### `get_monthly_employee_trend_fulltime`
+
+This function is used by the Payroll Dashboard to fetch the count of distinct full-time employees (`ma_nhan_vien` from "Fulltime" table) aggregated per month and year, for a given year, optional list of locations (`dia_diem`), and optional list of `nganh_doc`. The X-axis of the chart will use the `Thang_x` column from your `Time` table.
+
+**SQL Code:**
+```sql
+DROP FUNCTION IF EXISTS get_monthly_employee_trend_fulltime(INTEGER, TEXT[], TEXT[]);
+CREATE OR REPLACE FUNCTION get_monthly_employee_trend_fulltime(
+    p_filter_year INTEGER DEFAULT NULL,
+    p_filter_locations TEXT[] DEFAULT NULL,
+    p_filter_nganh_docs TEXT[] DEFAULT NULL
+)
+RETURNS TABLE(
+    month_label TEXT,
+    year_val INTEGER,
+    employee_count INTEGER
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        t."Thang_x" AS month_label,
+        f.nam::INTEGER AS year_val,
+        COUNT(DISTINCT f.ma_nhan_vien)::INTEGER AS employee_count
+    FROM
+        "Fulltime" f
+    INNER JOIN
+        "Time" t ON f.nam::INTEGER = t."Năm"::INTEGER
+                 AND f.thang = t."Thang_x"
+    WHERE
+        (p_filter_year IS NULL OR f.nam::INTEGER = p_filter_year)
+        AND (
+            p_filter_locations IS NULL OR
+            array_length(p_filter_locations, 1) IS NULL OR
+            array_length(p_filter_locations, 1) = 0 OR
+            f.dia_diem = ANY(p_filter_locations)
+        )
+        AND (
+            p_filter_nganh_docs IS NULL OR
+            array_length(p_filter_nganh_docs, 1) IS NULL OR
+            array_length(p_filter_nganh_docs, 1) = 0 OR
+            f.nganh_doc = ANY(p_filter_nganh_docs)
+        )
+    GROUP BY
+        f.nam::INTEGER,
+        t."Thang_x",
+        t.thangpro
+    ORDER BY
+        f.nam::INTEGER,
+        regexp_replace(t.thangpro, '\D', '', 'g')::INTEGER;
+END;
+$$;
+```
+
 #### `get_salary_revenue_ratio_components_by_location`
 
 This function calculates the full-time and part-time salary components of the salary-to-revenue ratio for each work location, applying optional year, month, and specific location filters.
@@ -649,10 +704,11 @@ $$;
 
 
 Once these functions are successfully created (or updated) in your Supabase SQL Editor, the application should be able to correctly filter and aggregate data. If you continue to encounter "unterminated dollar-quoted string" errors, please double-check for any invisible characters or ensure the entire function block is being processed correctly by the SQL editor, especially ensuring no comments are between `END;` and the final `$$;`.
-Additionally, for the `get_monthly_salary_trend_fulltime`, `get_monthly_salary_trend_parttime`, and `get_monthly_revenue_trend` functions, ensure you have a `Time` table (capital T) with appropriate columns (`"Năm"`, `thangpro` (TEXT), `"Thang_x"` (TEXT)) as described in the function's comments.
+Additionally, for the `get_monthly_salary_trend_fulltime`, `get_monthly_salary_trend_parttime`, `get_monthly_revenue_trend`, and `get_monthly_employee_trend_fulltime` functions, ensure you have a `Time` table (capital T) with appropriate columns (`"Năm"`, `thangpro` (TEXT), `"Thang_x"` (TEXT)) as described in the function's comments.
     
 
     
 
     
+
 

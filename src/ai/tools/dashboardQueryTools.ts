@@ -48,6 +48,14 @@ const NganhDocDonVi2QueryFilterSchema = z.object({
 });
 export type NganhDocDonVi2QueryFilterInput = z.infer<typeof NganhDocDonVi2QueryFilterSchema>;
 
+// Input schema for Monthly Employee Trend Tool
+const MonthlyEmployeeTrendInputSchema = z.object({
+  p_filter_year: z.number().optional().describe('The year to filter trends by (e.g., 2023).'),
+  p_filter_locations: z.array(z.string()).optional().describe('An array of location names (department names) to filter trends by.'),
+  p_filter_nganh_docs: z.array(z.string()).optional().describe('An array of "nganh_doc" names to filter trends by.'),
+});
+export type MonthlyEmployeeTrendInput = z.infer<typeof MonthlyEmployeeTrendInputSchema>;
+
 
 // Generic Output Schema for single value results
 const SingleValueOutputSchema = z.object({
@@ -92,6 +100,17 @@ const DonVi2PTSalaryOutputSchema = z.object({
     message: z.string().optional().describe('A message describing the result, success, no data, or error.'),
 });
 export type DonVi2PTSalaryOutput = z.infer<typeof DonVi2PTSalaryOutputSchema>;
+
+// Output schema for Monthly Employee Trend Tool
+const MonthlyEmployeeTrendOutputSchema = z.object({
+  data: z.array(z.object({
+    month_label: z.string(),
+    year_val: z.number(),
+    employee_count: z.number(),
+  })).nullable().describe('An array of monthly employee counts, or null.'),
+  message: z.string().optional().describe('A message describing the result, success, no data, or error.'),
+});
+export type MonthlyEmployeeTrendOutput = z.infer<typeof MonthlyEmployeeTrendOutputSchema>;
 
 
 // Tool for get_total_salary_fulltime
@@ -349,6 +368,31 @@ export const getDonVi2PTSalaryTool = ai.defineTool(
     } catch (e: any) {
       console.error('Error in getDonVi2PTSalaryTool:', e);
       return { data: null, message: `Lỗi khi lấy lương PT theo Đơn vị 2: ${e.message}` };
+    }
+  }
+);
+
+// Tool for get_monthly_employee_trend_fulltime
+export const getMonthlyEmployeeTrendFulltimeTool = ai.defineTool(
+  {
+    name: 'getMonthlyEmployeeTrendFulltimeTool',
+    description: 'Fetches the monthly trend of full-time employee count for a given year, optional locations, and optional "nganh_doc" filters. Use for "xu hướng số lượng nhân viên full-time hàng tháng".',
+    inputSchema: MonthlyEmployeeTrendInputSchema,
+    outputSchema: MonthlyEmployeeTrendOutputSchema,
+  },
+  async (input) => {
+    try {
+      const { data, error } = await supabase.rpc('get_monthly_employee_trend_fulltime', {
+        p_filter_year: input.p_filter_year,
+        p_filter_locations: input.p_filter_locations,
+        p_filter_nganh_docs: input.p_filter_nganh_docs,
+      });
+      if (error) throw error;
+      if (!data || data.length === 0) return { data: null, message: 'Không có dữ liệu xu hướng số lượng nhân viên full-time cho kỳ và bộ lọc đã chọn.' };
+      return { data, message: 'Truy vấn xu hướng số lượng nhân viên full-time thành công.' };
+    } catch (e: any) {
+      console.error('Error in getMonthlyEmployeeTrendFulltimeTool:', e);
+      return { data: null, message: `Lỗi khi lấy xu hướng số lượng nhân viên full-time: ${e.message}` };
     }
   }
 );
