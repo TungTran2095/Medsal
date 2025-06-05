@@ -15,7 +15,6 @@ import {
 interface EmployeeCountCardProps {
   selectedMonths?: number[];
   selectedYear?: number | null;
-  // Added for future consistency, RPC needs to be updated to use these
   selectedDepartmentsForDiadiem?: string[]; 
   selectedNganhDoc?: string[];
 }
@@ -30,14 +29,27 @@ export default function EmployeeCountCard({ selectedMonths, selectedYear, select
     setIsLoading(true);
     setError(null);
 
-    const yearSegment = selectedYear ? `Năm ${selectedYear}` : "Tất cả các năm";
+    let yearForRpc = selectedYear;
+    let monthsForRpc = (selectedMonths && selectedMonths.length > 0) ? [...selectedMonths] : null;
+    
+    let yearSegment = selectedYear ? `Năm ${selectedYear}` : "Tất cả các năm";
     let monthSegment: string;
-    if (selectedMonths && selectedMonths.length > 0) {
-      if (selectedMonths.length === 12) monthSegment = "tất cả các tháng";
-      else if (selectedMonths.length === 1) monthSegment = `Tháng ${String(selectedMonths[0]).padStart(2, '0')}`;
-      else monthSegment = `các tháng ${selectedMonths.map(m => String(m).padStart(2, '0')).join(', ')}`;
-    } else {
+
+    if (monthsForRpc && monthsForRpc.length > 0 && yearForRpc !== null) {
+      // If multiple months selected for a specific year, use the latest selected month
+      const latestSelectedMonth = Math.max(...monthsForRpc);
+      monthsForRpc = [latestSelectedMonth];
+      monthSegment = `Tháng ${String(latestSelectedMonth).padStart(2, '0')}`;
+    } else if (monthsForRpc && monthsForRpc.length > 0) {
+      // Multiple months selected, but no specific year (use all years)
+      if (monthsForRpc.length === 12) monthSegment = "tất cả các tháng";
+      else if (monthsForRpc.length === 1) monthSegment = `Tháng ${String(monthsForRpc[0]).padStart(2, '0')}`;
+      else monthSegment = `các tháng ${monthsForRpc.map(m => String(m).padStart(2, '0')).join(', ')}`;
+      // In this case, RPC will receive all selected months.
+    }
+     else {
       monthSegment = "tất cả các tháng";
+      // monthsForRpc remains null, RPC gets all months for the year / all years
     }
     
     let locationSegment = "tất cả địa điểm";
@@ -52,22 +64,18 @@ export default function EmployeeCountCard({ selectedMonths, selectedYear, select
     
     setFilterDescription(`${monthSegment} của ${yearSegment} tại ${locationSegment}`);
 
-
     try {
       const rpcArgs: { 
-        filter_year?: number; 
+        filter_year?: number | null; 
         filter_months?: number[] | null;
-        filter_locations?: string[] | null; // For future SQL update
-        filter_nganh_docs?: string[] | null; // For future SQL update
-      } = {};
-       if (selectedYear !== null) {
-        rpcArgs.filter_year = selectedYear;
-      }
-      rpcArgs.filter_months = (selectedMonths && selectedMonths.length > 0) ? selectedMonths : null;
-      // Pass these to RPC if/when it supports them
-      rpcArgs.filter_locations = (selectedDepartmentsForDiadiem && selectedDepartmentsForDiadiem.length > 0) ? selectedDepartmentsForDiadiem : null;
-      rpcArgs.filter_nganh_docs = (selectedNganhDoc && selectedNganhDoc.length > 0) ? selectedNganhDoc : null;
-
+        filter_locations?: string[] | null;
+        filter_nganh_docs?: string[] | null;
+      } = {
+        filter_year: yearForRpc,
+        filter_months: monthsForRpc,
+        filter_locations: (selectedDepartmentsForDiadiem && selectedDepartmentsForDiadiem.length > 0) ? selectedDepartmentsForDiadiem : null,
+        filter_nganh_docs: (selectedNganhDoc && selectedNganhDoc.length > 0) ? selectedNganhDoc : null,
+      };
 
       const functionName = 'get_employee_count_fulltime';
       const { data, error: rpcError } = await supabase.rpc(
