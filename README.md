@@ -39,6 +39,46 @@ AS $$
 $$;
 ```
 
+#### `get_employee_count_fulltime`
+
+This function is used by the Payroll Dashboard to count the number of distinct full-time employees (`ma_nhan_vien` from the `Fulltime` table), with optional filters for a selected year, an array of months, an array of location names (`dia_diem`), and an array of `nganh_doc` names. It correctly parses text-based month columns.
+
+**SQL Code:**
+```sql
+DROP FUNCTION IF EXISTS get_employee_count_fulltime(INTEGER, INTEGER[], TEXT[], TEXT[]);
+CREATE OR REPLACE FUNCTION get_employee_count_fulltime(
+    filter_year INTEGER DEFAULT NULL,
+    filter_months INTEGER[] DEFAULT NULL,
+    filter_locations TEXT[] DEFAULT NULL,
+    filter_nganh_docs TEXT[] DEFAULT NULL
+)
+RETURNS INTEGER -- Returns a count, so INTEGER or BIGINT
+LANGUAGE SQL
+AS $$
+  SELECT COUNT(DISTINCT f.ma_nhan_vien)::INTEGER
+  FROM "Fulltime" f
+  WHERE (filter_year IS NULL OR f.nam::INTEGER = filter_year)
+    AND (
+        filter_months IS NULL OR
+        array_length(filter_months, 1) IS NULL OR
+        array_length(filter_months, 1) = 0 OR
+        regexp_replace(f.thang, '\D', '', 'g')::INTEGER = ANY(filter_months)
+    )
+    AND (
+        filter_locations IS NULL OR
+        array_length(filter_locations, 1) IS NULL OR
+        array_length(filter_locations, 1) = 0 OR
+        f.dia_diem = ANY(filter_locations)
+    )
+    AND (
+        filter_nganh_docs IS NULL OR
+        array_length(filter_nganh_docs, 1) IS NULL OR
+        array_length(filter_nganh_docs, 1) = 0 OR
+        f.nganh_doc = ANY(filter_nganh_docs)
+    );
+$$;
+```
+
 #### `get_total_salary_fulltime`
 
 This function is used by the Payroll Dashboard to calculate the total sum of `tong_thu_nhap` from the `Fulltime` table, with optional filters for a selected year, an array of months, an array of location names, and an array of `nganh_doc` names. It correctly parses text-based month columns (e.g., "Tháng 01") into integers.
@@ -615,3 +655,4 @@ Additionally, for the `get_monthly_salary_trend_fulltime`, `get_monthly_salary_t
     
 
     
+
