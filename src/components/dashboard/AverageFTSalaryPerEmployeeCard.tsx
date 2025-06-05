@@ -43,14 +43,25 @@ export default function AverageFTSalaryPerEmployeeCard({
     setAverageSalary(null);
     setDebugMessages([]);
 
+    let periodType = "Tổng";
     const yearSegment = selectedYear ? `Năm ${selectedYear}` : "Tất cả các năm";
     let monthSegment: string;
+    let numberOfMonthsForAverage = 0;
+
     if (selectedMonths && selectedMonths.length > 0) {
-      if (selectedMonths.length === 12) monthSegment = "tất cả các tháng";
+      numberOfMonthsForAverage = selectedMonths.length;
+      if (selectedMonths.length === 12) monthSegment = "cả năm";
       else if (selectedMonths.length === 1) monthSegment = `Tháng ${String(selectedMonths[0]).padStart(2, '0')}`;
       else monthSegment = `các tháng ${selectedMonths.map(m => String(m).padStart(2, '0')).join(', ')}`;
-    } else {
+      periodType = "TB tháng";
+    } else if (selectedYear) {
+      monthSegment = "cả năm";
+      numberOfMonthsForAverage = 12;
+      periodType = "TB tháng";
+    }
+    else {
       monthSegment = "tất cả các tháng";
+      // numberOfMonthsForAverage remains 0, will not divide by months for "all time"
     }
 
     let locationSegment = "tất cả địa điểm";
@@ -62,7 +73,7 @@ export default function AverageFTSalaryPerEmployeeCard({
       appliedFilters.push(selectedNganhDoc.length <= 2 ? selectedNganhDoc.join(' & ') : `${selectedNganhDoc.length} ngành dọc`);
     }
     if (appliedFilters.length > 0) locationSegment = appliedFilters.join(' và ');
-    setFilterDescription(`${monthSegment} của ${yearSegment} tại ${locationSegment}`);
+    setFilterDescription(`${periodType} cho ${monthSegment} của ${yearSegment} tại ${locationSegment}`);
 
     try {
       const rpcArgsBase = {
@@ -74,8 +85,6 @@ export default function AverageFTSalaryPerEmployeeCard({
         filter_locations: (selectedDepartmentsForDiadiem && selectedDepartmentsForDiadiem.length > 0) ? selectedDepartmentsForDiadiem : null,
         filter_nganh_docs: (selectedNganhDoc && selectedNganhDoc.length > 0) ? selectedNganhDoc : null,
       };
-      // Assuming get_employee_count_fulltime might also support these filters.
-      // If not, it will use what it supports and ignore others.
       const rpcArgsEmployeeCount = { ...rpcArgsSalary };
 
 
@@ -103,14 +112,14 @@ export default function AverageFTSalaryPerEmployeeCard({
       setDebugMessages(prev => [...prev, `Total Salary FT: ${totalSalary ?? 'Error'}`]);
 
 
-      if (!currentError) { // Only proceed if salary fetch was okay
+      if (!currentError) { 
         if (empCountRes.status === 'fulfilled') {
           if (empCountRes.value.error) {
             const e = empCountRes.value.error;
             currentError = { type: (e.code === '42883' || e.message.includes(empCountRpcName)) ? 'rpcMissing' : 'generic', message: `Lỗi tải Số Lượng NV: ${e.message}` };
           } else {
             employeeCount = Number(empCountRes.value.data);
-            if (employeeCount === null || isNaN(employeeCount)) employeeCount = 0; // Treat null/NaN count as 0
+            if (employeeCount === null || isNaN(employeeCount)) employeeCount = 0; 
           }
         } else {
           currentError = { type: 'generic', message: `Lỗi mạng khi tải Số Lượng NV: ${empCountRes.reason?.message}` };
@@ -130,10 +139,14 @@ export default function AverageFTSalaryPerEmployeeCard({
             setError({ type: 'dataIssue', message: 'Không thể tính lương TB: Số lượng nhân viên bằng 0 nhưng tổng lương > 0.' });
             setAverageSalary(null);
           } else {
-            setAverageSalary(0); // No employees, no salary = 0 average
+            setAverageSalary(0); 
           }
         } else {
-          setAverageSalary(totalSalary / employeeCount);
+          let avgSal = totalSalary / employeeCount;
+          if (numberOfMonthsForAverage > 0) {
+            avgSal = avgSal / numberOfMonthsForAverage;
+          }
+          setAverageSalary(avgSal);
         }
       } else {
         setError({ type: 'generic', message: 'Không thể lấy đủ dữ liệu để tính lương trung bình.' });
@@ -201,7 +214,7 @@ export default function AverageFTSalaryPerEmployeeCard({
               {displayValue}
             </div>
             <CardDescription className="text-xs text-muted-foreground truncate" title={filterDescription}>
-              Cho: {filterDescription}
+              {filterDescription}
             </CardDescription>
             {error && (
               <p className="text-xs text-destructive mt-0.5">{error.message}</p>
@@ -220,3 +233,4 @@ export default function AverageFTSalaryPerEmployeeCard({
   );
 }
 
+    

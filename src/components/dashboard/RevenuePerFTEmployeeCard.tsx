@@ -16,7 +16,7 @@ interface RevenuePerFTEmployeeCardProps {
   selectedMonths?: number[];
   selectedYear?: number | null;
   selectedDepartmentsForDiadiem?: string[];
-  selectedNganhDoc?: string[]; // Though not directly used by revenue RPC, it's used for employee count consistency
+  selectedNganhDoc?: string[]; 
 }
 
 interface FetchError {
@@ -44,15 +44,25 @@ export default function RevenuePerFTEmployeeCard({
     setRevenuePerEmployee(null);
     // setDebugMessages([]);
 
-
+    let periodType = "Tổng";
     const yearSegment = selectedYear ? `Năm ${selectedYear}` : "Tất cả các năm";
     let monthSegment: string;
+    let numberOfMonthsForAverage = 0;
+
     if (selectedMonths && selectedMonths.length > 0) {
-      if (selectedMonths.length === 12) monthSegment = "tất cả các tháng";
+      numberOfMonthsForAverage = selectedMonths.length;
+      if (selectedMonths.length === 12) monthSegment = "cả năm";
       else if (selectedMonths.length === 1) monthSegment = `Tháng ${String(selectedMonths[0]).padStart(2, '0')}`;
       else monthSegment = `các tháng ${selectedMonths.map(m => String(m).padStart(2, '0')).join(', ')}`;
-    } else {
+      periodType = "TB tháng";
+    } else if (selectedYear) {
+      monthSegment = "cả năm";
+      numberOfMonthsForAverage = 12;
+      periodType = "TB tháng";
+    }
+     else {
       monthSegment = "tất cả các tháng";
+      // numberOfMonthsForAverage remains 0 for "all time"
     }
 
     let locationSegment = "tất cả địa điểm";
@@ -60,12 +70,11 @@ export default function RevenuePerFTEmployeeCard({
     if (selectedDepartmentsForDiadiem && selectedDepartmentsForDiadiem.length > 0) {
       appliedFilters.push(selectedDepartmentsForDiadiem.length <= 2 ? selectedDepartmentsForDiadiem.join(' & ') : `${selectedDepartmentsForDiadiem.length} địa điểm (Loại/Pban)`);
     }
-    // Include Nganh Doc in description as employee count might be filtered by it
     if (selectedNganhDoc && selectedNganhDoc.length > 0) {
       appliedFilters.push(selectedNganhDoc.length <= 2 ? selectedNganhDoc.join(' & ') : `${selectedNganhDoc.length} ngành dọc`);
     }
     if (appliedFilters.length > 0) locationSegment = appliedFilters.join(' và ');
-    setFilterDescription(`${monthSegment} của ${yearSegment} tại ${locationSegment}`);
+    setFilterDescription(`${periodType} cho ${monthSegment} của ${yearSegment} tại ${locationSegment}`);
 
     try {
       const rpcArgsBase = {
@@ -75,7 +84,6 @@ export default function RevenuePerFTEmployeeCard({
       const rpcArgsRevenue = {
         ...rpcArgsBase,
         filter_locations: (selectedDepartmentsForDiadiem && selectedDepartmentsForDiadiem.length > 0) ? selectedDepartmentsForDiadiem : null,
-        // get_total_revenue does not use filter_nganh_docs
       };
       const rpcArgsEmployeeCount = {
         ...rpcArgsBase,
@@ -133,10 +141,14 @@ export default function RevenuePerFTEmployeeCard({
             setError({ type: 'dataIssue', message: 'Không thể tính DT/NV: Số lượng nhân viên bằng 0 nhưng doanh thu > 0.' });
             setRevenuePerEmployee(null);
           } else {
-            setRevenuePerEmployee(0); // No employees, no revenue = 0 average
+            setRevenuePerEmployee(0); 
           }
         } else {
-          setRevenuePerEmployee(totalRevenue / employeeCount);
+          let avgRev = totalRevenue / employeeCount;
+          if (numberOfMonthsForAverage > 0) {
+            avgRev = avgRev / numberOfMonthsForAverage;
+          }
+          setRevenuePerEmployee(avgRev);
         }
       } else {
          setError({ type: 'generic', message: 'Không thể lấy đủ dữ liệu để tính doanh thu / nhân viên.' });
@@ -202,7 +214,7 @@ export default function RevenuePerFTEmployeeCard({
               {displayValue}
             </div>
             <CardDescription className="text-xs text-muted-foreground truncate" title={filterDescription}>
-              Cho: {filterDescription}
+              {filterDescription}
             </CardDescription>
              {error && (
               <p className="text-xs text-destructive mt-0.5">{error.message}</p>
@@ -219,3 +231,5 @@ export default function RevenuePerFTEmployeeCard({
     </Card>
   );
 }
+
+    
