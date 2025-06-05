@@ -21,7 +21,7 @@ To create these functions:
         *   Ensure your selection is exact.
         *   **Before clicking RUN, visually inspect the pasted code in the Supabase SQL Editor. If the editor has automatically added any comments (lines starting with `--`, like `-- source: dashboard...`) at the very end of the function block (especially after the `END;` line but before the final `$$;`), you MUST manually delete those comments from the editor before running the SQL. Otherwise, you will get an "unterminated dollar-quoted string" error.**
 5.  Click **Run** for each function.
-    *   **For `get_monthly_salary_trend_fulltime`, `get_monthly_salary_trend_parttime`, `get_monthly_revenue_trend`, `get_salary_revenue_ratio_components_by_location`, `get_location_comparison_metrics`, `get_nganhdoc_ft_salary_hanoi`, `get_donvi2_pt_salary`, `get_monthly_employee_trend_fulltime`, `get_monthly_ft_salary_revenue_per_employee_trend`, or `get_total_workdays_fulltime`**: If you encounter an error like "cannot change return type of existing function" or "function with specified name and arguments already exists", you MUST first run `DROP FUNCTION function_name(parameters);` (e.g., `DROP FUNCTION get_monthly_salary_trend_fulltime(integer, text[], text[]);` or `DROP FUNCTION get_location_comparison_metrics(integer, integer[], text[]);` or `DROP FUNCTION get_nganhdoc_ft_salary_hanoi(INTEGER, INTEGER[]);` or `DROP FUNCTION get_monthly_employee_trend_fulltime(INTEGER, TEXT[], TEXT[]);` or `DROP FUNCTION get_monthly_ft_salary_revenue_per_employee_trend(INTEGER, TEXT[], TEXT[]);` or `DROP FUNCTION get_total_workdays_fulltime(INTEGER, INTEGER[], TEXT[], TEXT[]);`) and then run the `CREATE OR REPLACE FUNCTION` script for it.
+    *   **For `get_monthly_salary_trend_fulltime`, `get_monthly_salary_trend_parttime`, `get_monthly_revenue_trend`, `get_salary_revenue_ratio_components_by_location`, `get_location_comparison_metrics`, `get_nganhdoc_ft_salary_hanoi`, `get_donvi2_pt_salary`, `get_monthly_employee_trend_fulltime`, `get_monthly_ft_salary_revenue_per_employee_trend`, `get_total_workdays_fulltime`, or `get_ft_workload_efficiency_by_location`**: If you encounter an error like "cannot change return type of existing function" or "function with specified name and arguments already exists", you MUST first run `DROP FUNCTION function_name(parameters);` (e.g., `DROP FUNCTION get_monthly_salary_trend_fulltime(integer, text[], text[]);` or `DROP FUNCTION get_location_comparison_metrics(integer, integer[], text[]);` or `DROP FUNCTION get_nganhdoc_ft_salary_hanoi(INTEGER, INTEGER[]);` or `DROP FUNCTION get_monthly_employee_trend_fulltime(INTEGER, TEXT[], TEXT[]);` or `DROP FUNCTION get_monthly_ft_salary_revenue_per_employee_trend(INTEGER, TEXT[], TEXT[]);` or `DROP FUNCTION get_total_workdays_fulltime(INTEGER, INTEGER[], TEXT[], TEXT[]);` or `DROP FUNCTION get_ft_workload_efficiency_by_location(INTEGER, INTEGER[], TEXT[], TEXT[]);`) and then run the `CREATE OR REPLACE FUNCTION` script for it.
 
 #### `get_public_tables`
 
@@ -819,6 +819,104 @@ END;
 $$;
 ```
 
+#### `get_ft_workload_efficiency_by_location`
+
+This function calculates Full-Time Salary per Full-Time Workday and Revenue per Full-Time Workday for each location (`dia_diem` or `Tên đơn vị`).
+It uses filters for year, months, specific locations, and `nganh_doc` (for Fulltime salary & workdays).
+Revenue data is joined based on location name, assuming `Fulltime.dia_diem` and `Doanh_thu."Tên đơn vị"` can be aligned.
+
+**SQL Code:**
+```sql
+DROP FUNCTION IF EXISTS get_ft_workload_efficiency_by_location(INTEGER, INTEGER[], TEXT[], TEXT[]);
+CREATE OR REPLACE FUNCTION get_ft_workload_efficiency_by_location(
+    p_filter_year INTEGER DEFAULT NULL,
+    p_filter_months INTEGER[] DEFAULT NULL,
+    p_filter_locations TEXT[] DEFAULT NULL,
+    p_filter_nganh_docs TEXT[] DEFAULT NULL
+)
+RETURNS TABLE(
+    location_name TEXT,
+    ft_salary_per_ft_workday DOUBLE PRECISION,
+    revenue_per_ft_workday DOUBLE PRECISION
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    WITH ft_metrics AS (
+        SELECT
+            f.dia_diem,
+            SUM(CAST(REPLACE(f.tong_thu_nhap::text, ',', '') AS DOUBLE PRECISION)) AS total_ft_salary,
+            SUM(
+                COALESCE(f.ngay_thuong_chinh_thuc, 0) +
+                COALESCE(f.ngay_thuong_thu_viec, 0) +
+                COALESCE(f.nghi_tuan, 0) +
+                COALESCE(f.le_tet, 0) +
+                COALESCE(f.ngay_thuong_chinh_thuc2, 0) +
+                COALESCE(f.ngay_thuong_thu_viec3, 0) +
+                COALESCE(f.nghi_tuan4, 0) +
+                COALESCE(f.le_tet5, 0) +
+                COALESCE(f.nghi_nl, 0)
+            ) AS total_ft_workdays
+        FROM "Fulltime" f
+        WHERE (p_filter_year IS NULL OR f.nam::INTEGER = p_filter_year)
+          AND (
+              p_filter_months IS NULL OR
+              array_length(p_filter_months, 1) IS NULL OR
+              array_length(p_filter_months, 1) = 0 OR
+              regexp_replace(f.thang, '\D', '', 'g')::INTEGER = ANY(p_filter_months)
+          )
+          AND (
+              p_filter_locations IS NULL OR
+              array_length(p_filter_locations, 1) IS NULL OR
+              array_length(p_filter_locations, 1) = 0 OR
+              f.dia_diem = ANY(p_filter_locations)
+          )
+          AND (
+              p_filter_nganh_docs IS NULL OR
+              array_length(p_filter_nganh_docs, 1) IS NULL OR
+              array_length(p_filter_nganh_docs, 1) = 0 OR
+              f.nganh_doc = ANY(p_filter_nganh_docs)
+          )
+        GROUP BY f.dia_diem
+    ),
+    rev_metrics AS (
+        SELECT
+            dr."Tên đơn vị" AS dia_diem, -- Assuming "Tên đơn vị" in Doanh_thu maps to "dia_diem" in Fulltime
+            SUM(CAST(REPLACE(dr."Kỳ báo cáo"::text, ',', '') AS DOUBLE PRECISION)) AS total_revenue
+        FROM "Doanh_thu" dr
+        WHERE (p_filter_year IS NULL OR dr."Năm"::INTEGER = p_filter_year)
+          AND (
+              p_filter_months IS NULL OR
+              array_length(p_filter_months, 1) IS NULL OR
+              array_length(p_filter_months, 1) = 0 OR
+              regexp_replace(dr."Tháng", '\D', '', 'g')::INTEGER = ANY(p_filter_months)
+          )
+          AND dr."Tên đơn vị" NOT IN ('Medcom', 'Medon', 'Medicons', 'Meddom', 'Med Group')
+          AND ( 
+              p_filter_locations IS NULL OR
+              array_length(p_filter_locations, 1) IS NULL OR
+              array_length(p_filter_locations, 1) = 0 OR
+              dr."Tên đơn vị" = ANY(p_filter_locations)
+          )
+        GROUP BY dr."Tên đơn vị"
+    ),
+    all_locations AS (
+        SELECT dia_diem FROM ft_metrics
+        UNION
+        SELECT dia_diem FROM rev_metrics
+    )
+    SELECT
+        al.dia_diem AS location_name,
+        COALESCE(fm.total_ft_salary / NULLIF(fm.total_ft_workdays, 0), 0) AS ft_salary_per_ft_workday,
+        COALESCE(rm.total_revenue / NULLIF(fm.total_ft_workdays, 0), 0) AS revenue_per_ft_workday
+    FROM all_locations al
+    LEFT JOIN ft_metrics fm ON al.dia_diem = fm.dia_diem
+    LEFT JOIN rev_metrics rm ON al.dia_diem = rm.dia_diem
+    WHERE COALESCE(fm.total_ft_workdays, 0) > 0; -- Only include locations with workdays
+END;
+$$;
+```
 
 Once these functions are successfully created (or updated) in your Supabase SQL Editor, the application should be able to correctly filter and aggregate data. If you continue to encounter "unterminated dollar-quoted string" errors, please double-check for any invisible characters or ensure the entire function block is being processed correctly by the SQL editor, especially ensuring no comments are between `END;` and the final `$$;`.
 Additionally, for the `get_monthly_salary_trend_fulltime`, `get_monthly_salary_trend_parttime`, `get_monthly_revenue_trend`, `get_monthly_employee_trend_fulltime`, and `get_monthly_ft_salary_revenue_per_employee_trend` functions, ensure you have a `Time` table (capital T) with appropriate columns (`"Năm"`, `thangpro` (TEXT), `"Thang_x"` (TEXT)) as described in the function's comments.
@@ -827,4 +925,5 @@ Additionally, for the `get_monthly_salary_trend_fulltime`, `get_monthly_salary_t
     
 
     
+
 

@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, ChevronDown, FilterIcon, GanttChartSquare, MapPin, Settings2, Circle, Percent, Target, FolderKanban, BarChart3, Filter as FilterIconLucide, Briefcase, ListChecks, UserCheck, Users, LineChart, Banknote } from "lucide-react"; // Added Banknote
+import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, ChevronDown, FilterIcon, GanttChartSquare, MapPin, Settings2, Circle, Percent, Target, FolderKanban, BarChart3, Filter as FilterIconLucide, Briefcase, ListChecks, UserCheck, Users, LineChart, Banknote, ScatterChart as ScatterChartIconLucide } from "lucide-react"; // Added Banknote, ScatterChartIconLucide
 import type { PayrollEntry, FlatOrgUnit, OrgNode } from '@/types';
 import { supabase } from '@/lib/supabaseClient';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -36,6 +36,7 @@ import MonthlyEmployeeTrendChart from '@/components/charts/MonthlyEmployeeTrendC
 import MonthlyAvgSalaryRevenuePerEmployeeChart from '@/components/charts/MonthlyAvgSalaryRevenuePerEmployeeChart';
 import AverageSalaryPerWorkdayCard from '@/components/dashboard/AverageSalaryPerWorkdayCard'; // New card
 import RevenuePerWorkdayCard from '@/components/dashboard/RevenuePerWorkdayCard'; // New card
+import LocationWorkloadEfficiencyScatterChart from '@/components/charts/LocationWorkloadEfficiencyScatterChart'; // New Scatter Chart
 
 
 import {
@@ -1074,6 +1075,14 @@ export default function WorkspaceContent() {
                             selectedNganhDoc={selectedNganhDocForFilter}
                         />
                     </div>
+                    <div className="grid grid-cols-1 gap-3 mt-3">
+                        <LocationWorkloadEfficiencyScatterChart
+                            selectedYear={selectedYear}
+                            selectedMonths={selectedMonths}
+                            selectedDepartmentsForDiadiem={selectedDepartmentsFromLoaiFilter}
+                            selectedNganhDoc={selectedNganhDocForFilter}
+                        />
+                    </div>
                   </TabsContent>
                   <TabsContent value="detailedSalary" className="flex-grow overflow-y-auto space-y-3 mt-2">
                     <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-6">
@@ -1092,6 +1101,7 @@ export default function WorkspaceContent() {
     </SidebarProvider>
   );
 }
+
 
 
 
