@@ -15,6 +15,7 @@ interface DetailedSalaryData {
   ho_ten: string;
   tong_cong: number | null;
   tien_linh: number | null;
+  tien_linh_per_cong: number | null; // New field
 }
 
 interface DetailedSalaryTableProps {
@@ -59,11 +60,9 @@ export default function DetailedSalaryTable({
       if (rpcError) {
         let detailedErrorMessage = rpcError.message || `Không thể tải dữ liệu chi tiết lương qua RPC '${functionName}'.`;
         if (rpcError.code === '42883' || (rpcError.message && rpcError.message.toLowerCase().includes("does not exist") && rpcError.message.toLowerCase().includes(functionName))) {
-          detailedErrorMessage = `Hàm RPC '${functionName}' không tìm thấy hoặc có lỗi. Vui lòng kiểm tra định nghĩa hàm trong Supabase theo README.md. Đảm bảo bảng Fulltime có các cột 'ma_nhan_vien' và 'ho_va_ten'.`;
-        } else if (rpcError.message && rpcError.message.toLowerCase().includes('column "tien_linh" does not exist')) {
-          detailedErrorMessage = `Cột 'tien_linh' không tồn tại trong bảng 'Fulltime'. Hàm RPC '${functionName}' cần cột này.`;
-        } else if (rpcError.message && (rpcError.message.toLowerCase().includes('column "ma_nhan_vien" does not exist') || rpcError.message.toLowerCase().includes('column "ho_va_ten" does not exist'))) {
-          detailedErrorMessage = `Một trong các cột 'ma_nhan_vien' hoặc 'ho_va_ten' không tồn tại trong bảng 'Fulltime'. Hàm RPC '${functionName}' cần các cột này.`;
+          detailedErrorMessage = `Hàm RPC '${functionName}' không tìm thấy hoặc có lỗi. Vui lòng kiểm tra định nghĩa hàm trong Supabase theo README.md. Đảm bảo bảng Fulltime có các cột 'ma_nhan_vien', 'ho_va_ten', và 'tien_linh'.`;
+        } else if (rpcError.message && (rpcError.message.toLowerCase().includes('column "tien_linh" does not exist') || rpcError.message.toLowerCase().includes('column "ma_nhan_vien" does not exist') || rpcError.message.toLowerCase().includes('column "ho_va_ten" does not exist'))) {
+          detailedErrorMessage = `Một hoặc nhiều cột (ma_nhan_vien, ho_va_ten, tien_linh) không tồn tại trong bảng 'Fulltime'. Hàm RPC '${functionName}' cần các cột này.`;
         }
         throw new Error(detailedErrorMessage);
       }
@@ -74,6 +73,7 @@ export default function DetailedSalaryTable({
           ho_ten: String(item.ho_ten),
           tong_cong: item.tong_cong !== null ? Number(item.tong_cong) : null,
           tien_linh: item.tien_linh !== null ? Number(item.tien_linh) : null,
+          tien_linh_per_cong: item.tien_linh_per_cong !== null ? Number(item.tien_linh_per_cong) : null,
         })));
         setTotalRecords(Number(rpcData[0].total_records) || 0);
       } else {
@@ -82,7 +82,7 @@ export default function DetailedSalaryTable({
       }
 
     } catch (e: any) {
-      console.error(`Error fetching detailed salary data (raw):`, e, "Stringified:", JSON.stringify(e, Object.getOwnPropertyNames(e), 2));
+      console.error(`Error fetching detailed salary data (raw):`, JSON.stringify(e, Object.getOwnPropertyNames(e), 2));
       let errorMessage = 'Không thể tải dữ liệu chi tiết lương.';
       if (e && typeof e === 'object') {
           if (e.message) {
@@ -182,6 +182,7 @@ export default function DetailedSalaryTable({
                   <TableHead className="text-xs py-1.5 px-2">Họ và Tên</TableHead>
                   <TableHead className="text-xs py-1.5 px-2 text-right">Tổng Công</TableHead>
                   <TableHead className="text-xs py-1.5 px-2 text-right">Tiền Lĩnh</TableHead>
+                  <TableHead className="text-xs py-1.5 px-2 text-right">Tiền lĩnh/công</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -191,6 +192,7 @@ export default function DetailedSalaryTable({
                     <TableCell className="text-xs py-1.5 px-2 whitespace-nowrap">{row.ho_ten}</TableCell>
                     <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap">{formatNumber(row.tong_cong)}</TableCell>
                     <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap">{formatCurrency(row.tien_linh)}</TableCell>
+                    <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap">{formatCurrency(row.tien_linh_per_cong)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

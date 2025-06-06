@@ -922,7 +922,7 @@ $$;
 
 #### `get_detailed_employee_salary_data`
 
-This function fetches detailed salary information for full-time employees directly from the `Fulltime` table, including their ID (`ma_nhan_vien`), name (`ho_va_ten`), total workdays, and "tiền lĩnh" (from `Fulltime.tien_linh`) for a specified period and set of filters. It supports pagination.
+This function fetches detailed salary information for full-time employees directly from the `Fulltime` table, including their ID (`ma_nhan_vien`), name (`ho_va_ten`), total workdays, "tiền lĩnh" (from `Fulltime.tien_linh`), and calculates "tiền lĩnh / tổng công". It supports pagination.
 It assumes the `Fulltime` table has columns `ma_nhan_vien`, `ho_va_ten`, `tien_linh` (text format, possibly with commas), and all necessary workday columns.
 
 **SQL Code:**
@@ -941,6 +941,7 @@ RETURNS TABLE(
     ho_ten TEXT,
     tong_cong DOUBLE PRECISION,
     tien_linh DOUBLE PRECISION,
+    tien_linh_per_cong DOUBLE PRECISION, -- New column
     total_records BIGINT
 )
 LANGUAGE plpgsql
@@ -987,7 +988,7 @@ BEGIN
     grouped_by_employee AS (
         SELECT
             fd.ma_nhan_vien,
-            MIN(fd.ho_va_ten) AS ho_va_ten_selected, -- Use MIN for a deterministic single name
+            MIN(fd.ho_va_ten) AS ho_va_ten_selected, 
             SUM(fd.individual_tong_cong) AS aggregated_tong_cong,
             SUM(fd.individual_tien_linh) AS aggregated_tien_linh
         FROM filtered_data fd
@@ -1001,6 +1002,10 @@ BEGIN
         CAST(cd.ho_va_ten_selected AS TEXT) AS ho_ten,
         CAST(cd.aggregated_tong_cong AS DOUBLE PRECISION) AS tong_cong,
         CAST(cd.aggregated_tien_linh AS DOUBLE PRECISION) AS tien_linh,
+        CASE
+            WHEN COALESCE(cd.aggregated_tong_cong, 0) = 0 THEN NULL -- Avoid division by zero
+            ELSE CAST(cd.aggregated_tien_linh / cd.aggregated_tong_cong AS DOUBLE PRECISION)
+        END AS tien_linh_per_cong,
         CAST(cd.total_records_count AS BIGINT) AS total_records
     FROM counted_data cd
     ORDER BY cd.ma_nhan_vien
@@ -1024,4 +1029,5 @@ Additionally, for the `get_monthly_salary_trend_fulltime`, `get_monthly_salary_t
 
 
     
+
 
