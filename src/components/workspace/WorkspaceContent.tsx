@@ -34,9 +34,9 @@ import RevenuePerFTEmployeeCard from '@/components/dashboard/RevenuePerFTEmploye
 import EmployeeCountCard from '@/components/dashboard/EmployeeCountCard';
 import MonthlyEmployeeTrendChart from '@/components/charts/MonthlyEmployeeTrendChart';
 import MonthlyAvgSalaryRevenuePerEmployeeChart from '@/components/charts/MonthlyAvgSalaryRevenuePerEmployeeChart';
-import AverageSalaryPerWorkdayCard from '@/components/dashboard/AverageSalaryPerWorkdayCard'; 
-import RevenuePerWorkdayCard from '@/components/dashboard/RevenuePerWorkdayCard'; 
-import LocationWorkloadEfficiencyScatterChart from '@/components/charts/LocationWorkloadEfficiencyScatterChart'; 
+import AverageSalaryPerWorkdayCard from '@/components/dashboard/AverageSalaryPerWorkdayCard';
+import RevenuePerWorkdayCard from '@/components/dashboard/RevenuePerWorkdayCard';
+import LocationWorkloadEfficiencyScatterChart from '@/components/charts/LocationWorkloadEfficiencyScatterChart';
 import LocationSalaryPerWorkdayVsTotalWorkdaysScatterChart from '@/components/charts/LocationSalaryPerWorkdayVsTotalWorkdaysScatterChart';
 
 
@@ -69,7 +69,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type WorkspaceView = 'dbManagement' | 'dashboard' | 'aiTools';
-type DashboardTab = 'payrollOverview' | 'comparison' | 'kpiComparison' | 'salaryAnalysisTab' | 'salaryWorkloadAnalysis' | 'detailedSalary';
+type DashboardTab = 'payrollOverview' | 'comparison' | 'kpiComparison' | 'salaryAnalysisTab' | 'salaryWorkloadAnalysis'; // Removed 'detailedSalary'
 
 interface NavItem {
   id: WorkspaceView;
@@ -972,9 +972,6 @@ export default function WorkspaceContent() {
                        <TabsTrigger value="salaryWorkloadAnalysis" className="text-xs px-2.5 py-1.5 flex items-center gap-1">
                         <Briefcase className="h-3.5 w-3.5"/> Thống kê lương/công
                       </TabsTrigger>
-                      <TabsTrigger value="detailedSalary" className="text-xs px-2.5 py-1.5 flex items-center gap-1">
-                        <FileText className="h-3.5 w-3.5"/> Lương Chi Tiết
-                      </TabsTrigger>
                     </TabsList>
                   </div>
                   <TabsContent value="payrollOverview" className="flex-grow overflow-y-auto space-y-3 mt-2">
@@ -1004,10 +1001,10 @@ export default function WorkspaceContent() {
                         <ComparisonRevenueCard selectedMonths={selectedMonths} selectedDepartments={selectedDepartmentsFromLoaiFilter} />
                         <ComparisonSalaryRevenueRatioCard selectedMonths={selectedMonths} selectedDepartmentsForDiadiem={selectedDepartmentsFromLoaiFilter} selectedNganhDoc={selectedNganhDocForFilter} selectedDonVi2={selectedDonVi2ForFilter} />
                     </div>
-                    <NganhDocComparisonTable 
-                        selectedMonths={selectedMonths} 
-                        selectedNganhDoc={selectedNganhDocForFilter} 
-                        selectedDonVi2={selectedDonVi2ForFilter} 
+                    <NganhDocComparisonTable
+                        selectedMonths={selectedMonths}
+                        selectedNganhDoc={selectedNganhDocForFilter}
+                        selectedDonVi2={selectedDonVi2ForFilter}
                         orgHierarchyData={orgHierarchyData}
                         flatOrgUnits={flatOrgUnits}
                     />
@@ -1031,11 +1028,11 @@ export default function WorkspaceContent() {
                   </TabsContent>
                   <TabsContent value="salaryWorkloadAnalysis" className="flex-grow overflow-y-auto space-y-3 mt-2">
                      <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-5">
-                        <EmployeeCountCard 
-                            selectedMonths={selectedMonths} 
-                            selectedYear={selectedYear} 
-                            selectedDepartmentsForDiadiem={selectedDepartmentsFromLoaiFilter} 
-                            selectedNganhDoc={selectedNganhDocForFilter} 
+                        <EmployeeCountCard
+                            selectedMonths={selectedMonths}
+                            selectedYear={selectedYear}
+                            selectedDepartmentsForDiadiem={selectedDepartmentsFromLoaiFilter}
+                            selectedNganhDoc={selectedNganhDocForFilter}
                         />
                         <AverageFTSalaryPerEmployeeCard
                             selectedMonths={selectedMonths}
@@ -1063,11 +1060,11 @@ export default function WorkspaceContent() {
                         />
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-                         <MonthlyEmployeeTrendChart 
-                            selectedYear={selectedYear} 
-                            selectedMonths={selectedMonths} 
-                            selectedDepartmentsForDiadiem={selectedDepartmentsFromLoaiFilter} 
-                            selectedNganhDoc={selectedNganhDocForFilter} 
+                         <MonthlyEmployeeTrendChart
+                            selectedYear={selectedYear}
+                            selectedMonths={selectedMonths}
+                            selectedDepartmentsForDiadiem={selectedDepartmentsFromLoaiFilter}
+                            selectedNganhDoc={selectedNganhDocForFilter}
                         />
                         <MonthlyAvgSalaryRevenuePerEmployeeChart
                             selectedYear={selectedYear}
@@ -1089,14 +1086,6 @@ export default function WorkspaceContent() {
                              selectedDepartmentsForDiadiem={selectedDepartmentsFromLoaiFilter}
                              selectedNganhDoc={selectedNganhDocForFilter}
                         />
-                    </div>
-                  </TabsContent>
-                  <TabsContent value="detailedSalary" className="flex-grow overflow-y-auto space-y-3 mt-2">
-                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-6">
-                      <FileText className="h-16 w-16 mb-4 opacity-50" />
-                      <h3 className="text-xl font-semibold mb-2">Lương Chi Tiết</h3>
-                      <p className="text-sm text-center">Chức năng này đang được phát triển và sẽ sớm có mặt.</p>
-                      <p className="text-sm text-center mt-1">Tại đây bạn sẽ có thể xem chi tiết lương theo từng nhân viên, phòng ban, v.v.</p>
                     </div>
                   </TabsContent>
                 </Tabs>
