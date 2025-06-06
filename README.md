@@ -858,7 +858,7 @@ BEGIN
                 COALESCE(f.nghi_tuan4, 0) +
                 COALESCE(f.le_tet5, 0) +
                 COALESCE(f.nghi_nl, 0)
-            ) AS total_ft_workdays
+            )::DOUBLE PRECISION AS total_ft_workdays -- Explicitly cast sum to DOUBLE PRECISION here
         FROM "Fulltime" f
         WHERE (p_filter_year IS NULL OR f.nam::INTEGER = p_filter_year)
           AND (
@@ -909,9 +909,9 @@ BEGIN
     )
     SELECT
         al.dia_diem AS location_name,
-        COALESCE(fm.total_ft_salary / NULLIF(fm.total_ft_workdays, 0), 0)::DOUBLE PRECISION AS ft_salary_per_ft_workday,
-        COALESCE(rm.total_revenue / NULLIF(fm.total_ft_workdays, 0), 0)::DOUBLE PRECISION AS revenue_per_ft_workday,
-        COALESCE(fm.total_ft_workdays, 0)::DOUBLE PRECISION AS total_ft_workdays
+        COALESCE(fm.total_ft_salary / NULLIF(fm.total_ft_workdays, 0), 0) AS ft_salary_per_ft_workday, -- No need to cast here if types are already double precision
+        COALESCE(rm.total_revenue / NULLIF(fm.total_ft_workdays, 0), 0) AS revenue_per_ft_workday,   -- No need to cast here
+        COALESCE(fm.total_ft_workdays, 0) AS total_ft_workdays -- This is already double precision from CTE
     FROM all_locations al
     LEFT JOIN ft_metrics fm ON al.dia_diem = fm.dia_diem
     LEFT JOIN rev_metrics rm ON al.dia_diem = rm.dia_diem
@@ -927,4 +927,3 @@ Additionally, for the `get_monthly_salary_trend_fulltime`, `get_monthly_salary_t
     
 
     
-
