@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, ChevronDown, FilterIcon, GanttChartSquare, MapPin, Settings2, Circle, Percent, Target, FolderKanban, BarChart3, Filter as FilterIconLucide, Briefcase, ListChecks, UserCheck, Users, LineChart, Banknote, ScatterChart as ScatterChartIconLucide, CalendarDays } from "lucide-react"; // Added CalendarDays
+import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, ChevronDown, FilterIcon, GanttChartSquare, MapPin, Settings2, Circle, Percent, Target, FolderKanban, BarChart3, Filter as FilterIconLucide, Briefcase, ListChecks, UserCheck, Users, LineChart, Banknote, ScatterChart as ScatterChartIconLucide, CalendarDays, UsersRound } from "lucide-react"; // Added UsersRound
 import type { PayrollEntry, FlatOrgUnit, OrgNode } from '@/types';
 import { supabase } from '@/lib/supabaseClient';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -69,7 +69,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type WorkspaceView = 'dbManagement' | 'dashboard' | 'aiTools';
-type DashboardTab = 'payrollOverview' | 'comparison' | 'kpiComparison' | 'salaryAnalysisTab' | 'salaryWorkloadAnalysis'; // Removed 'detailedSalary'
+type DashboardTab = 'payrollOverview' | 'comparison' | 'kpiComparison' | 'salaryAnalysisTab' | 'salaryWorkloadAnalysis' | 'detailedSalaryAnalysis';
 
 interface NavItem {
   id: WorkspaceView;
@@ -972,6 +972,9 @@ export default function WorkspaceContent() {
                        <TabsTrigger value="salaryWorkloadAnalysis" className="text-xs px-2.5 py-1.5 flex items-center gap-1">
                         <Briefcase className="h-3.5 w-3.5"/> Thống kê lương/công
                       </TabsTrigger>
+                      <TabsTrigger value="detailedSalaryAnalysis" className="text-xs px-2.5 py-1.5 flex items-center gap-1">
+                        <UsersRound className="h-3.5 w-3.5"/> Lương Chi Tiết
+                      </TabsTrigger>
                     </TabsList>
                   </div>
                   <TabsContent value="payrollOverview" className="flex-grow overflow-y-auto space-y-3 mt-2">
@@ -1088,6 +1091,103 @@ export default function WorkspaceContent() {
                         />
                     </div>
                   </TabsContent>
+                  <TabsContent value="detailedSalaryAnalysis" className="flex-grow overflow-y-auto space-y-3 mt-2">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-md font-semibold flex items-center gap-1.5">
+                          <Users className="h-4 w-4 text-primary" />
+                          Thống Kê Sơ Bộ Lương Chi Tiết (Prototype)
+                        </CardTitle>
+                        <CardDescription className="text-xs">
+                          Các chỉ số tổng hợp từ dữ liệu lương chi tiết của nhân viên.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <Card className="bg-muted/50">
+                            <CardHeader className="pb-1 pt-2 px-3">
+                              <CardTitle className="text-xs font-medium text-muted-foreground">Trung Bình Tiền Lĩnh/NV</CardTitle>
+                            </CardHeader>
+                            <CardContent className="pb-2 px-3">
+                              <p className="text-lg font-bold text-primary">Đang tính...</p>
+                            </CardContent>
+                          </Card>
+                          <Card className="bg-muted/50">
+                            <CardHeader className="pb-1 pt-2 px-3">
+                              <CardTitle className="text-xs font-medium text-muted-foreground">Trung Bình Tổng Công/NV</CardTitle>
+                            </CardHeader>
+                            <CardContent className="pb-2 px-3">
+                              <p className="text-lg font-bold text-primary">Đang tính...</p>
+                            </CardContent>
+                          </Card>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-md font-semibold flex items-center gap-1.5">
+                          <LineChart className="h-4 w-4 text-primary" />
+                          Biểu Đồ Phân Bố (Prototype)
+                        </CardTitle>
+                        <CardDescription className="text-xs">
+                          Ví dụ: Phân bố tiền lĩnh hoặc Tiền lĩnh vs. Tổng công.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="h-[200px] flex items-center justify-center border rounded-md bg-muted/30">
+                        <p className="text-sm text-muted-foreground">Nội dung biểu đồ sẽ ở đây</p>
+                      </CardContent>
+                    </Card>
+                    
+                    <Card className="flex-grow flex flex-col">
+                      <CardHeader>
+                        <CardTitle className="text-md font-semibold flex items-center gap-1.5">
+                          <Table className="h-4 w-4 text-primary inline-block" /> {}
+                          Bảng Lương Chi Tiết Nhân Viên (Prototype)
+                        </CardTitle>
+                        <CardDescription className="text-xs">
+                          Dữ liệu lương, tổng công của từng nhân viên. (Cần phân trang và RPC riêng)
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="flex-grow overflow-auto p-0">
+                        <div className="border rounded-md">
+                          <Table>
+                            <TableHeader className="sticky top-0 bg-card z-10">
+                              <TableRow>
+                                <TableHead className="text-xs py-1.5 px-2">Mã NV</TableHead>
+                                <TableHead className="text-xs py-1.5 px-2">Tên NV</TableHead>
+                                <TableHead className="text-xs py-1.5 px-2 text-right">Tổng Công</TableHead>
+                                <TableHead className="text-xs py-1.5 px-2 text-right">Tiền Lĩnh (Fulltime)</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              <TableRow>
+                                <TableCell className="text-xs py-1.5 px-2">NV001</TableCell>
+                                <TableCell className="text-xs py-1.5 px-2">Nguyễn Văn A</TableCell>
+                                <TableCell className="text-xs py-1.5 px-2 text-right">22</TableCell>
+                                <TableCell className="text-xs py-1.5 px-2 text-right">15,000,000</TableCell>
+                              </TableRow>
+                              <TableRow>
+                                <TableCell className="text-xs py-1.5 px-2">NV002</TableCell>
+                                <TableCell className="text-xs py-1.5 px-2">Trần Thị B</TableCell>
+                                <TableCell className="text-xs py-1.5 px-2 text-right">21.5</TableCell>
+                                <TableCell className="text-xs py-1.5 px-2 text-right">12,500,000</TableCell>
+                              </TableRow>
+                              <TableRow>
+                                <TableCell className="text-xs py-1.5 px-2">NV003</TableCell>
+                                <TableCell className="text-xs py-1.5 px-2">Lê Văn C</TableCell>
+                                <TableCell className="text-xs py-1.5 px-2 text-right">23</TableCell>
+                                <TableCell className="text-xs py-1.5 px-2 text-right">18,000,000</TableCell>
+                              </TableRow>
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </CardContent>
+                      <div className="p-2 text-center text-xs text-muted-foreground">
+                        (Đây là dữ liệu mẫu. Cần kết nối với dữ liệu thực tế và thêm phân trang.)
+                      </div>
+                    </Card>
+                  </TabsContent>
                 </Tabs>
               </CardContent>
             </Card>
@@ -1097,3 +1197,4 @@ export default function WorkspaceContent() {
     </SidebarProvider>
   );
 }
+
