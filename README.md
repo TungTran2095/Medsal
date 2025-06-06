@@ -922,8 +922,8 @@ $$;
 
 #### `get_detailed_employee_salary_data`
 
-This function fetches detailed salary information for full-time employees, including their ID, name (from `MS_CBNV`), total workdays, and "tiền lĩnh" (from `Fulltime.tien_linh`) for a specified period and set of filters. It supports pagination.
-It assumes a table `MS_CBNV` exists with columns `"Mã nhân viên"` and `"Họ và tên"`, and `Fulltime` has a column `tien_linh` (text format, possibly with commas).
+This function fetches detailed salary information for full-time employees directly from the `Fulltime` table, including their ID (`ma_nhan_vien`), name (`ho_va_ten`), total workdays, and "tiền lĩnh" (from `Fulltime.tien_linh`) for a specified period and set of filters. It supports pagination.
+It assumes the `Fulltime` table has columns `ma_nhan_vien`, `ho_va_ten`, `tien_linh` (text format, possibly with commas), and all necessary workday columns.
 
 **SQL Code:**
 ```sql
@@ -947,9 +947,10 @@ LANGUAGE plpgsql
 AS $$
 BEGIN
     RETURN QUERY
-    WITH filtered_fulltime AS (
+    WITH grouped_fulltime AS (
         SELECT
             f.ma_nhan_vien,
+            f.ho_va_ten, -- Assuming 'ho_va_ten' exists in Fulltime table
             SUM(
                 COALESCE(f.ngay_thuong_chinh_thuc, 0) +
                 COALESCE(f.ngay_thuong_thu_viec, 0) +
@@ -960,7 +961,7 @@ BEGIN
                 COALESCE(f.nghi_tuan4, 0) +
                 COALESCE(f.le_tet5, 0) +
                 COALESCE(f.nghi_nl, 0)
-            )::DOUBLE PRECISION AS aggregated_tong_cong,
+            ) AS aggregated_tong_cong,
             SUM(CAST(REPLACE(f.tien_linh::text, ',', '') AS DOUBLE PRECISION)) AS aggregated_tien_linh
         FROM "Fulltime" f
         WHERE (p_filter_year IS NULL OR f.nam::INTEGER = p_filter_year)
@@ -982,34 +983,19 @@ BEGIN
               array_length(p_filter_nganh_docs, 1) = 0 OR
               f.nganh_doc = ANY(p_filter_nganh_docs)
           )
-        GROUP BY f.ma_nhan_vien
-    ),
-    employee_data AS (
-        SELECT
-            m."Mã nhân viên" AS ma_nv_cbnv,
-            m."Họ và tên" AS ho_ten_cbnv
-        FROM "MS_CBNV" m
-    ),
-    joined_data AS (
-      SELECT
-          ed.ma_nv_cbnv,
-          ed.ho_ten_cbnv,
-          ff.aggregated_tong_cong,
-          ff.aggregated_tien_linh
-      FROM filtered_fulltime ff
-      JOIN employee_data ed ON ff.ma_nhan_vien = ed.ma_nv_cbnv
+        GROUP BY f.ma_nhan_vien, f.ho_va_ten
     ),
     counted_data AS (
-      SELECT *, COUNT(*) OVER() AS total_records_count FROM joined_data
+      SELECT *, COUNT(*) OVER() AS total_records_count FROM grouped_fulltime
     )
     SELECT
-        cd.ma_nv_cbnv AS ma_nv,                 -- ALIASED to ma_nv
-        cd.ho_ten_cbnv AS ho_ten,               -- ALIASED to ho_ten
-        cd.aggregated_tong_cong AS tong_cong,   -- ALIASED to tong_cong
-        cd.aggregated_tien_linh AS tien_linh,   -- ALIASED to tien_linh
-        cd.total_records_count AS total_records -- ALIASED to total_records
+        CAST(cd.ma_nhan_vien AS TEXT) AS ma_nv,
+        CAST(cd.ho_va_ten AS TEXT) AS ho_ten,
+        CAST(cd.aggregated_tong_cong AS DOUBLE PRECISION) AS tong_cong,
+        CAST(cd.aggregated_tien_linh AS DOUBLE PRECISION) AS tien_linh,
+        CAST(cd.total_records_count AS BIGINT) AS total_records
     FROM counted_data cd
-    ORDER BY cd.ma_nv_cbnv
+    ORDER BY cd.ma_nhan_vien
     LIMIT p_limit
     OFFSET p_offset;
 END;

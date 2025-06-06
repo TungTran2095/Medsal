@@ -59,11 +59,11 @@ export default function DetailedSalaryTable({
       if (rpcError) {
         let detailedErrorMessage = rpcError.message || `Không thể tải dữ liệu chi tiết lương qua RPC '${functionName}'.`;
         if (rpcError.code === '42883' || (rpcError.message && rpcError.message.toLowerCase().includes("does not exist") && rpcError.message.toLowerCase().includes(functionName))) {
-          detailedErrorMessage = `Hàm RPC '${functionName}' không tìm thấy hoặc có lỗi. Vui lòng kiểm tra định nghĩa hàm trong Supabase theo README.md.`;
-        } else if (rpcError.message && rpcError.message.toLowerCase().includes('relation "ms_cbnv" does not exist')) {
-          detailedErrorMessage = `Bảng 'MS_CBNV' không tồn tại. Hàm RPC '${functionName}' cần bảng này để lấy thông tin nhân viên.`;
+          detailedErrorMessage = `Hàm RPC '${functionName}' không tìm thấy hoặc có lỗi. Vui lòng kiểm tra định nghĩa hàm trong Supabase theo README.md. Đảm bảo bảng Fulltime có các cột 'ma_nhan_vien' và 'ho_va_ten'.`;
         } else if (rpcError.message && rpcError.message.toLowerCase().includes('column "tien_linh" does not exist')) {
           detailedErrorMessage = `Cột 'tien_linh' không tồn tại trong bảng 'Fulltime'. Hàm RPC '${functionName}' cần cột này.`;
+        } else if (rpcError.message && (rpcError.message.toLowerCase().includes('column "ma_nhan_vien" does not exist') || rpcError.message.toLowerCase().includes('column "ho_va_ten" does not exist'))) {
+          detailedErrorMessage = `Một trong các cột 'ma_nhan_vien' hoặc 'ho_va_ten' không tồn tại trong bảng 'Fulltime'. Hàm RPC '${functionName}' cần các cột này.`;
         }
         throw new Error(detailedErrorMessage);
       }
@@ -162,10 +162,10 @@ export default function DetailedSalaryTable({
           <div className="flex flex-col items-center justify-center py-4 text-destructive bg-destructive/10 p-3 rounded-md flex-grow">
             <AlertTriangle className="h-6 w-6 mb-1" />
             <p className="font-semibold text-sm">Lỗi Tải Dữ Liệu</p>
-            <p className="text-xs text-center">{error}</p>
-            {error.includes("Hàm RPC") && (
+            <p className="text-xs text-center whitespace-pre-line">{error}</p>
+            {(error.includes("Hàm RPC") || error.includes("Cột")) && (
                 <p className="text-xs mt-1 text-center">
-                    Vui lòng kiểm tra định nghĩa hàm RPC `get_detailed_employee_salary_data` trong Supabase (README.md) và đảm bảo các bảng `Fulltime`, `MS_CBNV` tồn tại với các cột cần thiết (`tien_linh` trong `Fulltime`).
+                    Vui lòng kiểm tra định nghĩa hàm RPC `get_detailed_employee_salary_data` trong Supabase (README.md) và đảm bảo bảng `Fulltime` tồn tại với các cột `ma_nhan_vien`, `ho_va_ten`, `tien_linh` và các cột công cần thiết.
                 </p>
             )}
           </div>
