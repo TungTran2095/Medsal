@@ -947,11 +947,11 @@ LANGUAGE plpgsql
 AS $$
 BEGIN
     RETURN QUERY
-    WITH grouped_fulltime AS (
+    WITH filtered_data AS (
         SELECT
             f.ma_nhan_vien,
-            f.ho_va_ten, -- Assuming 'ho_va_ten' exists in Fulltime table
-            SUM(
+            f.ho_va_ten,
+            (
                 COALESCE(f.ngay_thuong_chinh_thuc, 0) +
                 COALESCE(f.ngay_thuong_thu_viec, 0) +
                 COALESCE(f.nghi_tuan, 0) +
@@ -961,8 +961,8 @@ BEGIN
                 COALESCE(f.nghi_tuan4, 0) +
                 COALESCE(f.le_tet5, 0) +
                 COALESCE(f.nghi_nl, 0)
-            ) AS aggregated_tong_cong,
-            SUM(CAST(REPLACE(f.tien_linh::text, ',', '') AS DOUBLE PRECISION)) AS aggregated_tien_linh
+            ) AS individual_tong_cong,
+            CAST(REPLACE(f.tien_linh::text, ',', '') AS DOUBLE PRECISION) AS individual_tien_linh
         FROM "Fulltime" f
         WHERE (p_filter_year IS NULL OR f.nam::INTEGER = p_filter_year)
           AND (
@@ -983,14 +983,22 @@ BEGIN
               array_length(p_filter_nganh_docs, 1) = 0 OR
               f.nganh_doc = ANY(p_filter_nganh_docs)
           )
-        GROUP BY f.ma_nhan_vien, f.ho_va_ten
+    ),
+    grouped_by_employee AS (
+        SELECT
+            fd.ma_nhan_vien,
+            MIN(fd.ho_va_ten) AS ho_va_ten_selected, -- Use MIN for a deterministic single name
+            SUM(fd.individual_tong_cong) AS aggregated_tong_cong,
+            SUM(fd.individual_tien_linh) AS aggregated_tien_linh
+        FROM filtered_data fd
+        GROUP BY fd.ma_nhan_vien
     ),
     counted_data AS (
-      SELECT *, COUNT(*) OVER() AS total_records_count FROM grouped_fulltime
+      SELECT *, COUNT(*) OVER() AS total_records_count FROM grouped_by_employee
     )
     SELECT
         CAST(cd.ma_nhan_vien AS TEXT) AS ma_nv,
-        CAST(cd.ho_va_ten AS TEXT) AS ho_ten,
+        CAST(cd.ho_va_ten_selected AS TEXT) AS ho_ten,
         CAST(cd.aggregated_tong_cong AS DOUBLE PRECISION) AS tong_cong,
         CAST(cd.aggregated_tien_linh AS DOUBLE PRECISION) AS tien_linh,
         CAST(cd.total_records_count AS BIGINT) AS total_records
@@ -1016,3 +1024,4 @@ Additionally, for the `get_monthly_salary_trend_fulltime`, `get_monthly_salary_t
 
 
     
+
