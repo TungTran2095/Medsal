@@ -1142,7 +1142,7 @@ export default function WorkspaceContent() {
                     <Card className="flex-grow flex flex-col">
                       <CardHeader>
                         <CardTitle className="text-md font-semibold flex items-center gap-1.5">
-                          <Table className="h-4 w-4 text-primary inline-block" /> {}
+                          <ListChecks className="h-4 w-4 text-primary inline-block" />
                           Bảng Lương Chi Tiết Nhân Viên (Prototype)
                         </CardTitle>
                         <CardDescription className="text-xs">
