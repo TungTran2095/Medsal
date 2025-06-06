@@ -1,12 +1,13 @@
 
 import type { Metadata } from 'next';
-import { Montserrat } from 'next/font/google';
+import { Inter } from 'next/font/google'; // Changed from Montserrat
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { ThemeProvider } from '@/contexts/ThemeContext';
 
-const montserrat = Montserrat({
-  variable: '--font-montserrat',
+// Changed font to Inter
+const inter = Inter({
+  variable: '--font-inter', // Changed variable name
   subsets: ['latin'],
 });
 
@@ -22,7 +23,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>{/* suppressHydrationWarning might be needed if theme causes initial mismatch */}
-      <body className={`${montserrat.variable} font-sans antialiased flex flex-col min-h-screen`}>
+      <body className={`${inter.variable} font-sans antialiased flex flex-col min-h-screen`}> {/* Used Inter variable */}
         <ThemeProvider>
           <main className="flex-grow flex flex-col">
           {children}

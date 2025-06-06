@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -10,7 +11,7 @@ export default {
   theme: {
   	extend: {
       fontFamily: {
-        sans: ["var(--font-montserrat)", "system-ui", "sans-serif"],
+        sans: ["var(--font-inter)", "system-ui", "sans-serif"], // Changed from montserrat
       },
   		colors: {
   			background: 'hsl(var(--background))',
@@ -65,9 +66,9 @@ export default {
   			}
   		},
   		borderRadius: {
-  			lg: 'var(--radius)', /* 0.75rem from globals.css */
-  			md: 'calc(var(--radius) - 0.25rem)', /* Effectively 0.5rem */
-  			sm: 'calc(var(--radius) - 0.5rem)' /* Effectively 0.25rem */
+  			lg: 'var(--radius)', /* Using new 0.625rem from globals.css */
+  			md: 'calc(var(--radius) - 0.125rem)', /* Adjusted for new base, e.g., 0.5rem */
+  			sm: 'calc(var(--radius) - 0.25rem)' /* Adjusted for new base, e.g., 0.375rem */
   		},
   		keyframes: {
   			'accordion-down': {
@@ -102,11 +103,11 @@ export default {
   			'accordion-up': 'accordion-up 0.2s ease-out',
         'bounce': 'bounce 1s infinite'
   		},
-      boxShadow: {
-        'soft-sm': '0 2px 4px 0px hsl(var(--foreground) / 0.05)',
-        'soft-md': '0 4px 8px 0px hsl(var(--foreground) / 0.07)',
-        'soft-lg': '0 8px 16px 0px hsl(var(--foreground) / 0.07)',
-        'soft-xl': '0 12px 24px 0px hsl(var(--foreground) / 0.07)',
+      boxShadow: { // Adjusted shadows for a subtler iOS feel
+        'soft-sm': '0 1px 2px 0px hsl(var(--foreground) / 0.05)',
+        'soft-md': '0 3px 6px 0px hsl(var(--foreground) / 0.06)', // Subtler than before
+        'soft-lg': '0 6px 12px 0px hsl(var(--foreground) / 0.06)', // Subtler than before
+        'soft-xl': '0 10px 20px 0px hsl(var(--foreground) / 0.06)', // Subtler than before
       }
   	}
   },
