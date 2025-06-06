@@ -188,7 +188,7 @@ AS $$
         filter_locations IS NULL OR
         array_length(filter_locations, 1) IS NULL OR
         array_length(filter_locations, 1) = 0 OR
-        dr."Tên đơn vị" = ANY(filter_locations)
+        EXISTS (SELECT 1 FROM unnest(filter_locations) AS flocs WHERE LOWER(dr."Tên đơn vị") = LOWER(flocs)) -- Case-insensitive comparison
     );
 $$;
 ```
@@ -389,7 +389,7 @@ BEGIN
             p_filter_locations IS NULL OR
             array_length(p_filter_locations, 1) IS NULL OR
             array_length(p_filter_locations, 1) = 0 OR
-            dr."Tên đơn vị" = ANY(p_filter_locations)
+             EXISTS (SELECT 1 FROM unnest(p_filter_locations) AS flocs WHERE LOWER(dr."Tên đơn vị") = LOWER(flocs)) -- Case-insensitive comparison
         )
     GROUP BY
         dr."Năm"::INTEGER,
@@ -605,7 +605,7 @@ BEGIN
               p_filter_locations IS NULL OR
               array_length(p_filter_locations, 1) IS NULL OR
               array_length(p_filter_locations, 1) = 0 OR
-              dr."Tên đơn vị" = ANY(p_filter_locations)
+             EXISTS (SELECT 1 FROM unnest(p_filter_locations) AS flocs WHERE LOWER(dr."Tên đơn vị") = LOWER(flocs)) -- Case-insensitive comparison
           )
         GROUP BY COALESCE(dr."Tên đơn vị", 'Không xác định')
     ),
@@ -676,7 +676,7 @@ BEGIN
               p_filter_locations IS NULL OR
               array_length(p_filter_locations, 1) IS NULL OR
               array_length(p_filter_locations, 1) = 0 OR
-              f.dia_diem = ANY(p_filter_locations)
+               EXISTS (SELECT 1 FROM unnest(p_filter_locations) AS flocs WHERE LOWER(f.dia_diem) = LOWER(flocs)) -- Case-insensitive
           )
         GROUP BY COALESCE(f.dia_diem, 'Không xác định')
     ),
@@ -696,7 +696,7 @@ BEGIN
               p_filter_locations IS NULL OR
               array_length(p_filter_locations, 1) IS NULL OR
               array_length(p_filter_locations, 1) = 0 OR
-              pt."Don vi" = ANY(p_filter_locations)
+               EXISTS (SELECT 1 FROM unnest(p_filter_locations) AS flocs WHERE LOWER(pt."Don vi") = LOWER(flocs)) -- Case-insensitive
           )
         GROUP BY COALESCE(pt."Don vi", 'Không xác định')
     ),
@@ -717,7 +717,7 @@ BEGIN
               p_filter_locations IS NULL OR
               array_length(p_filter_locations, 1) IS NULL OR
               array_length(p_filter_locations, 1) = 0 OR
-              dr."Tên đơn vị" = ANY(p_filter_locations)
+              EXISTS (SELECT 1 FROM unnest(p_filter_locations) AS flocs WHERE LOWER(dr."Tên đơn vị") = LOWER(flocs)) -- Case-insensitive
           )
         GROUP BY COALESCE(dr."Tên đơn vị", 'Không xác định')
     ),
@@ -838,7 +838,7 @@ RETURNS TABLE(
     location_name TEXT,
     ft_salary_per_ft_workday DOUBLE PRECISION,
     revenue_per_ft_workday DOUBLE PRECISION,
-    total_ft_workdays DOUBLE PRECISION
+    total_ft_workdays DOUBLE PRECISION -- Expected type for column 4
 )
 LANGUAGE plpgsql
 AS $$
@@ -858,7 +858,7 @@ BEGIN
                 COALESCE(f.nghi_tuan4, 0) +
                 COALESCE(f.le_tet5, 0) +
                 COALESCE(f.nghi_nl, 0)
-            )::DOUBLE PRECISION AS total_ft_workdays -- Explicitly cast sum to DOUBLE PRECISION here
+            )::DOUBLE PRECISION AS total_ft_workdays -- Cast sum to DOUBLE PRECISION
         FROM "Fulltime" f
         WHERE (p_filter_year IS NULL OR f.nam::INTEGER = p_filter_year)
           AND (
@@ -883,7 +883,7 @@ BEGIN
     ),
     rev_metrics AS (
         SELECT
-            dr."Tên đơn vị" AS dia_diem, -- Assuming "Tên đơn vị" in Doanh_thu maps to "dia_diem" in Fulltime
+            dr."Tên đơn vị" AS dia_diem, 
             SUM(CAST(REPLACE(dr."Kỳ báo cáo"::text, ',', '') AS DOUBLE PRECISION)) AS total_revenue
         FROM "Doanh_thu" dr
         WHERE (p_filter_year IS NULL OR dr."Năm"::INTEGER = p_filter_year)
@@ -894,11 +894,11 @@ BEGIN
               regexp_replace(dr."Tháng", '\D', '', 'g')::INTEGER = ANY(p_filter_months)
           )
           AND dr."Tên đơn vị" NOT IN ('Medcom', 'Medon', 'Medicons', 'Meddom', 'Med Group')
-          AND ( 
+          AND (
               p_filter_locations IS NULL OR
               array_length(p_filter_locations, 1) IS NULL OR
               array_length(p_filter_locations, 1) = 0 OR
-              dr."Tên đơn vị" = ANY(p_filter_locations)
+              EXISTS (SELECT 1 FROM unnest(p_filter_locations) AS flocs WHERE LOWER(dr."Tên đơn vị") = LOWER(flocs)) -- Case-insensitive
           )
         GROUP BY dr."Tên đơn vị"
     ),
@@ -909,13 +909,13 @@ BEGIN
     )
     SELECT
         al.dia_diem AS location_name,
-        COALESCE(fm.total_ft_salary / NULLIF(fm.total_ft_workdays, 0), 0) AS ft_salary_per_ft_workday, -- No need to cast here if types are already double precision
-        COALESCE(rm.total_revenue / NULLIF(fm.total_ft_workdays, 0), 0) AS revenue_per_ft_workday,   -- No need to cast here
-        COALESCE(fm.total_ft_workdays, 0) AS total_ft_workdays -- This is already double precision from CTE
+        COALESCE(fm.total_ft_salary / NULLIF(fm.total_ft_workdays, 0), 0.0::DOUBLE PRECISION) AS ft_salary_per_ft_workday,
+        COALESCE(rm.total_revenue / NULLIF(fm.total_ft_workdays, 0), 0.0::DOUBLE PRECISION) AS revenue_per_ft_workday,
+        COALESCE(fm.total_ft_workdays, 0.0::DOUBLE PRECISION) AS total_ft_workdays -- Ensures this is DOUBLE PRECISION
     FROM all_locations al
     LEFT JOIN ft_metrics fm ON al.dia_diem = fm.dia_diem
     LEFT JOIN rev_metrics rm ON al.dia_diem = rm.dia_diem
-    WHERE COALESCE(fm.total_ft_workdays, 0) > 0; -- Only include locations with workdays
+    WHERE COALESCE(fm.total_ft_workdays, 0) > 0; 
 END;
 $$;
 ```
@@ -927,3 +927,4 @@ Additionally, for the `get_monthly_salary_trend_fulltime`, `get_monthly_salary_t
     
 
     
+
