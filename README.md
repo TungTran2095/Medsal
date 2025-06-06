@@ -1003,11 +1003,11 @@ BEGIN
       SELECT *, COUNT(*) OVER() AS total_records_count FROM joined_data
     )
     SELECT
-        cd.ma_nv_cbnv,
-        cd.ho_ten_cbnv,
-        cd.aggregated_tong_cong,
-        cd.aggregated_tien_linh,
-        cd.total_records_count
+        cd.ma_nv_cbnv AS ma_nv,
+        cd.ho_ten_cbnv AS ho_ten,
+        cd.aggregated_tong_cong AS tong_cong,
+        cd.aggregated_tien_linh AS tien_linh,
+        cd.total_records_count AS total_records
     FROM counted_data cd
     ORDER BY cd.ma_nv_cbnv -- Or any other preferred order
     LIMIT p_limit
@@ -1024,5 +1024,6 @@ Additionally, for the `get_monthly_salary_trend_fulltime`, `get_monthly_salary_t
     
 
     
+
 
 
