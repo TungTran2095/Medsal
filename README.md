@@ -909,9 +909,9 @@ BEGIN
     )
     SELECT
         al.dia_diem AS location_name,
-        COALESCE(fm.total_ft_salary / NULLIF(fm.total_ft_workdays, 0), 0) AS ft_salary_per_ft_workday,
-        COALESCE(rm.total_revenue / NULLIF(fm.total_ft_workdays, 0), 0) AS revenue_per_ft_workday,
-        COALESCE(fm.total_ft_workdays, 0) AS total_ft_workdays
+        COALESCE(fm.total_ft_salary / NULLIF(fm.total_ft_workdays, 0), 0)::DOUBLE PRECISION AS ft_salary_per_ft_workday,
+        COALESCE(rm.total_revenue / NULLIF(fm.total_ft_workdays, 0), 0)::DOUBLE PRECISION AS revenue_per_ft_workday,
+        COALESCE(fm.total_ft_workdays, 0)::DOUBLE PRECISION AS total_ft_workdays
     FROM all_locations al
     LEFT JOIN ft_metrics fm ON al.dia_diem = fm.dia_diem
     LEFT JOIN rev_metrics rm ON al.dia_diem = rm.dia_diem
@@ -928,4 +928,3 @@ Additionally, for the `get_monthly_salary_trend_fulltime`, `get_monthly_salary_t
 
     
 
-```
