@@ -82,11 +82,23 @@ export default function DetailedSalaryTable({
       }
 
     } catch (e: any) {
-      console.error(`Error fetching detailed salary data:`, JSON.stringify(e, null, 2));
-      setError(e.message);
+      console.error(`Error fetching detailed salary data (raw):`, e, "Stringified:", JSON.stringify(e, Object.getOwnPropertyNames(e), 2));
+      let errorMessage = 'Không thể tải dữ liệu chi tiết lương.';
+      if (e && typeof e === 'object') {
+          if (e.message) {
+              errorMessage = e.message;
+          } else if ((e as any).details) { 
+              errorMessage = `Lỗi chi tiết: ${(e as any).details}`;
+          } else if ((e as any).code) { 
+              errorMessage = `Lỗi RPC với mã: ${(e as any).code}`;
+          }
+      } else if (typeof e === 'string') {
+          errorMessage = e;
+      }
+      setError(errorMessage);
       toast({
         title: "Lỗi Tải Dữ Liệu Lương Chi Tiết",
-        description: e.message,
+        description: errorMessage,
         variant: "destructive",
       });
       setData([]);
