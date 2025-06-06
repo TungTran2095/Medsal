@@ -178,8 +178,29 @@ export default function LocationSalaryPerWorkdayVsTotalWorkdaysScatterChart({
       setChartData(processedData);
 
     } catch (err: any) {
-      setError(err.message || 'Không thể tải dữ liệu cho biểu đồ Lương/Công vs Tổng Công.');
-      console.error("Error fetching data for salary/workday vs total workdays scatter chart:", err);
+      let errorMessage = 'Không thể tải dữ liệu cho biểu đồ Lương/Công vs Tổng Công.';
+      if (err && typeof err === 'object') {
+          if (err.message) {
+              errorMessage = err.message;
+          } else if (err.details) { // Supabase specific error structure
+              errorMessage = `Lỗi chi tiết: ${err.details}`;
+          } else if (err.code) { // Supabase specific error structure
+              errorMessage = `Lỗi RPC với mã: ${err.code}`;
+          } else {
+              try {
+                  const stringifiedError = JSON.stringify(err);
+                  if (stringifiedError !== '{}') { // Avoid setting "{}" as error message
+                      errorMessage = `Lỗi không xác định: ${stringifiedError}`;
+                  }
+              } catch (e) {
+                  // Ignore stringification error, keep default message
+              }
+          }
+      } else if (typeof err === 'string') {
+          errorMessage = err;
+      }
+      setError(errorMessage);
+      console.error("Error fetching data for salary/workday vs total workdays scatter chart (raw):", err, "Stringified:", JSON.stringify(err, Object.getOwnPropertyNames(err), 2));
     } finally {
       setIsLoading(false);
     }
@@ -270,3 +291,4 @@ export default function LocationSalaryPerWorkdayVsTotalWorkdaysScatterChart({
     </Card>
   );
 }
+
