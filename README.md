@@ -21,7 +21,7 @@ To create these functions:
         *   Ensure your selection is exact.
         *   **Before clicking RUN, visually inspect the pasted code in the Supabase SQL Editor. If the editor has automatically added any comments (lines starting with `--`, like `-- source: dashboard...`) at the very end of the function block (especially after the `END;` line but before the final `$$;`), you MUST manually delete those comments from the editor before running the SQL. Otherwise, you will get an "unterminated dollar-quoted string" error.**
 5.  Click **Run** for each function.
-    *   **For `get_monthly_salary_trend_fulltime`, `get_monthly_salary_trend_parttime`, `get_monthly_revenue_trend`, `get_salary_revenue_ratio_components_by_location`, `get_location_comparison_metrics`, `get_nganhdoc_ft_salary_hanoi`, `get_donvi2_pt_salary`, `get_monthly_employee_trend_fulltime`, `get_monthly_ft_salary_revenue_per_employee_trend`, `get_total_workdays_fulltime`, or `get_ft_workload_efficiency_by_location`**: If you encounter an error like "cannot change return type of existing function" or "function with specified name and arguments already exists", you MUST first run `DROP FUNCTION function_name(parameters);` (e.g., `DROP FUNCTION get_monthly_salary_trend_fulltime(integer, text[], text[]);` or `DROP FUNCTION get_location_comparison_metrics(integer, integer[], text[]);` or `DROP FUNCTION get_nganhdoc_ft_salary_hanoi(INTEGER, INTEGER[]);` or `DROP FUNCTION get_monthly_employee_trend_fulltime(INTEGER, TEXT[], TEXT[]);` or `DROP FUNCTION get_monthly_ft_salary_revenue_per_employee_trend(INTEGER, TEXT[], TEXT[]);` or `DROP FUNCTION get_total_workdays_fulltime(INTEGER, INTEGER[], TEXT[], TEXT[]);` or `DROP FUNCTION get_ft_workload_efficiency_by_location(INTEGER, INTEGER[], TEXT[], TEXT[]);`) and then run the `CREATE OR REPLACE FUNCTION` script for it.
+    *   **For `get_monthly_salary_trend_fulltime`, `get_monthly_salary_trend_parttime`, `get_monthly_revenue_trend`, `get_salary_revenue_ratio_components_by_location`, `get_location_comparison_metrics`, `get_nganhdoc_ft_salary_hanoi`, `get_donvi2_pt_salary`, `get_monthly_employee_trend_fulltime`, `get_monthly_ft_salary_revenue_per_employee_trend`, `get_total_workdays_fulltime`, `get_ft_workload_efficiency_by_location`, or `get_detailed_employee_salary_data`**: If you encounter an error like "cannot change return type of existing function" or "function with specified name and arguments already exists", you MUST first run `DROP FUNCTION function_name(parameters);` (e.g., `DROP FUNCTION get_monthly_salary_trend_fulltime(integer, text[], text[]);` or `DROP FUNCTION get_location_comparison_metrics(integer, integer[], text[]);` or `DROP FUNCTION get_nganhdoc_ft_salary_hanoi(INTEGER, INTEGER[]);` or `DROP FUNCTION get_monthly_employee_trend_fulltime(INTEGER, TEXT[], TEXT[]);` or `DROP FUNCTION get_monthly_ft_salary_revenue_per_employee_trend(INTEGER, TEXT[], TEXT[]);` or `DROP FUNCTION get_total_workdays_fulltime(INTEGER, INTEGER[], TEXT[], TEXT[]);` or `DROP FUNCTION get_ft_workload_efficiency_by_location(INTEGER, INTEGER[], TEXT[], TEXT[]);` or `DROP FUNCTION get_detailed_employee_salary_data(INTEGER, INTEGER[], TEXT[], TEXT[], INTEGER, INTEGER);`) and then run the `CREATE OR REPLACE FUNCTION` script for it.
 
 #### `get_public_tables`
 
@@ -498,7 +498,7 @@ BEGIN
             SUM(CAST(REPLACE(dr."Kỳ báo cáo"::text, ',', '') AS DOUBLE PRECISION)) AS total_revenue
         FROM "Doanh_thu" dr
         WHERE (p_filter_year IS NULL OR dr."Năm"::INTEGER = p_filter_year)
-          AND (p_filter_locations IS NULL OR array_length(p_filter_locations, 1) IS NULL OR dr."Tên đơn vị" = ANY(p_filter_locations))
+          AND (p_filter_locations IS NULL OR array_length(p_filter_locations, 1) IS NULL OR EXISTS (SELECT 1 FROM unnest(p_filter_locations) AS flocs WHERE LOWER(dr."Tên đơn vị") = LOWER(flocs))) -- Use case-insensitive EXISTS for revenue location filter
           AND dr."Tên đơn vị" NOT IN ('Medcom', 'Medon', 'Medicons', 'Meddom', 'Med Group')
         GROUP BY dr."Năm"::INTEGER, dr."Tháng"
     )
@@ -920,6 +920,103 @@ END;
 $$;
 ```
 
+#### `get_detailed_employee_salary_data`
+
+This function fetches detailed salary information for full-time employees, including their ID, name (from `MS_CBNV`), total workdays, and "tiền lĩnh" (from `Fulltime.tien_linh`) for a specified period and set of filters. It supports pagination.
+It assumes a table `MS_CBNV` exists with columns `"Mã nhân viên"` and `"Họ và tên"`, and `Fulltime` has a column `tien_linh` (text format, possibly with commas).
+
+**SQL Code:**
+```sql
+DROP FUNCTION IF EXISTS get_detailed_employee_salary_data(INTEGER, INTEGER[], TEXT[], TEXT[], INTEGER, INTEGER);
+CREATE OR REPLACE FUNCTION get_detailed_employee_salary_data(
+    p_filter_year INTEGER DEFAULT NULL,
+    p_filter_months INTEGER[] DEFAULT NULL,
+    p_filter_locations TEXT[] DEFAULT NULL,
+    p_filter_nganh_docs TEXT[] DEFAULT NULL,
+    p_limit INTEGER DEFAULT 10,
+    p_offset INTEGER DEFAULT 0
+)
+RETURNS TABLE(
+    ma_nv TEXT,
+    ho_ten TEXT,
+    tong_cong DOUBLE PRECISION,
+    tien_linh DOUBLE PRECISION,
+    total_records BIGINT
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    WITH filtered_fulltime AS (
+        SELECT
+            f.ma_nhan_vien,
+            SUM(
+                COALESCE(f.ngay_thuong_chinh_thuc, 0) +
+                COALESCE(f.ngay_thuong_thu_viec, 0) +
+                COALESCE(f.nghi_tuan, 0) +
+                COALESCE(f.le_tet, 0) +
+                COALESCE(f.ngay_thuong_chinh_thuc2, 0) +
+                COALESCE(f.ngay_thuong_thu_viec3, 0) +
+                COALESCE(f.nghi_tuan4, 0) +
+                COALESCE(f.le_tet5, 0) +
+                COALESCE(f.nghi_nl, 0)
+            )::DOUBLE PRECISION AS aggregated_tong_cong,
+            SUM(CAST(REPLACE(f.tien_linh::text, ',', '') AS DOUBLE PRECISION)) AS aggregated_tien_linh
+        FROM "Fulltime" f
+        WHERE (p_filter_year IS NULL OR f.nam::INTEGER = p_filter_year)
+          AND (
+              p_filter_months IS NULL OR
+              array_length(p_filter_months, 1) IS NULL OR
+              array_length(p_filter_months, 1) = 0 OR
+              regexp_replace(f.thang, '\D', '', 'g')::INTEGER = ANY(p_filter_months)
+          )
+          AND (
+              p_filter_locations IS NULL OR
+              array_length(p_filter_locations, 1) IS NULL OR
+              array_length(p_filter_locations, 1) = 0 OR
+              f.dia_diem = ANY(p_filter_locations)
+          )
+          AND (
+              p_filter_nganh_docs IS NULL OR
+              array_length(p_filter_nganh_docs, 1) IS NULL OR
+              array_length(p_filter_nganh_docs, 1) = 0 OR
+              f.nganh_doc = ANY(p_filter_nganh_docs)
+          )
+        GROUP BY f.ma_nhan_vien
+    ),
+    employee_data AS (
+        SELECT
+            m."Mã nhân viên" AS ma_nv_cbnv,
+            m."Họ và tên" AS ho_ten_cbnv
+        FROM "MS_CBNV" m
+    ),
+    joined_data AS (
+      SELECT
+          ed.ma_nv_cbnv,
+          ed.ho_ten_cbnv,
+          ff.aggregated_tong_cong,
+          ff.aggregated_tien_linh
+      FROM filtered_fulltime ff
+      JOIN employee_data ed ON ff.ma_nhan_vien = ed.ma_nv_cbnv
+    ),
+    counted_data AS (
+      SELECT *, COUNT(*) OVER() AS total_records_count FROM joined_data
+    )
+    SELECT
+        cd.ma_nv_cbnv,
+        cd.ho_ten_cbnv,
+        cd.aggregated_tong_cong,
+        cd.aggregated_tien_linh,
+        cd.total_records_count
+    FROM counted_data cd
+    ORDER BY cd.ma_nv_cbnv -- Or any other preferred order
+    LIMIT p_limit
+    OFFSET p_offset;
+END;
+$$;
+```
+
+
 Once these functions are successfully created (or updated) in your Supabase SQL Editor, the application should be able to correctly filter and aggregate data. If you continue to encounter "unterminated dollar-quoted string" errors, please double-check for any invisible characters or ensure the entire function block is being processed correctly by the SQL editor, especially ensuring no comments are between `END;` and the final `$$;`.
 Additionally, for the `get_monthly_salary_trend_fulltime`, `get_monthly_salary_trend_parttime`, `get_monthly_revenue_trend`, `get_monthly_employee_trend_fulltime`, and `get_monthly_ft_salary_revenue_per_employee_trend` functions, ensure you have a `Time` table (capital T) with appropriate columns (`"Năm"`, `thangpro` (TEXT), `"Thang_x"` (TEXT)) as described in the function's comments.
     
@@ -927,4 +1024,5 @@ Additionally, for the `get_monthly_salary_trend_fulltime`, `get_monthly_salary_t
     
 
     
+
 
