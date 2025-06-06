@@ -115,7 +115,7 @@ export default function WorkspaceContent() {
   const [flatOrgUnits, setFlatOrgUnits] = useState<FlatOrgUnit[]>([]);
 
 
-  const [activeDashboardTab, setActiveDashboardTab] = useState<DashboardTab>('salaryWorkloadAnalysis');
+  const [activeDashboardTab, setActiveDashboardTab] = useState<DashboardTab>('payrollOverview');
 
   const [isMounted, setIsMounted] = useState(false);
 
