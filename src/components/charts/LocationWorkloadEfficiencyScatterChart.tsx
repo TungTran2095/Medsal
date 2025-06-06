@@ -137,7 +137,15 @@ export default function LocationWorkloadEfficiencyScatterChart({
         let setupErrorDetails = "";
         if (rpcMessageText.includes('relation "fulltime" does not exist')) { setupErrorDetails += " Bảng 'Fulltime' không tồn tại."; isCriticalSetupError = true; }
         if (rpcMessageText.includes('relation "doanh_thu" does not exist')) { setupErrorDetails += " Bảng 'Doanh_thu' không tồn tại."; isCriticalSetupError = true; }
-        if (rpcMessageText.includes('column "total_ft_workdays" of relation')) { setupErrorDetails += " Hàm RPC có thể chưa được cập nhật để trả về 'total_ft_workdays'."; isCriticalSetupError = true; }
+        // Check if the error message indicates the RPC hasn't been updated for 'total_ft_workdays'
+        if (!rpcMessageText.includes('column "total_ft_workdays" of relation') && rpcMessageText.includes("returned record type does not match expected record type")) {
+             setupErrorDetails += " Hàm RPC 'get_ft_workload_efficiency_by_location' có thể chưa được cập nhật để trả về 'total_ft_workdays'.";
+             isCriticalSetupError = true;
+        } else if (rpcMessageText.includes('column "total_ft_workdays" of relation')) { // Less likely if above is true, but a fallback.
+             setupErrorDetails += " Cấu trúc trả về của RPC thiếu cột 'total_ft_workdays'.";
+             isCriticalSetupError = true;
+        }
+
 
         const workdayColumns = ['ngay_thuong_chinh_thuc', 'ngay_thuong_thu_viec', 'nghi_tuan', 'le_tet', 'ngay_thuong_chinh_thuc2', 'ngay_thuong_thu_viec3', 'nghi_tuan4', 'le_tet5', 'nghi_nl'];
         for (const col of workdayColumns) {
@@ -163,8 +171,8 @@ export default function LocationWorkloadEfficiencyScatterChart({
         ft_salary_per_ft_workday: (item.ft_salary_per_ft_workday === null || item.ft_salary_per_ft_workday === undefined) ? null : Number(item.ft_salary_per_ft_workday),
         revenue_per_ft_workday: (item.revenue_per_ft_workday === null || item.revenue_per_ft_workday === undefined) ? null : Number(item.revenue_per_ft_workday),
         // total_ft_workdays is available on 'item' due to modified RPC, but not directly used by *this* chart's state
-      })).filter(d => d.ft_salary_per_ft_workday !== null && d.revenue_per_ft_workday !== null && d.ft_salary_per_ft_workday > 0 && d.revenue_per_ft_workday > 0); 
-      
+      })).filter(d => d.ft_salary_per_ft_workday !== null && d.revenue_per_ft_workday !== null && d.ft_salary_per_ft_workday > 0 && d.revenue_per_ft_workday > 0);
+
       setChartData(processedData);
 
     } catch (err: any) {
@@ -201,19 +209,19 @@ export default function LocationWorkloadEfficiencyScatterChart({
           <ResponsiveContainer width="100%" height="100%">
             <DynamicScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis 
-                type="number" 
-                dataKey="revenue_per_ft_workday" 
-                name={chartConfig.revenue_per_ft_workday.label} 
-                tickFormatter={axisFormatter} 
+              <XAxis
+                type="number"
+                dataKey="revenue_per_ft_workday"
+                name={chartConfig.revenue_per_ft_workday.label}
+                tickFormatter={axisFormatter}
                 className="text-xs"
                 label={{ value: chartConfig.revenue_per_ft_workday.label, position: 'insideBottom', offset: -15, className:'text-xs fill-muted-foreground' }}
               />
-              <YAxis 
-                type="number" 
-                dataKey="ft_salary_per_ft_workday" 
-                name={chartConfig.ft_salary_per_ft_workday.label} 
-                tickFormatter={axisFormatter} 
+              <YAxis
+                type="number"
+                dataKey="ft_salary_per_ft_workday"
+                name={chartConfig.ft_salary_per_ft_workday.label}
+                tickFormatter={axisFormatter}
                 className="text-xs"
                 label={{ value: chartConfig.ft_salary_per_ft_workday.label, angle: -90, position: 'insideLeft', offset: 0, className:'text-xs fill-muted-foreground' }}
               />
@@ -237,10 +245,10 @@ export default function LocationWorkloadEfficiencyScatterChart({
                   />
                 }
               />
-              <Scatter 
-                name="Hiệu suất Địa điểm" 
-                data={chartData} 
-                fill="hsl(var(--chart-3))" 
+              <Scatter
+                name="Hiệu suất Địa điểm"
+                data={chartData}
+                fill="hsl(var(--chart-3))"
               >
                 <LabelList dataKey="location_name" content={<CustomScatterDataLabel />} />
               </Scatter>
@@ -251,5 +259,3 @@ export default function LocationWorkloadEfficiencyScatterChart({
     </Card>
   );
 }
-
-```
