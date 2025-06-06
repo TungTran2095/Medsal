@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, ChevronDown, FilterIcon, GanttChartSquare, MapPin, Settings2, Circle, Percent, Target, FolderKanban, BarChart3, Filter as FilterIconLucide, Briefcase, ListChecks, UserCheck, Users, LineChart, Banknote, ScatterChart as ScatterChartIconLucide } from "lucide-react"; // Added Banknote, ScatterChartIconLucide
+import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, ChevronDown, FilterIcon, GanttChartSquare, MapPin, Settings2, Circle, Percent, Target, FolderKanban, BarChart3, Filter as FilterIconLucide, Briefcase, ListChecks, UserCheck, Users, LineChart, Banknote, ScatterChart as ScatterChartIconLucide, CalendarDays } from "lucide-react"; // Added CalendarDays
 import type { PayrollEntry, FlatOrgUnit, OrgNode } from '@/types';
 import { supabase } from '@/lib/supabaseClient';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -34,9 +34,10 @@ import RevenuePerFTEmployeeCard from '@/components/dashboard/RevenuePerFTEmploye
 import EmployeeCountCard from '@/components/dashboard/EmployeeCountCard';
 import MonthlyEmployeeTrendChart from '@/components/charts/MonthlyEmployeeTrendChart';
 import MonthlyAvgSalaryRevenuePerEmployeeChart from '@/components/charts/MonthlyAvgSalaryRevenuePerEmployeeChart';
-import AverageSalaryPerWorkdayCard from '@/components/dashboard/AverageSalaryPerWorkdayCard'; // New card
-import RevenuePerWorkdayCard from '@/components/dashboard/RevenuePerWorkdayCard'; // New card
-import LocationWorkloadEfficiencyScatterChart from '@/components/charts/LocationWorkloadEfficiencyScatterChart'; // New Scatter Chart
+import AverageSalaryPerWorkdayCard from '@/components/dashboard/AverageSalaryPerWorkdayCard'; 
+import RevenuePerWorkdayCard from '@/components/dashboard/RevenuePerWorkdayCard'; 
+import LocationWorkloadEfficiencyScatterChart from '@/components/charts/LocationWorkloadEfficiencyScatterChart'; 
+import LocationSalaryPerWorkdayVsTotalWorkdaysScatterChart from '@/components/charts/LocationSalaryPerWorkdayVsTotalWorkdaysScatterChart';
 
 
 import {
@@ -1082,10 +1083,12 @@ export default function WorkspaceContent() {
                             selectedDepartmentsForDiadiem={selectedDepartmentsFromLoaiFilter}
                             selectedNganhDoc={selectedNganhDocForFilter}
                         />
-                        {/* Placeholder for the next chart */}
-                        {/* <Card className="h-[400px] mt-3 flex items-center justify-center">
-                           <p className="text-muted-foreground">Biểu đồ tiếp theo...</p>
-                        </Card> */}
+                        <LocationSalaryPerWorkdayVsTotalWorkdaysScatterChart
+                             selectedYear={selectedYear}
+                             selectedMonths={selectedMonths}
+                             selectedDepartmentsForDiadiem={selectedDepartmentsFromLoaiFilter}
+                             selectedNganhDoc={selectedNganhDocForFilter}
+                        />
                     </div>
                   </TabsContent>
                   <TabsContent value="detailedSalary" className="flex-grow overflow-y-auto space-y-3 mt-2">
@@ -1105,10 +1108,4 @@ export default function WorkspaceContent() {
     </SidebarProvider>
   );
 }
-
-
-
-
-
-
-
+```

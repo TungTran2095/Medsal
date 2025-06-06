@@ -821,7 +821,7 @@ $$;
 
 #### `get_ft_workload_efficiency_by_location`
 
-This function calculates Full-Time Salary per Full-Time Workday and Revenue per Full-Time Workday for each location (`dia_diem` or `Tên đơn vị`).
+This function calculates Full-Time Salary per Full-Time Workday, Revenue per Full-Time Workday, and Total Full-Time Workdays for each location (`dia_diem` or `Tên đơn vị`).
 It uses filters for year, months, specific locations, and `nganh_doc` (for Fulltime salary & workdays).
 Revenue data is joined based on location name, assuming `Fulltime.dia_diem` and `Doanh_thu."Tên đơn vị"` can be aligned.
 
@@ -837,7 +837,8 @@ CREATE OR REPLACE FUNCTION get_ft_workload_efficiency_by_location(
 RETURNS TABLE(
     location_name TEXT,
     ft_salary_per_ft_workday DOUBLE PRECISION,
-    revenue_per_ft_workday DOUBLE PRECISION
+    revenue_per_ft_workday DOUBLE PRECISION,
+    total_ft_workdays DOUBLE PRECISION
 )
 LANGUAGE plpgsql
 AS $$
@@ -909,7 +910,8 @@ BEGIN
     SELECT
         al.dia_diem AS location_name,
         COALESCE(fm.total_ft_salary / NULLIF(fm.total_ft_workdays, 0), 0) AS ft_salary_per_ft_workday,
-        COALESCE(rm.total_revenue / NULLIF(fm.total_ft_workdays, 0), 0) AS revenue_per_ft_workday
+        COALESCE(rm.total_revenue / NULLIF(fm.total_ft_workdays, 0), 0) AS revenue_per_ft_workday,
+        COALESCE(fm.total_ft_workdays, 0) AS total_ft_workdays
     FROM all_locations al
     LEFT JOIN ft_metrics fm ON al.dia_diem = fm.dia_diem
     LEFT JOIN rev_metrics rm ON al.dia_diem = rm.dia_diem
@@ -926,4 +928,4 @@ Additionally, for the `get_monthly_salary_trend_fulltime`, `get_monthly_salary_t
 
     
 
-
+```
