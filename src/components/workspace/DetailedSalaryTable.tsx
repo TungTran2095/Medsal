@@ -18,7 +18,7 @@ interface DetailedSalaryData {
   tong_cong: number | null;
   tien_linh: number | null;
   tien_linh_per_cong: number | null;
-  total_records?: bigint; // Total records matching filter, before client-side sorting/display
+  total_records?: bigint; 
   overall_sum_tien_linh?: number | null; 
   overall_sum_tong_cong?: number | null; 
 }
@@ -58,7 +58,7 @@ export default function DetailedSalaryTable({
         p_filter_months: (selectedMonths && selectedMonths.length > 0) ? selectedMonths : null,
         p_filter_locations: (selectedDepartmentsForDiadiem && selectedDepartmentsForDiadiem.length > 0) ? selectedDepartmentsForDiadiem : null,
         p_filter_nganh_docs: (selectedNganhDoc && selectedNganhDoc.length > 0) ? selectedNganhDoc : null,
-        p_limit: null, // Fetch all records
+        p_limit: null, 
         p_offset: 0,
       };
 
@@ -217,7 +217,7 @@ export default function DetailedSalaryTable({
             </div>
           )}
           {!isLoading && !error && data.length > 0 && (
-            <ScrollArea className="h-full border rounded-md">
+            <ScrollArea className="border rounded-md max-h-[36rem]">
               <Table>
                 <TableHeader className="sticky top-0 bg-card z-10">
                   <TableRow>
@@ -247,3 +247,4 @@ export default function DetailedSalaryTable({
     </Card>
   );
 }
+
