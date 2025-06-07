@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, ChevronDown, FilterIcon, GanttChartSquare, MapPin, Settings2, Circle, Percent, Target, FolderKanban, BarChart3, Filter as FilterIconLucide, Briefcase, ListChecks, UserCheck, Users, LineChart, Banknote, ScatterChart as ScatterChartIconLucide, CalendarDays, UsersRound } from "lucide-react";
+import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, ChevronDown, FilterIcon, GanttChartSquare, MapPin, Settings2, Circle, Percent, Target, FolderKanban, BarChart3, Filter as FilterIconLucide, Briefcase, ListChecks, UserCheck, Users, LineChart, Banknote, ScatterChart as ScatterChartIconLucide, CalendarDays, UsersRound, AlertTriangle } from "lucide-react";
 import type { PayrollEntry, FlatOrgUnit, OrgNode } from '@/types';
 import { supabase } from '@/lib/supabaseClient';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -88,6 +88,13 @@ const staticMonths: MonthOption[] = Array.from({ length: 12 }, (_, i) => ({
   label: `Tháng ${String(i + 1).padStart(2, '0')}`,
 }));
 
+interface AggregateDataState {
+  status: 'idle' | 'loading' | 'success' | 'error';
+  avgTienLinh: number | null;
+  avgTongCong: number | null;
+  error?: string | null;
+}
+
 
 export default function WorkspaceContent() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -119,6 +126,14 @@ export default function WorkspaceContent() {
   const [activeDashboardTab, setActiveDashboardTab] = useState<DashboardTab>('payrollOverview');
 
   const [isMounted, setIsMounted] = useState(false);
+
+  const [aggregateData, setAggregateData] = useState<AggregateDataState>({
+    status: 'idle',
+    avgTienLinh: null,
+    avgTongCong: null,
+    error: null,
+  });
+
 
   useEffect(() => {
     setIsMounted(true);
@@ -587,6 +602,72 @@ export default function WorkspaceContent() {
     }
     return label || "Chọn địa điểm";
   };
+
+  const handleAggregateDataFetched = useCallback((
+    overallSumTienLinh: number | null,
+    overallSumTongCong: number | null,
+    totalEmployees: number
+  ) => {
+    if (overallSumTienLinh === null || overallSumTongCong === null || totalEmployees === null) {
+      setAggregateData({
+        status: 'error',
+        avgTienLinh: null,
+        avgTongCong: null,
+        error: "Không đủ dữ liệu tổng hợp từ bảng chi tiết."
+      });
+      return;
+    }
+
+    if (totalEmployees === 0) {
+      setAggregateData({
+        status: 'success',
+        avgTienLinh: 0,
+        avgTongCong: 0,
+      });
+    } else {
+      setAggregateData({
+        status: 'success',
+        avgTienLinh: overallSumTienLinh / totalEmployees,
+        avgTongCong: overallSumTongCong / totalEmployees,
+      });
+    }
+  }, []);
+
+  const handleTableLoadingChange = useCallback((isLoading: boolean) => {
+    if (isLoading) {
+      setAggregateData(prev => ({ ...prev, status: 'loading' }));
+    }
+    // Do not set to 'idle' or 'success' here; handleAggregateDataFetched will do that.
+  }, []);
+
+  const formatCurrencyShort = (value: number | null) => {
+    if (value === null || value === undefined) return 'N/A';
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency: 'VND',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+      notation: 'compact',
+      compactDisplay: 'short'
+    }).format(value);
+  };
+
+  const formatNumberShort = (value: number | null) => {
+    if (value === null || value === undefined) return 'N/A';
+    return new Intl.NumberFormat('vi-VN', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 1,
+      notation: 'compact',
+      compactDisplay: 'short'
+    }).format(value);
+  };
+
+  useEffect(() => {
+    // Reset aggregate data when filters change
+    if (activeDashboardTab === 'detailedSalaryAnalysis') {
+      setAggregateData({ status: 'loading', avgTienLinh: null, avgTongCong: null, error: null });
+    }
+  }, [selectedYear, selectedMonths, selectedDepartmentsFromLoaiFilter, selectedNganhDocForFilter, activeDashboardTab]);
 
 
   return (
@@ -1107,7 +1188,22 @@ export default function WorkspaceContent() {
                               <CardTitle className="text-xs font-medium text-muted-foreground">Trung Bình Tiền Lĩnh/NV</CardTitle>
                             </CardHeader>
                             <CardContent className="pb-1.5 px-2">
-                              <p className="text-base font-bold text-primary">Đang tính...</p>
+                              {aggregateData.status === 'loading' && (
+                                <div className="flex items-center text-sm text-muted-foreground">
+                                  <Loader2 className="h-4 w-4 animate-spin mr-1" /> Đang tính...
+                                </div>
+                              )}
+                              {aggregateData.status === 'error' && (
+                                <div className="flex items-center text-sm text-destructive">
+                                  <AlertTriangle className="h-4 w-4 mr-1" /> Lỗi
+                                </div>
+                              )}
+                              {aggregateData.status === 'success' && (
+                                <p className="text-base font-bold text-primary">{formatCurrencyShort(aggregateData.avgTienLinh)}</p>
+                              )}
+                               {aggregateData.status === 'idle' && (
+                                <p className="text-base font-bold text-muted-foreground">N/A</p>
+                              )}
                             </CardContent>
                           </Card>
                           <Card className="bg-muted/50">
@@ -1115,10 +1211,28 @@ export default function WorkspaceContent() {
                               <CardTitle className="text-xs font-medium text-muted-foreground">Trung Bình Tổng Công/NV</CardTitle>
                             </CardHeader>
                             <CardContent className="pb-1.5 px-2">
-                              <p className="text-base font-bold text-primary">Đang tính...</p>
+                              {aggregateData.status === 'loading' && (
+                                <div className="flex items-center text-sm text-muted-foreground">
+                                  <Loader2 className="h-4 w-4 animate-spin mr-1" /> Đang tính...
+                                </div>
+                              )}
+                              {aggregateData.status === 'error' && (
+                                <div className="flex items-center text-sm text-destructive">
+                                  <AlertTriangle className="h-4 w-4 mr-1" /> Lỗi
+                                </div>
+                              )}
+                              {aggregateData.status === 'success' && (
+                                <p className="text-base font-bold text-primary">{formatNumberShort(aggregateData.avgTongCong)}</p>
+                              )}
+                              {aggregateData.status === 'idle' && (
+                                <p className="text-base font-bold text-muted-foreground">N/A</p>
+                              )}
                             </CardContent>
                           </Card>
                         </div>
+                          {aggregateData.status === 'error' && aggregateData.error && (
+                            <p className="text-xs text-destructive mt-1">{aggregateData.error}</p>
+                          )}
                       </CardContent>
                     </Card>
                      <Card>
@@ -1140,6 +1254,8 @@ export default function WorkspaceContent() {
                         selectedMonths={selectedMonths}
                         selectedDepartmentsForDiadiem={selectedDepartmentsFromLoaiFilter}
                         selectedNganhDoc={selectedNganhDocForFilter}
+                        onAggregateDataFetched={handleAggregateDataFetched}
+                        onLoadingChange={handleTableLoadingChange}
                     />
                   </TabsContent>
                 </Tabs>
@@ -1151,4 +1267,3 @@ export default function WorkspaceContent() {
     </SidebarProvider>
   );
 }
-
