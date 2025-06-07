@@ -1093,13 +1093,6 @@ export default function WorkspaceContent() {
                     </div>
                   </TabsContent>
                   <TabsContent value="detailedSalaryAnalysis" className="flex-grow overflow-y-auto space-y-3 mt-2">
-                    <DetailedSalaryTable
-                        selectedYear={selectedYear}
-                        selectedMonths={selectedMonths}
-                        selectedDepartmentsForDiadiem={selectedDepartmentsFromLoaiFilter}
-                        selectedNganhDoc={selectedNganhDocForFilter}
-                    />
-                    {/* Placeholder cards and charts as before, if DetailedSalaryTable doesn't cover them all */}
                     <Card>
                       <CardHeader className="pb-1 pt-2 px-3">
                         <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
@@ -1142,6 +1135,12 @@ export default function WorkspaceContent() {
                         <p className="text-xs text-muted-foreground">Nội dung biểu đồ sẽ ở đây</p>
                       </CardContent>
                     </Card>
+                    <DetailedSalaryTable
+                        selectedYear={selectedYear}
+                        selectedMonths={selectedMonths}
+                        selectedDepartmentsForDiadiem={selectedDepartmentsFromLoaiFilter}
+                        selectedNganhDoc={selectedNganhDocForFilter}
+                    />
                   </TabsContent>
                 </Tabs>
               </CardContent>
