@@ -933,8 +933,8 @@ CREATE OR REPLACE FUNCTION get_detailed_employee_salary_data(
     p_filter_months INTEGER[] DEFAULT NULL,
     p_filter_locations TEXT[] DEFAULT NULL,
     p_filter_nganh_docs TEXT[] DEFAULT NULL,
-    p_limit INTEGER DEFAULT 10,
-    p_offset INTEGER DEFAULT 0
+    p_limit INTEGER DEFAULT NULL, -- Changed default to NULL for fetching all
+    p_offset INTEGER DEFAULT 0 -- Default offset to 0
 )
 RETURNS TABLE(
     ma_nv TEXT,
@@ -1014,8 +1014,8 @@ BEGIN
           os.total_unique_employees
       FROM grouped_by_employee gbe
       CROSS JOIN overall_sums os 
-      ORDER BY gbe.ma_nhan_vien 
-      LIMIT p_limit
+      ORDER BY gbe.ma_nhan_vien -- Consider making sort order configurable or default to something meaningful
+      LIMIT p_limit -- If p_limit is NULL, this is equivalent to LIMIT ALL
       OFFSET p_offset
     )
     SELECT
@@ -1032,8 +1032,7 @@ BEGIN
         CAST(ped.total_overall_tong_cong AS DOUBLE PRECISION) AS overall_sum_tong_cong
     FROM paginated_employee_data ped;
 END;
-$$ LANGUAGE plpgsql;
-```
+$$; -- Removed LANGUAGE plpgsql from here as it's at the top
 
 
 Once these functions are successfully created (or updated) in your Supabase SQL Editor, the application should be able to correctly filter and aggregate data. If you continue to encounter "unterminated dollar-quoted string" errors, please double-check for any invisible characters or ensure the entire function block is being processed correctly by the SQL editor, especially ensuring no comments are between `END;` and the final `$$;`.
@@ -1049,6 +1048,7 @@ Additionally, for the `get_monthly_salary_trend_fulltime`, `get_monthly_salary_t
 
 
     
+
 
 
 

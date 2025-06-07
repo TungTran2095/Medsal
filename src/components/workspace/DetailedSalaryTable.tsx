@@ -1,14 +1,16 @@
 
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+// Button is not used directly for pagination anymore, but might be for future actions
+// import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, AlertTriangle, ListChecks, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Loader2, AlertTriangle, ListChecks, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { cn } from '@/lib/utils';
 
 interface DetailedSalaryData {
   ma_nv: string;
@@ -16,9 +18,9 @@ interface DetailedSalaryData {
   tong_cong: number | null;
   tien_linh: number | null;
   tien_linh_per_cong: number | null;
-  total_records?: bigint;
-  overall_sum_tien_linh?: number | null; // Added for aggregate
-  overall_sum_tong_cong?: number | null; // Added for aggregate
+  total_records?: bigint; // Total records matching filter, before client-side sorting/display
+  overall_sum_tien_linh?: number | null; 
+  overall_sum_tong_cong?: number | null; 
 }
 
 interface DetailedSalaryTableProps {
@@ -28,7 +30,11 @@ interface DetailedSalaryTableProps {
   selectedNganhDoc?: string[];
 }
 
-const ROWS_PER_PAGE = 15;
+type SortableColumn = 'ma_nv' | 'ho_ten' | 'tong_cong' | 'tien_linh' | 'tien_linh_per_cong';
+interface SortConfig {
+  key: SortableColumn | null;
+  direction: 'ascending' | 'descending';
+}
 
 export default function DetailedSalaryTable({
   selectedYear,
@@ -39,22 +45,21 @@ export default function DetailedSalaryTable({
   const [data, setData] = useState<DetailedSalaryData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
   const { toast } = useToast();
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'ma_nv', direction: 'ascending' });
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const offset = (currentPage - 1) * ROWS_PER_PAGE;
       const rpcArgs = {
         p_filter_year: selectedYear,
         p_filter_months: (selectedMonths && selectedMonths.length > 0) ? selectedMonths : null,
         p_filter_locations: (selectedDepartmentsForDiadiem && selectedDepartmentsForDiadiem.length > 0) ? selectedDepartmentsForDiadiem : null,
         p_filter_nganh_docs: (selectedNganhDoc && selectedNganhDoc.length > 0) ? selectedNganhDoc : null,
-        p_limit: ROWS_PER_PAGE,
-        p_offset: offset,
+        p_limit: null, // Fetch all records
+        p_offset: 0,
       };
 
       const functionName = 'get_detailed_employee_salary_data';
@@ -77,8 +82,6 @@ export default function DetailedSalaryTable({
           tong_cong: item.tong_cong !== null ? Number(item.tong_cong) : null,
           tien_linh: item.tien_linh !== null ? Number(item.tien_linh) : null,
           tien_linh_per_cong: item.tien_linh_per_cong !== null ? Number(item.tien_linh_per_cong) : null,
-          overall_sum_tien_linh: item.overall_sum_tien_linh !== null ? Number(item.overall_sum_tien_linh) : null,
-          overall_sum_tong_cong: item.overall_sum_tong_cong !== null ? Number(item.overall_sum_tong_cong) : null,
         })));
         setTotalRecords(Number(rpcData[0].total_records) || 0);
       } else {
@@ -111,15 +114,44 @@ export default function DetailedSalaryTable({
     } finally {
       setIsLoading(false);
     }
-  }, [selectedYear, selectedMonths, selectedDepartmentsForDiadiem, selectedNganhDoc, currentPage, toast]);
+  }, [selectedYear, selectedMonths, selectedDepartmentsForDiadiem, selectedNganhDoc, toast]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [selectedYear, selectedMonths, selectedDepartmentsForDiadiem, selectedNganhDoc]);
+  const requestSort = (key: SortableColumn) => {
+    let direction: 'ascending' | 'descending' = 'ascending';
+    if (sortConfig.key === key && sortConfig.direction === 'ascending') {
+      direction = 'descending';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const sortedData = useMemo(() => {
+    let sortableItems = [...data];
+    if (sortConfig.key) {
+      sortableItems.sort((a, b) => {
+        const valA = a[sortConfig.key!];
+        const valB = b[sortConfig.key!];
+
+        if (valA === null && valB === null) return 0;
+        if (valA === null) return 1; 
+        if (valB === null) return -1;
+
+        if (typeof valA === 'number' && typeof valB === 'number') {
+          return sortConfig.direction === 'ascending' ? valA - valB : valB - valA;
+        }
+        if (typeof valA === 'string' && typeof valB === 'string') {
+          return sortConfig.direction === 'ascending'
+            ? valA.localeCompare(valB)
+            : valB.localeCompare(valA);
+        }
+        return 0;
+      });
+    }
+    return sortableItems;
+  }, [data, sortConfig]);
 
   const formatCurrency = (value: number | null) => {
     if (value === null || value === undefined) return 'N/A';
@@ -131,17 +163,22 @@ export default function DetailedSalaryTable({
     return new Intl.NumberFormat('vi-VN', { minimumFractionDigits: 0, maximumFractionDigits: 1 }).format(value);
   };
 
-  const handleNextPage = () => {
-    setCurrentPage(prev => prev + 1);
-  };
+  const SortableHeader = ({ columnKey, label, align = 'left' }: { columnKey: SortableColumn, label: string, align?: 'left' | 'right' | 'center' }) => (
+    <TableHead
+      className={cn("text-xs py-1.5 px-2 cursor-pointer hover:bg-muted/50", `text-${align}`)}
+      onClick={() => requestSort(columnKey)}
+    >
+      <div className={cn("flex items-center gap-1", align === 'right' ? 'justify-end' : align === 'center' ? 'justify-center' : 'justify-start')}>
+        <span>{label}</span>
+        {sortConfig.key === columnKey ? (
+          sortConfig.direction === 'ascending' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+        ) : (
+          <ArrowUpDown className="h-3 w-3 opacity-30" />
+        )}
+      </div>
+    </TableHead>
+  );
 
-  const handlePreviousPage = () => {
-    setCurrentPage(prev => Math.max(1, prev - 1));
-  };
-
-  const totalPages = Math.ceil(totalRecords / ROWS_PER_PAGE);
-  const canGoNext = currentPage < totalPages;
-  const canGoPrevious = currentPage > 1;
 
   return (
     <Card className="flex-grow flex flex-col h-full">
@@ -151,11 +188,11 @@ export default function DetailedSalaryTable({
           Bảng Lương Chi Tiết Nhân Viên
         </CardTitle>
         <CardDescription className="text-xs">
-          Dữ liệu lương và tổng công của từng nhân viên full-time theo bộ lọc.
+          Dữ liệu lương và tổng công của từng nhân viên full-time theo bộ lọc ({totalRecords} dòng).
         </CardDescription>
       </CardHeader>
       <CardContent className="flex-grow flex flex-col overflow-hidden p-3">
-        <div className="flex-grow min-h-0"> {/* This div will take available space and manage its content */}
+        <div className="flex-grow min-h-0">
           {isLoading && (
             <div className="flex items-center justify-center h-full text-muted-foreground">
               <Loader2 className="h-5 w-5 animate-spin mr-2" />
@@ -180,19 +217,19 @@ export default function DetailedSalaryTable({
             </div>
           )}
           {!isLoading && !error && data.length > 0 && (
-            <ScrollArea className="h-full border rounded-md"> {/* h-full makes ScrollArea use the height of its parent */}
+            <ScrollArea className="h-full border rounded-md">
               <Table>
                 <TableHeader className="sticky top-0 bg-card z-10">
                   <TableRow>
-                    <TableHead className="text-xs py-1.5 px-2">Mã NV</TableHead>
-                    <TableHead className="text-xs py-1.5 px-2">Họ và Tên</TableHead>
-                    <TableHead className="text-xs py-1.5 px-2 text-right">Tổng Công</TableHead>
-                    <TableHead className="text-xs py-1.5 px-2 text-right">Tiền Lĩnh</TableHead>
-                    <TableHead className="text-xs py-1.5 px-2 text-right">Tiền lĩnh/công</TableHead>
+                    <SortableHeader columnKey="ma_nv" label="Mã NV" />
+                    <SortableHeader columnKey="ho_ten" label="Họ và Tên" />
+                    <SortableHeader columnKey="tong_cong" label="Tổng Công" align="right" />
+                    <SortableHeader columnKey="tien_linh" label="Tiền Lĩnh" align="right" />
+                    <SortableHeader columnKey="tien_linh_per_cong" label="Tiền lĩnh/công" align="right" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.map((row) => (
+                  {sortedData.map((row) => (
                     <TableRow key={row.ma_nv}>
                       <TableCell className="text-xs py-1.5 px-2 whitespace-nowrap">{row.ma_nv}</TableCell>
                       <TableCell className="text-xs py-1.5 px-2 whitespace-nowrap">{row.ho_ten}</TableCell>
@@ -206,36 +243,7 @@ export default function DetailedSalaryTable({
             </ScrollArea>
           )}
         </div>
-        
-        {!isLoading && totalRecords > 0 && (
-          <div className="shrink-0 flex items-center justify-end space-x-1 py-2 mt-2"> {/* mt-2 to give some space after content */}
-            <span className="text-xs text-muted-foreground mr-2">
-              Hàng {Math.min((currentPage - 1) * ROWS_PER_PAGE + 1, totalRecords)} - {Math.min(currentPage * ROWS_PER_PAGE, totalRecords)} của {totalRecords}
-            </span>
-            <Button
-                variant="outline"
-                size="sm"
-                onClick={handlePreviousPage}
-                disabled={!canGoPrevious || isLoading}
-                className="text-xs py-1 h-auto px-2"
-            >
-                <ChevronLeft className="h-3 w-3 mr-0.5"/>
-                Trước
-            </Button>
-            <Button
-                variant="outline"
-                size="sm"
-                onClick={handleNextPage}
-                disabled={!canGoNext || isLoading}
-                className="text-xs py-1 h-auto px-2"
-            >
-                Sau
-                <ChevronRight className="h-3 w-3 ml-0.5"/>
-            </Button>
-          </div>
-        )}
       </CardContent>
     </Card>
   );
 }
-
