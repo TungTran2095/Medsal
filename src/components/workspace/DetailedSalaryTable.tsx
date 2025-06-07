@@ -15,7 +15,8 @@ interface DetailedSalaryData {
   ho_ten: string;
   tong_cong: number | null;
   tien_linh: number | null;
-  tien_linh_per_cong: number | null; // New field
+  tien_linh_per_cong: number | null;
+  total_records?: bigint; // Ensure this matches the RPC return if it's still there
 }
 
 interface DetailedSalaryTableProps {
@@ -61,7 +62,7 @@ export default function DetailedSalaryTable({
         let detailedErrorMessage = rpcError.message || `Không thể tải dữ liệu chi tiết lương qua RPC '${functionName}'.`;
         if (rpcError.code === '42883' || (rpcError.message && rpcError.message.toLowerCase().includes("does not exist") && rpcError.message.toLowerCase().includes(functionName))) {
           detailedErrorMessage = `Hàm RPC '${functionName}' không tìm thấy hoặc có lỗi. Vui lòng kiểm tra định nghĩa hàm trong Supabase theo README.md. Đảm bảo bảng Fulltime có các cột 'ma_nhan_vien', 'ho_va_ten', và 'tien_linh'.`;
-        } else if (rpcError.message && (rpcError.message.toLowerCase().includes('column "tien_linh" does not exist') || rpcError.message.toLowerCase().includes('column "ma_nhan_vien" does not exist') || rpcError.message.toLowerCase().includes('column "ho_va_ten" does not exist'))) {
+        } else if (rpcError.message && (rpcError.message.toLowerCase().includes('column "ma_nhan_vien" does not exist') || rpcError.message.toLowerCase().includes('column "ho_va_ten" does not exist') || rpcError.message.toLowerCase().includes('column "tien_linh" does not exist'))) {
           detailedErrorMessage = `Một hoặc nhiều cột (ma_nhan_vien, ho_va_ten, tien_linh) không tồn tại trong bảng 'Fulltime'. Hàm RPC '${functionName}' cần các cột này.`;
         }
         throw new Error(detailedErrorMessage);
@@ -82,7 +83,7 @@ export default function DetailedSalaryTable({
       }
 
     } catch (e: any) {
-      console.error(`Error fetching detailed salary data (raw):`, JSON.stringify(e, Object.getOwnPropertyNames(e), 2));
+      console.error(`Error fetching detailed salary data:`, JSON.stringify(e, Object.getOwnPropertyNames(e), 2));
       let errorMessage = 'Không thể tải dữ liệu chi tiết lương.';
       if (e && typeof e === 'object') {
           if (e.message) {
@@ -112,11 +113,9 @@ export default function DetailedSalaryTable({
     fetchData();
   }, [fetchData]);
 
-  // Reset page to 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [selectedYear, selectedMonths, selectedDepartmentsForDiadiem, selectedNganhDoc]);
-
 
   const formatCurrency = (value: number | null) => {
     if (value === null || value === undefined) return 'N/A';
@@ -152,55 +151,60 @@ export default function DetailedSalaryTable({
         </CardDescription>
       </CardHeader>
       <CardContent className="flex-grow flex flex-col overflow-hidden p-3">
-        {isLoading && (
-          <div className="flex items-center justify-center py-4 text-muted-foreground flex-grow">
-            <Loader2 className="h-5 w-5 animate-spin mr-2" />
-            <p className="text-sm">Đang tải dữ liệu lương chi tiết...</p>
-          </div>
-        )}
-        {error && !isLoading && (
-          <div className="flex flex-col items-center justify-center py-4 text-destructive bg-destructive/10 p-3 rounded-md flex-grow">
-            <AlertTriangle className="h-6 w-6 mb-1" />
-            <p className="font-semibold text-sm">Lỗi Tải Dữ Liệu</p>
-            <p className="text-xs text-center whitespace-pre-line">{error}</p>
-            {(error.includes("Hàm RPC") || error.includes("Cột")) && (
-                <p className="text-xs mt-1 text-center">
-                    Vui lòng kiểm tra định nghĩa hàm RPC `get_detailed_employee_salary_data` trong Supabase (README.md) và đảm bảo bảng `Fulltime` tồn tại với các cột `ma_nhan_vien`, `ho_va_ten`, `tien_linh` và các cột công cần thiết.
-                </p>
-            )}
-          </div>
-        )}
-        {!isLoading && !error && data.length === 0 && (
-          <p className="text-muted-foreground text-center py-4 text-sm flex-grow">Không có dữ liệu lương chi tiết cho bộ lọc hiện tại.</p>
-        )}
-        {!isLoading && !error && data.length > 0 && (
-          <ScrollArea className="flex-grow border rounded-md">
-            <Table>
-              <TableHeader className="sticky top-0 bg-card z-10">
-                <TableRow>
-                  <TableHead className="text-xs py-1.5 px-2">Mã NV</TableHead>
-                  <TableHead className="text-xs py-1.5 px-2">Họ và Tên</TableHead>
-                  <TableHead className="text-xs py-1.5 px-2 text-right">Tổng Công</TableHead>
-                  <TableHead className="text-xs py-1.5 px-2 text-right">Tiền Lĩnh</TableHead>
-                  <TableHead className="text-xs py-1.5 px-2 text-right">Tiền lĩnh/công</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.map((row) => (
-                  <TableRow key={row.ma_nv}>
-                    <TableCell className="text-xs py-1.5 px-2 whitespace-nowrap">{row.ma_nv}</TableCell>
-                    <TableCell className="text-xs py-1.5 px-2 whitespace-nowrap">{row.ho_ten}</TableCell>
-                    <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap">{formatNumber(row.tong_cong)}</TableCell>
-                    <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap">{formatCurrency(row.tien_linh)}</TableCell>
-                    <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap">{formatCurrency(row.tien_linh_per_cong)}</TableCell>
+        <div className="flex-grow min-h-0"> {/* This div will take available space and manage its content */}
+          {isLoading && (
+            <div className="flex items-center justify-center h-full text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin mr-2" />
+              <p className="text-sm">Đang tải dữ liệu lương chi tiết...</p>
+            </div>
+          )}
+          {error && !isLoading && (
+            <div className="flex flex-col items-center justify-center h-full text-destructive bg-destructive/10 p-3 rounded-md">
+              <AlertTriangle className="h-6 w-6 mb-1" />
+              <p className="font-semibold text-sm">Lỗi Tải Dữ Liệu</p>
+              <p className="text-xs text-center whitespace-pre-line">{error}</p>
+              {(error.includes("Hàm RPC") || error.includes("Cột")) && (
+                  <p className="text-xs mt-1 text-center">
+                      Vui lòng kiểm tra định nghĩa hàm RPC `get_detailed_employee_salary_data` trong Supabase (README.md) và đảm bảo bảng `Fulltime` tồn tại với các cột `ma_nhan_vien`, `ho_va_ten`, `tien_linh` và các cột công cần thiết.
+                  </p>
+              )}
+            </div>
+          )}
+          {!isLoading && !error && data.length === 0 && (
+            <div className="flex items-center justify-center h-full">
+                <p className="text-muted-foreground text-center py-4 text-sm">Không có dữ liệu lương chi tiết cho bộ lọc hiện tại.</p>
+            </div>
+          )}
+          {!isLoading && !error && data.length > 0 && (
+            <ScrollArea className="h-full border rounded-md"> {/* h-full makes ScrollArea use the height of its parent */}
+              <Table>
+                <TableHeader className="sticky top-0 bg-card z-10">
+                  <TableRow>
+                    <TableHead className="text-xs py-1.5 px-2">Mã NV</TableHead>
+                    <TableHead className="text-xs py-1.5 px-2">Họ và Tên</TableHead>
+                    <TableHead className="text-xs py-1.5 px-2 text-right">Tổng Công</TableHead>
+                    <TableHead className="text-xs py-1.5 px-2 text-right">Tiền Lĩnh</TableHead>
+                    <TableHead className="text-xs py-1.5 px-2 text-right">Tiền lĩnh/công</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </ScrollArea>
-        )}
+                </TableHeader>
+                <TableBody>
+                  {data.map((row) => (
+                    <TableRow key={row.ma_nv}>
+                      <TableCell className="text-xs py-1.5 px-2 whitespace-nowrap">{row.ma_nv}</TableCell>
+                      <TableCell className="text-xs py-1.5 px-2 whitespace-nowrap">{row.ho_ten}</TableCell>
+                      <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap">{formatNumber(row.tong_cong)}</TableCell>
+                      <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap">{formatCurrency(row.tien_linh)}</TableCell>
+                      <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap">{formatCurrency(row.tien_linh_per_cong)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </ScrollArea>
+          )}
+        </div>
+        
         {!isLoading && totalRecords > 0 && (
-          <div className="flex items-center justify-end space-x-1 py-2 mt-auto shrink-0">
+          <div className="shrink-0 flex items-center justify-end space-x-1 py-2 mt-2"> {/* mt-2 to give some space after content */}
             <span className="text-xs text-muted-foreground mr-2">
               Hàng {Math.min((currentPage - 1) * ROWS_PER_PAGE + 1, totalRecords)} - {Math.min(currentPage * ROWS_PER_PAGE, totalRecords)} của {totalRecords}
             </span>
@@ -230,3 +234,4 @@ export default function DetailedSalaryTable({
     </Card>
   );
 }
+
