@@ -88,13 +88,6 @@ const staticMonths: MonthOption[] = Array.from({ length: 12 }, (_, i) => ({
   label: `Tháng ${String(i + 1).padStart(2, '0')}`,
 }));
 
-interface AggregateDataState {
-  status: 'idle' | 'loading' | 'success' | 'error';
-  avgTienLinh: number | null;
-  avgTongCong: number | null;
-  error?: string | null;
-}
-
 
 export default function WorkspaceContent() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -126,13 +119,6 @@ export default function WorkspaceContent() {
   const [activeDashboardTab, setActiveDashboardTab] = useState<DashboardTab>('payrollOverview');
 
   const [isMounted, setIsMounted] = useState(false);
-
-  const [aggregateData, setAggregateData] = useState<AggregateDataState>({
-    status: 'idle',
-    avgTienLinh: null,
-    avgTongCong: null,
-    error: null,
-  });
 
 
   useEffect(() => {
@@ -602,73 +588,6 @@ export default function WorkspaceContent() {
     }
     return label || "Chọn địa điểm";
   };
-
-  const handleAggregateDataFetched = useCallback((
-    overallSumTienLinh: number | null,
-    overallSumTongCong: number | null,
-    totalEmployees: number
-  ) => {
-    if (overallSumTienLinh === null || overallSumTongCong === null || totalEmployees === null) {
-      setAggregateData({
-        status: 'error',
-        avgTienLinh: null,
-        avgTongCong: null,
-        error: "Không đủ dữ liệu tổng hợp từ bảng chi tiết."
-      });
-      return;
-    }
-
-    if (totalEmployees === 0) {
-      setAggregateData({
-        status: 'success',
-        avgTienLinh: 0,
-        avgTongCong: 0,
-      });
-    } else {
-      setAggregateData({
-        status: 'success',
-        avgTienLinh: overallSumTienLinh / totalEmployees,
-        avgTongCong: overallSumTongCong / totalEmployees,
-      });
-    }
-  }, []);
-
-  const handleTableLoadingChange = useCallback((isLoading: boolean) => {
-    if (isLoading) {
-      setAggregateData(prev => ({ ...prev, status: 'loading' }));
-    }
-    // Do not set to 'idle' or 'success' here; handleAggregateDataFetched will do that.
-  }, []);
-
-  const formatCurrencyShort = (value: number | null) => {
-    if (value === null || value === undefined) return 'N/A';
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-      notation: 'compact',
-      compactDisplay: 'short'
-    }).format(value);
-  };
-
-  const formatNumberShort = (value: number | null) => {
-    if (value === null || value === undefined) return 'N/A';
-    return new Intl.NumberFormat('vi-VN', {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 1,
-      notation: 'compact',
-      compactDisplay: 'short'
-    }).format(value);
-  };
-
-  useEffect(() => {
-    // Reset aggregate data when filters change
-    if (activeDashboardTab === 'detailedSalaryAnalysis') {
-      setAggregateData({ status: 'loading', avgTienLinh: null, avgTongCong: null, error: null });
-    }
-  }, [selectedYear, selectedMonths, selectedDepartmentsFromLoaiFilter, selectedNganhDocForFilter, activeDashboardTab]);
-
 
   return (
     <SidebarProvider defaultOpen={false} >
@@ -1174,67 +1093,6 @@ export default function WorkspaceContent() {
                     </div>
                   </TabsContent>
                   <TabsContent value="detailedSalaryAnalysis" className="flex-grow overflow-y-auto space-y-3 mt-2">
-                    <Card>
-                      <CardHeader className="pb-1 pt-2 px-3">
-                        <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
-                          <UserCheck className="h-4 w-4 text-primary" />
-                          Thống Kê Sơ Bộ Từ Dữ Liệu Chi Tiết
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="pb-2 px-3">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          <Card className="bg-muted/50">
-                            <CardHeader className="pb-0.5 pt-1.5 px-2">
-                              <CardTitle className="text-xs font-medium text-muted-foreground">Trung Bình Tiền Lĩnh/NV</CardTitle>
-                            </CardHeader>
-                            <CardContent className="pb-1.5 px-2">
-                              {aggregateData.status === 'loading' && (
-                                <div className="flex items-center text-sm text-muted-foreground">
-                                  <Loader2 className="h-4 w-4 animate-spin mr-1" /> Đang tính...
-                                </div>
-                              )}
-                              {aggregateData.status === 'error' && (
-                                <div className="flex items-center text-sm text-destructive">
-                                  <AlertTriangle className="h-4 w-4 mr-1" /> Lỗi
-                                </div>
-                              )}
-                              {aggregateData.status === 'success' && (
-                                <p className="text-base font-bold text-primary">{formatCurrencyShort(aggregateData.avgTienLinh)}</p>
-                              )}
-                               {aggregateData.status === 'idle' && (
-                                <p className="text-base font-bold text-muted-foreground">N/A</p>
-                              )}
-                            </CardContent>
-                          </Card>
-                          <Card className="bg-muted/50">
-                            <CardHeader className="pb-0.5 pt-1.5 px-2">
-                              <CardTitle className="text-xs font-medium text-muted-foreground">Trung Bình Tổng Công/NV</CardTitle>
-                            </CardHeader>
-                            <CardContent className="pb-1.5 px-2">
-                              {aggregateData.status === 'loading' && (
-                                <div className="flex items-center text-sm text-muted-foreground">
-                                  <Loader2 className="h-4 w-4 animate-spin mr-1" /> Đang tính...
-                                </div>
-                              )}
-                              {aggregateData.status === 'error' && (
-                                <div className="flex items-center text-sm text-destructive">
-                                  <AlertTriangle className="h-4 w-4 mr-1" /> Lỗi
-                                </div>
-                              )}
-                              {aggregateData.status === 'success' && (
-                                <p className="text-base font-bold text-primary">{formatNumberShort(aggregateData.avgTongCong)}</p>
-                              )}
-                              {aggregateData.status === 'idle' && (
-                                <p className="text-base font-bold text-muted-foreground">N/A</p>
-                              )}
-                            </CardContent>
-                          </Card>
-                        </div>
-                          {aggregateData.status === 'error' && aggregateData.error && (
-                            <p className="text-xs text-destructive mt-1">{aggregateData.error}</p>
-                          )}
-                      </CardContent>
-                    </Card>
                      <Card>
                       <CardHeader className="pb-1 pt-2 px-3">
                         <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
@@ -1254,8 +1112,6 @@ export default function WorkspaceContent() {
                         selectedMonths={selectedMonths}
                         selectedDepartmentsForDiadiem={selectedDepartmentsFromLoaiFilter}
                         selectedNganhDoc={selectedNganhDocForFilter}
-                        onAggregateDataFetched={handleAggregateDataFetched}
-                        onLoadingChange={handleTableLoadingChange}
                     />
                   </TabsContent>
                 </Tabs>
@@ -1267,3 +1123,4 @@ export default function WorkspaceContent() {
     </SidebarProvider>
   );
 }
+

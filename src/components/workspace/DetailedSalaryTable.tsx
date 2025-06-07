@@ -16,7 +16,9 @@ interface DetailedSalaryData {
   tong_cong: number | null;
   tien_linh: number | null;
   tien_linh_per_cong: number | null;
-  total_records?: bigint; // Ensure this matches the RPC return if it's still there
+  total_records?: bigint;
+  overall_sum_tien_linh?: number | null; // Added for aggregate
+  overall_sum_tong_cong?: number | null; // Added for aggregate
 }
 
 interface DetailedSalaryTableProps {
@@ -75,6 +77,8 @@ export default function DetailedSalaryTable({
           tong_cong: item.tong_cong !== null ? Number(item.tong_cong) : null,
           tien_linh: item.tien_linh !== null ? Number(item.tien_linh) : null,
           tien_linh_per_cong: item.tien_linh_per_cong !== null ? Number(item.tien_linh_per_cong) : null,
+          overall_sum_tien_linh: item.overall_sum_tien_linh !== null ? Number(item.overall_sum_tien_linh) : null,
+          overall_sum_tong_cong: item.overall_sum_tong_cong !== null ? Number(item.overall_sum_tong_cong) : null,
         })));
         setTotalRecords(Number(rpcData[0].total_records) || 0);
       } else {
