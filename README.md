@@ -922,7 +922,7 @@ $$;
 
 #### `get_detailed_employee_salary_data`
 
-This function fetches detailed salary information for full-time employees directly from the `Fulltime` table, including their ID (`ma_nhan_vien`), name (`ho_va_ten`), total workdays, "tiền lĩnh" (from `Fulltime.tien_linh`), and calculates "tiền lĩnh / tổng công". It supports pagination.
+This function fetches detailed salary information for full-time employees directly from the `Fulltime` table, including their ID (`ma_nhan_vien`), name (`ho_va_ten`), total workdays, "tiền lĩnh" (from `Fulltime.tien_linh`), and calculates "tiền lĩnh / tổng công". It also calculates overall sums for `tien_linh` and `tong_cong` across all filtered employees. It supports pagination.
 It assumes the `Fulltime` table has columns `ma_nhan_vien`, `ho_va_ten`, `tien_linh` (text format, possibly with commas), and all necessary workday columns.
 
 **SQL Code:**
@@ -941,8 +941,10 @@ RETURNS TABLE(
     ho_ten TEXT,
     tong_cong DOUBLE PRECISION,
     tien_linh DOUBLE PRECISION,
-    tien_linh_per_cong DOUBLE PRECISION, -- New column
-    total_records BIGINT
+    tien_linh_per_cong DOUBLE PRECISION,
+    total_records BIGINT,
+    overall_sum_tien_linh DOUBLE PRECISION,
+    overall_sum_tong_cong DOUBLE PRECISION
 )
 LANGUAGE plpgsql
 AS $$
@@ -994,25 +996,43 @@ BEGIN
         FROM filtered_data fd
         GROUP BY fd.ma_nhan_vien
     ),
-    counted_data AS (
-      SELECT *, COUNT(*) OVER() AS total_records_count FROM grouped_by_employee
+    overall_sums AS (
+        SELECT
+            SUM(gbe.aggregated_tong_cong) AS total_overall_tong_cong,
+            SUM(gbe.aggregated_tien_linh) AS total_overall_tien_linh,
+            COUNT(gbe.ma_nhan_vien) AS total_unique_employees
+        FROM grouped_by_employee gbe
+    ),
+    paginated_employee_data AS (
+      SELECT
+          gbe.ma_nhan_vien,
+          gbe.ho_va_ten_selected,
+          gbe.aggregated_tong_cong,
+          gbe.aggregated_tien_linh,
+          os.total_overall_tong_cong,
+          os.total_overall_tien_linh,
+          os.total_unique_employees
+      FROM grouped_by_employee gbe
+      CROSS JOIN overall_sums os 
+      ORDER BY gbe.ma_nhan_vien 
+      LIMIT p_limit
+      OFFSET p_offset
     )
     SELECT
-        CAST(cd.ma_nhan_vien AS TEXT) AS ma_nv,
-        CAST(cd.ho_va_ten_selected AS TEXT) AS ho_ten,
-        CAST(cd.aggregated_tong_cong AS DOUBLE PRECISION) AS tong_cong,
-        CAST(cd.aggregated_tien_linh AS DOUBLE PRECISION) AS tien_linh,
+        CAST(ped.ma_nhan_vien AS TEXT) AS ma_nv,
+        CAST(ped.ho_va_ten_selected AS TEXT) AS ho_ten,
+        CAST(ped.aggregated_tong_cong AS DOUBLE PRECISION) AS tong_cong,
+        CAST(ped.aggregated_tien_linh AS DOUBLE PRECISION) AS tien_linh,
         CASE
-            WHEN COALESCE(cd.aggregated_tong_cong, 0) = 0 THEN NULL -- Avoid division by zero
-            ELSE CAST(cd.aggregated_tien_linh / cd.aggregated_tong_cong AS DOUBLE PRECISION)
+            WHEN COALESCE(ped.aggregated_tong_cong, 0) = 0 THEN NULL
+            ELSE CAST(ped.aggregated_tien_linh / ped.aggregated_tong_cong AS DOUBLE PRECISION)
         END AS tien_linh_per_cong,
-        CAST(cd.total_records_count AS BIGINT) AS total_records
-    FROM counted_data cd
-    ORDER BY cd.ma_nhan_vien
-    LIMIT p_limit
-    OFFSET p_offset;
+        CAST(ped.total_unique_employees AS BIGINT) AS total_records,
+        CAST(ped.total_overall_tien_linh AS DOUBLE PRECISION) AS overall_sum_tien_linh,
+        CAST(ped.total_overall_tong_cong AS DOUBLE PRECISION) AS overall_sum_tong_cong
+    FROM paginated_employee_data ped;
 END;
-$$;
+$$ LANGUAGE plpgsql;
 ```
 
 
@@ -1029,5 +1049,6 @@ Additionally, for the `get_monthly_salary_trend_fulltime`, `get_monthly_salary_t
 
 
     
+
 
 
