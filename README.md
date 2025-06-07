@@ -922,38 +922,53 @@ $$;
 
 #### `get_detailed_employee_salary_data`
 
-This function fetches detailed salary information for full-time employees directly from the `Fulltime` table, including their ID (`ma_nhan_vien`), name (`ho_va_ten`), total workdays, "tiền lĩnh" (from `Fulltime.tien_linh`), and calculates "tiền lĩnh / tổng công". It also calculates overall sums for `tien_linh` and `tong_cong` across all filtered employees. It supports pagination.
+This function fetches detailed salary information for full-time employees for a selected period and the corresponding period in the previous year to enable Year-over-Year (YoY) comparison. It returns current year (CY) and previous year (PY) metrics for `tong_cong` (total workdays) and `tien_linh` (earnings), and calculates `tien_linh_per_cong` for both periods.
+It also returns `total_records` (unique employees in CY matching filters) and overall sums for `tien_linh_cy` and `tong_cong_cy`.
+It supports filtering by year (as CY), months, locations (`dia_diem`), and `nganh_doc`.
+If `p_filter_year` is `NULL`, previous year fields will be `NULL`.
 It assumes the `Fulltime` table has columns `ma_nhan_vien`, `ho_va_ten`, `tien_linh` (text format, possibly with commas), and all necessary workday columns.
 
 **SQL Code:**
 ```sql
 DROP FUNCTION IF EXISTS get_detailed_employee_salary_data(INTEGER, INTEGER[], TEXT[], TEXT[], INTEGER, INTEGER);
 CREATE OR REPLACE FUNCTION get_detailed_employee_salary_data(
-    p_filter_year INTEGER DEFAULT NULL,
+    p_filter_year INTEGER DEFAULT NULL, -- This is the Current Year (CY) for comparison
     p_filter_months INTEGER[] DEFAULT NULL,
     p_filter_locations TEXT[] DEFAULT NULL,
     p_filter_nganh_docs TEXT[] DEFAULT NULL,
-    p_limit INTEGER DEFAULT NULL, -- Changed default to NULL for fetching all
-    p_offset INTEGER DEFAULT 0 -- Default offset to 0
+    p_limit INTEGER DEFAULT NULL,
+    p_offset INTEGER DEFAULT 0
 )
 RETURNS TABLE(
     ma_nv TEXT,
     ho_ten TEXT,
-    tong_cong DOUBLE PRECISION,
-    tien_linh DOUBLE PRECISION,
-    tien_linh_per_cong DOUBLE PRECISION,
-    total_records BIGINT,
-    overall_sum_tien_linh DOUBLE PRECISION,
-    overall_sum_tong_cong DOUBLE PRECISION
+    tong_cong_cy DOUBLE PRECISION,
+    tien_linh_cy DOUBLE PRECISION,
+    tien_linh_per_cong_cy DOUBLE PRECISION,
+    tong_cong_py DOUBLE PRECISION,
+    tien_linh_py DOUBLE PRECISION,
+    tien_linh_per_cong_py DOUBLE PRECISION,
+    total_records BIGINT, -- Total unique employees in CY matching filters
+    overall_sum_tien_linh_cy DOUBLE PRECISION, -- Sum of tien_linh_cy for all matched CY employees
+    overall_sum_tong_cong_cy DOUBLE PRECISION -- Sum of tong_cong_cy for all matched CY employees
 )
 LANGUAGE plpgsql
 AS $$
+DECLARE
+    v_previous_year INTEGER;
 BEGIN
+    IF p_filter_year IS NOT NULL THEN
+        v_previous_year := p_filter_year - 1;
+    ELSE
+        v_previous_year := NULL; -- No previous year if p_filter_year is NULL
+    END IF;
+
     RETURN QUERY
-    WITH filtered_data AS (
+    WITH base_employee_data AS (
         SELECT
             f.ma_nhan_vien,
             f.ho_va_ten,
+            f.nam::INTEGER AS data_year,
             (
                 COALESCE(f.ngay_thuong_chinh_thuc, 0) +
                 COALESCE(f.ngay_thuong_thu_viec, 0) +
@@ -967,73 +982,100 @@ BEGIN
             ) AS individual_tong_cong,
             CAST(REPLACE(f.tien_linh::text, ',', '') AS DOUBLE PRECISION) AS individual_tien_linh
         FROM "Fulltime" f
-        WHERE (p_filter_year IS NULL OR f.nam::INTEGER = p_filter_year)
-          AND (
-              p_filter_months IS NULL OR
-              array_length(p_filter_months, 1) IS NULL OR
-              array_length(p_filter_months, 1) = 0 OR
-              regexp_replace(f.thang, '\D', '', 'g')::INTEGER = ANY(p_filter_months)
-          )
-          AND (
-              p_filter_locations IS NULL OR
-              array_length(p_filter_locations, 1) IS NULL OR
-              array_length(p_filter_locations, 1) = 0 OR
-              f.dia_diem = ANY(p_filter_locations)
-          )
-          AND (
-              p_filter_nganh_docs IS NULL OR
-              array_length(p_filter_nganh_docs, 1) IS NULL OR
-              array_length(p_filter_nganh_docs, 1) = 0 OR
-              f.nganh_doc = ANY(p_filter_nganh_docs)
-          )
+        WHERE 
+            (p_filter_year IS NULL OR f.nam::INTEGER = p_filter_year OR f.nam::INTEGER = v_previous_year) -- Fetch for CY and PY if CY is given
+            AND (
+                p_filter_months IS NULL OR
+                array_length(p_filter_months, 1) IS NULL OR
+                array_length(p_filter_months, 1) = 0 OR
+                regexp_replace(f.thang, '\D', '', 'g')::INTEGER = ANY(p_filter_months)
+            )
+            AND (
+                p_filter_locations IS NULL OR
+                array_length(p_filter_locations, 1) IS NULL OR
+                array_length(p_filter_locations, 1) = 0 OR
+                f.dia_diem = ANY(p_filter_locations)
+            )
+            AND (
+                p_filter_nganh_docs IS NULL OR
+                array_length(p_filter_nganh_docs, 1) IS NULL OR
+                array_length(p_filter_nganh_docs, 1) = 0 OR
+                f.nganh_doc = ANY(p_filter_nganh_docs)
+            )
     ),
-    grouped_by_employee AS (
+    grouped_by_employee_year AS (
         SELECT
-            fd.ma_nhan_vien,
-            MIN(fd.ho_va_ten) AS ho_va_ten_selected, 
-            SUM(fd.individual_tong_cong) AS aggregated_tong_cong,
-            SUM(fd.individual_tien_linh) AS aggregated_tien_linh
-        FROM filtered_data fd
-        GROUP BY fd.ma_nhan_vien
+            bed.ma_nhan_vien,
+            MIN(bed.ho_va_ten) AS ho_va_ten_selected, 
+            bed.data_year,
+            SUM(bed.individual_tong_cong) AS aggregated_tong_cong,
+            SUM(bed.individual_tien_linh) AS aggregated_tien_linh
+        FROM base_employee_data bed
+        GROUP BY bed.ma_nhan_vien, bed.data_year
     ),
-    overall_sums AS (
+    current_year_aggregated AS (
+        SELECT * FROM grouped_by_employee_year WHERE data_year = p_filter_year
+    ),
+    previous_year_aggregated AS (
+        SELECT * FROM grouped_by_employee_year WHERE data_year = v_previous_year
+    ),
+    combined_employee_data AS (
         SELECT
-            SUM(gbe.aggregated_tong_cong) AS total_overall_tong_cong,
-            SUM(gbe.aggregated_tien_linh) AS total_overall_tien_linh,
-            COUNT(gbe.ma_nhan_vien) AS total_unique_employees
-        FROM grouped_by_employee gbe
+            COALESCE(cya.ma_nhan_vien, pya.ma_nhan_vien) AS ma_nhan_vien,
+            COALESCE(cya.ho_va_ten_selected, pya.ho_va_ten_selected) AS ho_va_ten_selected,
+            cya.aggregated_tong_cong AS tong_cong_cy,
+            cya.aggregated_tien_linh AS tien_linh_cy,
+            pya.aggregated_tong_cong AS tong_cong_py,
+            pya.aggregated_tien_linh AS tien_linh_py
+        FROM current_year_aggregated cya
+        FULL OUTER JOIN previous_year_aggregated pya ON cya.ma_nhan_vien = pya.ma_nhan_vien
+    ),
+    overall_sums_cy AS ( -- Calculate overall sums only for the current year filtered data
+        SELECT
+            SUM(cya.aggregated_tong_cong) AS total_overall_tong_cong_cy,
+            SUM(cya.aggregated_tien_linh) AS total_overall_tien_linh_cy,
+            COUNT(cya.ma_nhan_vien) AS total_unique_employees_cy -- Count of employees in CY
+        FROM current_year_aggregated cya
     ),
     paginated_employee_data AS (
       SELECT
-          gbe.ma_nhan_vien,
-          gbe.ho_va_ten_selected,
-          gbe.aggregated_tong_cong,
-          gbe.aggregated_tien_linh,
-          os.total_overall_tong_cong,
-          os.total_overall_tien_linh,
-          os.total_unique_employees
-      FROM grouped_by_employee gbe
-      CROSS JOIN overall_sums os 
-      ORDER BY gbe.ma_nhan_vien -- Consider making sort order configurable or default to something meaningful
-      LIMIT p_limit -- If p_limit is NULL, this is equivalent to LIMIT ALL
+          ced.ma_nhan_vien,
+          ced.ho_va_ten_selected,
+          ced.tong_cong_cy,
+          ced.tien_linh_cy,
+          ced.tong_cong_py,
+          ced.tien_linh_py,
+          os_cy.total_overall_tong_cong_cy,
+          os_cy.total_overall_tien_linh_cy,
+          os_cy.total_unique_employees_cy
+      FROM combined_employee_data ced
+      CROSS JOIN overall_sums_cy os_cy -- Make overall CY sums available to each row before pagination
+      ORDER BY ced.ma_nhan_vien
+      LIMIT p_limit 
       OFFSET p_offset
     )
     SELECT
         CAST(ped.ma_nhan_vien AS TEXT) AS ma_nv,
         CAST(ped.ho_va_ten_selected AS TEXT) AS ho_ten,
-        CAST(ped.aggregated_tong_cong AS DOUBLE PRECISION) AS tong_cong,
-        CAST(ped.aggregated_tien_linh AS DOUBLE PRECISION) AS tien_linh,
+        CAST(ped.tong_cong_cy AS DOUBLE PRECISION) AS tong_cong_cy,
+        CAST(ped.tien_linh_cy AS DOUBLE PRECISION) AS tien_linh_cy,
         CASE
-            WHEN COALESCE(ped.aggregated_tong_cong, 0) = 0 THEN NULL
-            ELSE CAST(ped.aggregated_tien_linh / ped.aggregated_tong_cong AS DOUBLE PRECISION)
-        END AS tien_linh_per_cong,
-        CAST(ped.total_unique_employees AS BIGINT) AS total_records,
-        CAST(ped.total_overall_tien_linh AS DOUBLE PRECISION) AS overall_sum_tien_linh,
-        CAST(ped.total_overall_tong_cong AS DOUBLE PRECISION) AS overall_sum_tong_cong
+            WHEN COALESCE(ped.tong_cong_cy, 0) = 0 THEN NULL
+            ELSE CAST(ped.tien_linh_cy / ped.tong_cong_cy AS DOUBLE PRECISION)
+        END AS tien_linh_per_cong_cy,
+        CAST(ped.tong_cong_py AS DOUBLE PRECISION) AS tong_cong_py,
+        CAST(ped.tien_linh_py AS DOUBLE PRECISION) AS tien_linh_py,
+        CASE
+            WHEN COALESCE(ped.tong_cong_py, 0) = 0 THEN NULL
+            ELSE CAST(ped.tien_linh_py / ped.tong_cong_py AS DOUBLE PRECISION)
+        END AS tien_linh_per_cong_py,
+        CAST(ped.total_unique_employees_cy AS BIGINT) AS total_records,
+        CAST(ped.total_overall_tien_linh_cy AS DOUBLE PRECISION) AS overall_sum_tien_linh_cy,
+        CAST(ped.total_overall_tong_cong_cy AS DOUBLE PRECISION) AS overall_sum_tong_cong_cy
     FROM paginated_employee_data ped;
 END;
-$$; -- Removed LANGUAGE plpgsql from here as it's at the top
-
+$$;
+```
 
 Once these functions are successfully created (or updated) in your Supabase SQL Editor, the application should be able to correctly filter and aggregate data. If you continue to encounter "unterminated dollar-quoted string" errors, please double-check for any invisible characters or ensure the entire function block is being processed correctly by the SQL editor, especially ensuring no comments are between `END;` and the final `$$;`.
 Additionally, for the `get_monthly_salary_trend_fulltime`, `get_monthly_salary_trend_parttime`, `get_monthly_revenue_trend`, `get_monthly_employee_trend_fulltime`, and `get_monthly_ft_salary_revenue_per_employee_trend` functions, ensure you have a `Time` table (capital T) with appropriate columns (`"Năm"`, `thangpro` (TEXT), `"Thang_x"` (TEXT)) as described in the function's comments.
@@ -1048,6 +1090,7 @@ Additionally, for the `get_monthly_salary_trend_fulltime`, `get_monthly_salary_t
 
 
     
+
 
 
 
