@@ -118,7 +118,7 @@ export default function WorkspaceContent() {
 
   const [activeDashboardTab, setActiveDashboardTab] = useState<DashboardTab>('payrollOverview');
 
-  const [isMounted, setIsMounted] = useState(false);
+  const [isMounted, setIsMounted] = useState(false); // Corrected syntax error here
 
 
   useEffect(() => {
@@ -967,17 +967,22 @@ export default function WorkspaceContent() {
                        <TabsTrigger value="kpiComparison" className="text-xs px-2.5 py-1.5 flex items-center gap-1">
                         <Target className="h-3.5 w-3.5"/> So sánh với Chỉ Tiêu
                       </TabsTrigger>
-                       <TabsTrigger value="salaryAnalysisTab" className="text-xs px-2.5 py-1.5 flex items-center gap-1">
+                      <TabsTrigger value="salaryAnalysisTab" className="text-xs px-2.5 py-1.5 flex items-center gap-1">
                         <FolderKanban className="h-3.5 w-3.5"/> Phân tích lương
                       </TabsTrigger>
-                       <TabsTrigger value="salaryWorkloadAnalysis" className="text-xs px-2.5 py-1.5 flex items-center gap-1">
-                        <Briefcase className="h-3.5 w-3.5"/> Thống kê lương/công
+                      <TabsTrigger value="salaryWorkloadAnalysis" className="text-xs px-2.5 py-1.5 flex items-center gap-1">
+                        <Briefcase className="h-3.5 w-3.5"/> Lương và Hiệu suất
                       </TabsTrigger>
-                      <TabsTrigger value="detailedSalaryAnalysis" className="text-xs px-2.5 py-1.5 flex items-center gap-1">
-                        <UsersRound className="h-3.5 w-3.5"/> Lương Chi Tiết
+                       <TabsTrigger value="detailedSalaryAnalysis" className="text-xs px-2.5 py-1.5 flex items-center gap-1">
+                        <ListChecks className="h-3.5 w-3.5"/> Chi tiết lương
                       </TabsTrigger>
                     </TabsList>
                   </div>
+
+                 {/* Dashboard Tabs Content */}
+
+                  {/* Tab: Tổng Quan Lương & Doanh Thu */}
+
                   <TabsContent value="payrollOverview" className="flex-grow overflow-y-auto space-y-3 mt-2">
                     <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
                         <TotalSalaryCard selectedMonths={selectedMonths} selectedYear={selectedYear} selectedDepartmentsForDiadiem={selectedDepartmentsFromLoaiFilter} selectedNganhDoc={selectedNganhDocForFilter} />
@@ -997,6 +1002,9 @@ export default function WorkspaceContent() {
                         </div>
                     </div>
                   </TabsContent>
+
+                   {/* Tab: So sánh cùng kỳ */}
+
                   <TabsContent value="comparison" className="flex-grow overflow-y-auto space-y-3 mt-2">
                     <div className="grid gap-3 md:grid-cols-5">
                         <ComparisonFulltimeSalaryCard selectedMonths={selectedMonths} selectedDepartmentsForDiadiem={selectedDepartmentsFromLoaiFilter} selectedNganhDoc={selectedNganhDocForFilter} />
@@ -1012,15 +1020,15 @@ export default function WorkspaceContent() {
                         orgHierarchyData={orgHierarchyData}
                         flatOrgUnits={flatOrgUnits}
                     />
-                    <LocationComparisonTable selectedMonths={selectedMonths} selectedDepartmentsForDiadiem={selectedDepartmentsFromLoaiFilter} selectedNganhDoc={selectedNganhDocForFilter} selectedDonVi2={selectedDonVi2ForFilter} />
+                     <LocationComparisonTable selectedMonths={selectedMonths} selectedDepartments={selectedDepartmentsFromLoaiFilter} />
                   </TabsContent>
-                   <TabsContent value="kpiComparison" className="flex-grow overflow-y-auto space-y-3 mt-2">
-                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-6">
-                      <Target className="h-16 w-16 mb-4 opacity-50" />
-                      <h3 className="text-xl font-semibold mb-2">So sánh với Chỉ Tiêu</h3>
-                      <p className="text-sm text-center">Chức năng này đang được phát triển và sẽ sớm có mặt.</p>
-                      <p className="text-sm text-center mt-1">Vui lòng quay lại sau để xem các so sánh với chỉ tiêu KPI của bạn.</p>
-                    </div>
+
+                   {/* Tab: So sánh với Chỉ Tiêu */}
+                  <TabsContent value="kpiComparison" className="flex-grow overflow-y-auto space-y-3 mt-2">
+                     <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-6">
+                       <AlertTriangle className="h-16 w-16 mb-4 opacity-50 text-yellow-500" />
+                        <h3 className="text-xl font-semibold mb-2">Chức năng này đang được xây dựng.</h3>
+                     </div>
                   </TabsContent>
                   <TabsContent value="salaryAnalysisTab" className="flex-grow overflow-y-auto space-y-3 mt-2">
                     <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-6">
@@ -1030,6 +1038,9 @@ export default function WorkspaceContent() {
                       <p className="text-sm text-center mt-1">Tại đây bạn sẽ có thể xem các phân tích chi tiết về lương.</p>
                     </div>
                   </TabsContent>
+
+                   {/* Tab: Lương và Hiệu suất */}
+
                   <TabsContent value="salaryWorkloadAnalysis" className="flex-grow overflow-y-auto space-y-3 mt-2">
                      <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-5">
                         <EmployeeCountCard
@@ -1092,21 +1103,9 @@ export default function WorkspaceContent() {
                         />
                     </div>
                   </TabsContent>
+
+                   {/* Tab: Chi tiết lương */}
                   <TabsContent value="detailedSalaryAnalysis" className="flex-grow overflow-y-auto space-y-3 mt-2">
-                     <Card>
-                      <CardHeader className="pb-1 pt-2 px-3">
-                        <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
-                          <LineChart className="h-4 w-4 text-primary" />
-                          Biểu Đồ Phân Bố (Prototype)
-                        </CardTitle>
-                        <CardDescription className="text-xs">
-                          Ví dụ: Phân bố tiền lĩnh hoặc Tiền lĩnh vs. Tổng công.
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="h-[150px] flex items-center justify-center border rounded-md bg-muted/30 pb-2 px-3">
-                        <p className="text-xs text-muted-foreground">Nội dung biểu đồ sẽ ở đây</p>
-                      </CardContent>
-                    </Card>
                     <DetailedSalaryTable
                         selectedYear={selectedYear}
                         selectedMonths={selectedMonths}

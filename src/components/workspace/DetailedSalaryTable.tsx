@@ -290,7 +290,7 @@ export default function DetailedSalaryTable({
             </div>
           )}
           {!isLoading && !error && data.length > 0 && (
-            <ScrollArea className="border rounded-md max-h-[36rem]">
+            <ScrollArea className="border rounded-md h-full">
               <Table>
                 <TableHeader className="sticky top-0 bg-card z-10">
                   <TableRow>

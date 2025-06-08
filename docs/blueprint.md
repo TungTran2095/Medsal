@@ -1,19 +1,19 @@
-# **App Name**: Echo Chamber
+# **App Name**: Lương Pro
 
 ## Core Features:
 
-- Message Display: Display messages in a clean, chat bubble format.
-- Text Input: Allow users to input and send text messages.
-- AI-Powered Echo: The application leverages a sophisticated AI tool designed to generate responses mirroring the style and content of user inputs, facilitating continuous and contextually relevant conversations.
-- History Management: Implement a user-friendly interface for managing conversation history.
-- Auto-scrolling: The application will automatically scroll the displayed messages as needed to display the latest content.
+- Salary Data Table: Display employee salary data, year-over-year, in a table format.
+- Vertical Scroll: Enable vertical scrolling within the data table to accommodate large datasets without affecting page layout.
+- Data Entry: Input field where employee information may be inputted for display in the table.
+- Calculation Mistake Spotter: Based on the entered values for each field, an AI tool will find common calculation mistakes, and add them to a warning section. Note that it won't correct the information, but instead, serve to make the person inputting aware.
+- Salary Fluctuation Line Chart: Add a line chart to the Distribution Chart (Prototype) to show the fluctuation of salary received over each month
 
 ## Style Guidelines:
 
-- Primary color: Saturated blue (#4285F4), reminiscent of classic messaging apps, implying trust.
-- Background color: Light gray (#F5F5F5), providing a neutral backdrop for readability.
-- Accent color: Teal (#009688) for interactive elements, offering a fresh, modern contrast.
-- Clean and readable font for all text, ensuring clarity and ease of reading.
-- Use minimalist icons for actions like sending messages or accessing settings.
-- Modern, messaging-app inspired layout, with the text box at the bottom.
-- Smooth transitions and subtle animations when new messages are added.
+- Primary color: Muted blue (#6495ED) to convey trustworthiness and stability.
+- Background color: Light gray (#F0F0F0) for a clean and neutral backdrop.
+- Accent color: Soft orange (#FFB347) to highlight key interactive elements such as the warning section.
+- Body and headline font: 'Helvetica', a modern, humanist sans-serif suitable for tabular data and readable body text.
+- Data table occupies the primary space, with a dedicated warning area. Vertical scrolling implemented within the table to maintain page structure.
+- Simple, professional icons representing data types and actions.
+- Subtle transitions when loading or updating data to maintain user engagement without distraction.
