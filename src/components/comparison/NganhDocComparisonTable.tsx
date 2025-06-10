@@ -1,5 +1,3 @@
-
-      
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -191,11 +189,7 @@ const RenderTableRow: React.FC<RenderTableRowProps> = ({
     [hierarchicalChildren, dataMap]
   );
   
-  const hasDynamicChildrenToPotentiallyShow = isHTKCBNode && DYNAMIC_CHILDREN_NAMES.length > 0 && 
-    DYNAMIC_CHILDREN_NAMES.some(name => {
-        const childData = specificChildrenData.get(name);
-        return childData && (childData.total_salary_2024 !== 0 || childData.total_salary_2025 !== 0);
-    });
+  const hasDynamicChildrenToPotentiallyShow = false; // Không hiển thị các phòng khám con
 
   const canExpand = hasDisplayableHierarchicalChildrenWithData || (isHTKCBNode && hasDynamicChildrenToPotentiallyShow);
 
@@ -365,10 +359,19 @@ export default function NganhDocComparisonTable({
         const msg = ftRpcError.message ? String(ftRpcError.message).toLowerCase() : '';
         yearError = { type: (ftRpcError.code === '42883' || msg.includes(ftFunctionName.toLowerCase()) || (msg.includes(ftFunctionName.toLowerCase()) && msg.includes('does not exist')) ) ? 'rpcMissing' : 'generic', message: `Lỗi RPC (${ftFunctionName}, ${year}): ${ftRpcError.message}` };
       } else {
-        ftSalaryData = (Array.isArray(ftRpcData) ? ftRpcData : []).map((item: any) => ({
-          key: String(item.nganh_doc_key),
-          ft_salary: Number(item.ft_salary) || 0,
-        }));
+        // Lọc bỏ các phòng khám trùng lặp
+        const uniqueKeys = new Set<string>();
+        ftSalaryData = (Array.isArray(ftRpcData) ? ftRpcData : [])
+          .filter((item: any) => {
+            const key = String(item.nganh_doc_key);
+            if (uniqueKeys.has(key)) return false;
+            uniqueKeys.add(key);
+            return true;
+          })
+          .map((item: any) => ({
+            key: String(item.nganh_doc_key),
+            ft_salary: Number(item.ft_salary) || 0,
+          }));
       }
     } catch (e: any) {
       if (!yearError) yearError = { type: 'generic', message: `Lỗi không xác định khi gọi RPC Lương FT (năm ${year}): ${e.message}` };
@@ -382,10 +385,19 @@ export default function NganhDocComparisonTable({
                 const msg = ptRpcError.message ? String(ptRpcError.message).toLowerCase() : '';
                 yearError = { type: (ptRpcError.code === '42883' || msg.includes(ptFunctionName.toLowerCase()) || (msg.includes(ptFunctionName.toLowerCase()) && msg.includes('does not exist')) ) ? 'rpcMissing' : 'generic', message: `Lỗi RPC (${ptFunctionName}, ${year}): ${ptRpcError.message}` };
             } else {
-                ptSalaryData = (Array.isArray(ptRpcData) ? ptRpcData : []).map((item: any) => ({
+                // Lọc bỏ các phòng khám trùng lặp
+                const uniqueKeys = new Set<string>();
+                ptSalaryData = (Array.isArray(ptRpcData) ? ptRpcData : [])
+                  .filter((item: any) => {
+                    const key = String(item.don_vi_2_key);
+                    if (uniqueKeys.has(key)) return false;
+                    uniqueKeys.add(key);
+                    return true;
+                  })
+                  .map((item: any) => ({
                     key: String(item.don_vi_2_key),
                     pt_salary: Number(item.pt_salary) || 0,
-                }));
+                  }));
             }
         } catch (e: any) {
             if (!yearError) yearError = { type: 'generic', message: `Lỗi không xác định khi gọi RPC Lương PT (năm ${year}): ${e.message}` };
@@ -397,54 +409,7 @@ export default function NganhDocComparisonTable({
   const fetchSpecificChildrenFinancialData = useCallback(async () => {
     setIsLoadingSpecificChildren(true);
     const newSpecificChildrenData = new Map<string, MergedNganhDocData>();
-
-    for (const childName of DYNAMIC_CHILDREN_NAMES) {
-        let ft2024 = 0, ft2025 = 0, pt2024 = 0, pt2025 = 0;
-        
-        for (const year of [2024, 2025]) {
-            const rpcArgsFt = {
-                filter_year: year,
-                filter_months: (selectedMonths && selectedMonths.length > 0) ? selectedMonths : null,
-                filter_locations: [childName], 
-                filter_nganh_docs: [HETHONG_KHAMCHUABENH_NAME], // Filter by parent's nganh_doc
-            };
-            const rpcArgsPt = {
-                filter_year: year,
-                filter_months: (selectedMonths && selectedMonths.length > 0) ? selectedMonths : null,
-                filter_locations: [childName], 
-                filter_donvi2: [HETHONG_KHAMCHUABENH_NAME], // Filter by parent's Don_vi_2
-            };
-
-            try {
-                const { data: ftData, error: ftErr } = await supabase.rpc('get_total_salary_fulltime', rpcArgsFt);
-                if (ftErr) { console.warn(`Error fetching FT for ${childName} ${year} (as child of HTKCB):`, ftErr); }
-                else if (year === 2024) ft2024 = Number(ftData) || 0;
-                else ft2025 = Number(ftData) || 0;
-
-                const { data: ptData, error: ptErr } = await supabase.rpc('get_total_salary_parttime', rpcArgsPt);
-                if (ptErr) { console.warn(`Error fetching PT for ${childName} ${year} (as child of HTKCB):`, ptErr); }
-                else if (year === 2024) pt2024 = Number(ptData) || 0;
-                else pt2025 = Number(ptData) || 0;
-
-            } catch (e) {
-                console.warn(`Exception fetching data for ${childName} ${year} (as child of HTKCB):`, e);
-            }
-        }
-        
-        const total_salary_2024 = ft2024 + pt2024;
-        const total_salary_2025 = ft2025 + pt2025;
-        newSpecificChildrenData.set(childName, {
-            grouping_key: childName,
-            ft_salary_2024: ft2024, ft_salary_2025: ft2025,
-            pt_salary_2024: pt2024, pt_salary_2025: pt2025,
-            total_salary_2024: total_salary_2024,
-            total_salary_2025: total_salary_2025,
-            ft_salary_change_val: calculateChange(ft2025, ft2024),
-            pt_salary_change_val: calculateChange(pt2025, pt2024),
-            total_salary_change_val: calculateChange(total_salary_2025, total_salary_2024),
-        });
-    }
-    setSpecificChildrenData(newSpecificChildrenData);
+    setSpecificChildrenData(newSpecificChildrenData); // Không lấy dữ liệu cho các phòng khám con
     setIsLoadingSpecificChildren(false);
   }, [selectedMonths]);
 

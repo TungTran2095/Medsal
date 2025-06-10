@@ -1,4 +1,3 @@
-
 # Firebase Studio
 
 This is a NextJS starter in Firebase Studio.
@@ -762,20 +761,24 @@ LANGUAGE plpgsql
 AS $$
 BEGIN
     RETURN QUERY
-    SELECT
-        COALESCE(f.nganh_doc, 'Chưa phân loại') AS nganh_doc_key,
-        SUM(CAST(REPLACE(f.tong_thu_nhap::text, ',', '') AS NUMERIC)) AS ft_salary
-    FROM "Fulltime" f
-    WHERE
-        (p_filter_year IS NULL OR f.nam::INTEGER = p_filter_year)
-        AND (
-            p_filter_months IS NULL OR
-            array_length(p_filter_months, 1) IS NULL OR
-            array_length(p_filter_months, 1) = 0 OR
-            regexp_replace(f.thang, '\D', '', 'g')::INTEGER = ANY(p_filter_months)
-        )
-        AND f.hn_or_note = 'Hà Nội' -- Specific filter for Hanoi
-    GROUP BY COALESCE(f.nganh_doc, 'Chưa phân loại')
+    WITH unique_nganh_doc AS (
+        SELECT DISTINCT ON (COALESCE(f.nganh_doc, 'Chưa phân loại'))
+            COALESCE(f.nganh_doc, 'Chưa phân loại') AS nganh_doc_key,
+            SUM(CAST(REPLACE(f.tong_thu_nhap::text, ',', '') AS NUMERIC)) AS ft_salary
+        FROM "Fulltime" f
+        WHERE
+            (p_filter_year IS NULL OR f.nam::INTEGER = p_filter_year)
+            AND (
+                p_filter_months IS NULL OR
+                array_length(p_filter_months, 1) IS NULL OR
+                array_length(p_filter_months, 1) = 0 OR
+                regexp_replace(f.thang, '\D', '', 'g')::INTEGER = ANY(p_filter_months)
+            )
+            AND f.hn_or_note = 'Hà Nội' -- Specific filter for Hanoi
+        GROUP BY COALESCE(f.nganh_doc, 'Chưa phân loại')
+    )
+    SELECT nganh_doc_key, ft_salary
+    FROM unique_nganh_doc
     ORDER BY nganh_doc_key;
 END;
 $$;
@@ -801,19 +804,23 @@ LANGUAGE plpgsql
 AS $$
 BEGIN
     RETURN QUERY
-    SELECT
-        COALESCE(pt."Don_vi_2", 'Chưa phân loại') AS don_vi_2_key, -- Ensure this matches your column name
-        SUM(CAST(REPLACE(pt."Tong tien"::text, ',', '') AS NUMERIC)) AS pt_salary
-    FROM "Parttime" pt
-    WHERE
-        (p_filter_year IS NULL OR pt."Nam"::INTEGER = p_filter_year)
-        AND (
-            p_filter_months IS NULL OR
-            array_length(p_filter_months, 1) IS NULL OR
-            array_length(p_filter_months, 1) = 0 OR
-            regexp_replace(pt."Thoi gian", '\D', '', 'g')::INTEGER = ANY(p_filter_months)
-        )
-    GROUP BY COALESCE(pt."Don_vi_2", 'Chưa phân loại') -- Ensure this matches your column name
+    WITH unique_don_vi_2 AS (
+        SELECT DISTINCT ON (COALESCE(pt."Don_vi_2", 'Chưa phân loại'))
+            COALESCE(pt."Don_vi_2", 'Chưa phân loại') AS don_vi_2_key,
+            SUM(CAST(REPLACE(pt."Tong tien"::text, ',', '') AS NUMERIC)) AS pt_salary
+        FROM "Parttime" pt
+        WHERE
+            (p_filter_year IS NULL OR pt."Nam"::INTEGER = p_filter_year)
+            AND (
+                p_filter_months IS NULL OR
+                array_length(p_filter_months, 1) IS NULL OR
+                array_length(p_filter_months, 1) = 0 OR
+                regexp_replace(pt."Thoi gian", '\D', '', 'g')::INTEGER = ANY(p_filter_months)
+            )
+        GROUP BY COALESCE(pt."Don_vi_2", 'Chưa phân loại')
+    )
+    SELECT don_vi_2_key, pt_salary
+    FROM unique_don_vi_2
     ORDER BY don_vi_2_key;
 END;
 $$;
