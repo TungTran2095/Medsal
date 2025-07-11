@@ -1084,6 +1084,345 @@ END;
 $$;
 ```
 
+#### `get_doctor_count_latest_fulltime`
+
+Hàm này dùng để đếm tổng số nhân viên full-time có chức danh là bác sĩ trong bảng `Fulltime` ở tháng & năm mới nhất có dữ liệu. Hàm này thực hiện các bước sau:
+1. Count số lượng bác sĩ thông qua cột "ma_nhan_vien" của bảng Fulltime
+2. Filter tháng mới nhất của số lượng này thông qua cột Năm (int8) và Thang_x (text)
+3. Với "ma_nhan_vien" của bảng Fulltime thì trùng với cột "Mã nhân viên" trong bảng "MS_CBNV"
+4. Bảng "MS_CBNV" có một cột tên là "Job title". Cột này trùng với cột "CHỨC DANH CÔNG VIỆC (JOB TITLE)" của bảng "MS_Org_chucdanh"
+5. Trong bảng "MS_Org_chucdanh" thì chọn filter cột "JOB TYPE" =Bác sĩ
+
+Hàm này **không nhận tham số filter** và **chỉ trả về 1 số nguyên duy nhất**.
+
+**SQL Cod   e:**
+```sql
+-- Xóa tất cả các phiên bản của hàm cũ (nếu có)
+CREATE OR REPLACE FUNCTION get_doctor_count_latest_fulltime()
+RETURNS INTEGER
+LANGUAGE SQL
+AS $$
+  WITH max_year AS (
+    SELECT MAX(nam::INTEGER) AS max_year FROM "Fulltime"
+  ),
+  valid_months AS (
+    SELECT thang
+    FROM "Fulltime"
+    WHERE nam = (SELECT max_year FROM max_year)
+      AND thang IS NOT NULL
+      AND regexp_replace(thang, '\\D', '', 'g') ~ '^\\d+$'
+  ),
+  max_month AS (
+    SELECT LPAD(MAX(CAST(regexp_replace(thang, '\\D', '', 'g') AS INTEGER))::text, 2, '0') AS max_month
+    FROM valid_months
+  )
+  SELECT COUNT(DISTINCT f.ma_nhan_vien)
+  FROM "Fulltime" f
+  JOIN "MS_CBNV" m ON f.ma_nhan_vien = m."Mã nhân viên"
+  JOIN "MS_Org_chucdanh" o ON TRIM(UPPER(m."Job title")) = TRIM(UPPER(o."CHỨC DANH CÔNG VIỆC (JOB TITLE)"))
+  WHERE f.nam::INTEGER = (SELECT MAX(nam) FROM "Fulltime")
+    AND regexp_replace(f.thang, '\D', '', 'g') = (
+      SELECT LPAD(MAX(CAST(regexp_replace(thang, '\D', '', 'g') AS INTEGER))::text, 2, '0')
+      FROM "Fulltime"
+      WHERE nam = (SELECT MAX(nam) FROM "Fulltime")
+    )
+      AND o."JOB TYPE" = 'Bác sĩ';
+$$;
+```
+
+- Đảm bảo bảng `Fulltime` có trường `ma_nhan_vien`, `thang`, `nam` và bảng `MS_CBNV` có trường `"Mã nhân viên"`, `"Job title"`, và bảng `MS_Org_chucdanh` có trường `"CHỨC DANH CÔNG VIỆC (JOB TITLE)"`, `"JOB TYPE"`.
+- Nếu tên trường khác, hãy sửa lại cho đúng với cấu trúc bảng của bạn.
+
+#### `get_total_doctor_salary_latest_year`
+
+Function này dùng để lấy tổng thu nhập (tong_thu_nhap) của tất cả bác sĩ fulltime trong năm mới nhất từ bảng Fulltime. Nếu không có dữ liệu, trả về 0.
+
+**SQL Code:**
+```sql
+CREATE OR REPLACE FUNCTION get_total_doctor_salary_latest_year()
+RETURNS DOUBLE PRECISION
+LANGUAGE SQL
+AS $$
+  SELECT COALESCE(SUM(CAST(REPLACE(tong_thu_nhap::text, ',', '') AS DOUBLE PRECISION)), 0)
+  FROM "Fulltime"
+  WHERE nam = (
+    SELECT MAX(nam) FROM "Fulltime"
+    WHERE tong_thu_nhap IS NOT NULL AND tong_thu_nhap <> ''
+  )
+    AND tong_thu_nhap IS NOT NULL AND tong_thu_nhap <> ''
+    AND (nganh_doc ILIKE '%bác sĩ%' OR chuc_danh ILIKE '%bác sĩ%');
+$$;
+```
+
+#### `get_doctor_salary_per_workday_latest_year`
+
+Function này trả về trung bình Lương/công của các bác sĩ fulltime trong tháng/năm mới nhất (theo đúng logic join xác định bác sĩ như get_doctor_count_latest_fulltime). Công thức: tổng tong_thu_nhap chia tổng số công (tổng các cột ngày công). Đã xử lý chuẩn cột thang dạng text.
+
+**SQL Code:**
+```sql
+CREATE OR REPLACE FUNCTION get_doctor_salary_per_workday_latest_year()
+RETURNS DOUBLE PRECISION
+LANGUAGE SQL
+AS $$
+  WITH max_year AS (
+    SELECT MAX(nam) AS max_year FROM "Fulltime"
+  ),
+  valid_months AS (
+    SELECT regexp_replace(thang, '\\D', '', 'g') AS thang_so
+    FROM "Fulltime"
+    WHERE nam = (SELECT max_year FROM max_year)
+      AND thang IS NOT NULL
+      AND regexp_replace(thang, '\\D', '', 'g') ~ '^\\d+$'
+  ),
+  max_month AS (
+    SELECT LPAD(MAX(CAST(thang_so AS INTEGER))::text, 2, '0') AS max_month
+    FROM valid_months
+  ),
+  doctor_data AS (
+    SELECT f.tong_thu_nhap,
+           COALESCE(f.ngay_thuong_chinh_thuc, 0) +
+           COALESCE(f.ngay_thuong_thu_viec, 0) +
+           COALESCE(f.nghi_tuan, 0) +
+           COALESCE(f.le_tet, 0) +
+           COALESCE(f.ngay_thuong_chinh_thuc2, 0) +
+           COALESCE(f.ngay_thuong_thu_viec3, 0) +
+           COALESCE(f.nghi_tuan4, 0) +
+           COALESCE(f.le_tet5, 0) +
+           COALESCE(f.nghi_nl, 0) AS total_workdays
+    FROM "Fulltime" f
+    JOIN "MS_CBNV" m ON f.ma_nhan_vien = m."Mã nhân viên"
+    JOIN "MS_Org_chucdanh" o ON TRIM(UPPER(m."Job title")) = TRIM(UPPER(o."CHỨC DANH CÔNG VIỆC (JOB TITLE)"))
+    WHERE f.nam = (SELECT max_year FROM max_year)
+      AND LPAD(regexp_replace(f.thang, '\\D', '', 'g'), 2, '0') = (SELECT max_month FROM max_month)
+      AND f.thang IS NOT NULL
+      AND regexp_replace(f.thang, '\\D', '', 'g') ~ '^\\d+$'
+      AND o."JOB TYPE" = 'Bác sĩ'
+  )
+  SELECT CASE WHEN SUM(total_workdays) = 0 THEN 0
+              ELSE SUM(CAST(REPLACE(tong_thu_nhap::text, ',', '') AS DOUBLE PRECISION)) / SUM(total_workdays)
+         END
+  FROM doctor_data;
+$$;
+```
+
+#### `get_doctor_salary_per_workday_by_jobtitle_latest_year`
+
+Function này trả về lương/công trung bình của từng chức danh công việc (JOB TITLE) trong bảng MS_Org_chucdanh cho năm mới nhất, chỉ tính các chức danh có nhân viên fulltime thực nhận lương/công > 0.
+
+**SQL Code:**
+```sql
+DROP FUNCTION IF EXISTS get_doctor_salary_per_workday_by_jobtitle_latest_year();
+CREATE OR REPLACE FUNCTION get_doctor_salary_per_workday_by_jobtitle_latest_year()
+RETURNS TABLE(
+    job_title TEXT,
+    salary_per_workday DOUBLE PRECISION
+)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_max_year INTEGER;
+BEGIN
+    SELECT MAX(nam) INTO v_max_year FROM "Fulltime";
+    RETURN QUERY
+    SELECT
+        o."CHỨC DANH CÔNG VIỆC (JOB TITLE)" AS job_title,
+        CASE WHEN SUM(
+            COALESCE(f.ngay_thuong_chinh_thuc, 0) +
+            COALESCE(f.ngay_thuong_thu_viec, 0) +
+            COALESCE(f.nghi_tuan, 0) +
+            COALESCE(f.le_tet, 0) +
+            COALESCE(f.ngay_thuong_chinh_thuc2, 0) +
+            COALESCE(f.ngay_thuong_thu_viec3, 0) +
+            COALESCE(f.nghi_tuan4, 0) +
+            COALESCE(f.le_tet5, 0) +
+            COALESCE(f.nghi_nl, 0)
+        ) = 0 THEN 0 ELSE
+            SUM(CAST(REPLACE(f.tong_thu_nhap::text, ',', '') AS DOUBLE PRECISION)) /
+            SUM(
+                COALESCE(f.ngay_thuong_chinh_thuc, 0) +
+                COALESCE(f.ngay_thuong_thu_viec, 0) +
+                COALESCE(f.nghi_tuan, 0) +
+                COALESCE(f.le_tet, 0) +
+                COALESCE(f.ngay_thuong_chinh_thuc2, 0) +
+                COALESCE(f.ngay_thuong_thu_viec3, 0) +
+                COALESCE(f.nghi_tuan4, 0) +
+                COALESCE(f.le_tet5, 0) +
+                COALESCE(f.nghi_nl, 0)
+            )
+        END AS salary_per_workday
+    FROM "Fulltime" f
+    JOIN "MS_CBNV" m ON f.ma_nhan_vien = m."Mã nhân viên"
+    JOIN "MS_Org_chucdanh" o ON TRIM(UPPER(m."Job title")) = TRIM(UPPER(o."CHỨC DANH CÔNG VIỆC (JOB TITLE)"))
+    WHERE f.nam = v_max_year
+      AND f.thang IS NOT NULL
+      AND regexp_replace(f.thang, '\\D', '', 'g') ~ '^\\d{1,2}'
+    GROUP BY o."CHỨC DANH CÔNG VIỆC (JOB TITLE)"
+    HAVING SUM(
+        COALESCE(f.ngay_thuong_chinh_thuc, 0) +
+        COALESCE(f.ngay_thuong_thu_viec, 0) +
+        COALESCE(f.nghi_tuan, 0) +
+        COALESCE(f.le_tet, 0) +
+        COALESCE(f.ngay_thuong_chinh_thuc2, 0) +
+        COALESCE(f.ngay_thuong_thu_viec3, 0) +
+        COALESCE(f.nghi_tuan4, 0) +
+        COALESCE(f.le_tet5, 0) +
+        COALESCE(f.nghi_nl, 0)
+    ) > 0
+    ORDER BY salary_per_workday DESC;
+END;
+$$;
+```
+
+- Hàm này trả về lương/công trung bình cho từng chức danh công việc trong năm mới nhất.
+- Chỉ tính các chức danh có tổng số công > 0.
+- Đảm bảo các bảng và cột liên quan đã tồn tại đúng như tên trong hàm.
+
+#### `get_doctor_salary_per_workday_by_jobtitle_trend`
+
+Function này trả về lương/công trung bình của từng chức danh công việc (JOB TITLE) cho từng tháng trong năm được chọn. Dùng cho chart Biến Động Lương/Công Bác Sĩ theo chức danh.
+
+**SQL Code:**
+```sql
+DROP FUNCTION IF EXISTS get_doctor_salary_per_workday_by_jobtitle_trend(INTEGER);
+CREATE OR REPLACE FUNCTION get_doctor_salary_per_workday_by_jobtitle_trend(
+    p_filter_year INTEGER DEFAULT NULL
+)
+RETURNS TABLE(
+    month_label TEXT,
+    job_title TEXT,
+    salary_per_workday DOUBLE PRECISION
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        t."Thang_x" AS month_label,
+        o."CHỨC DANH CÔNG VIỆC (JOB TITLE)" AS job_title,
+        CASE WHEN SUM(
+            COALESCE(f.ngay_thuong_chinh_thuc, 0) +
+            COALESCE(f.ngay_thuong_thu_viec, 0) +
+            COALESCE(f.nghi_tuan, 0) +
+            COALESCE(f.le_tet, 0) +
+            COALESCE(f.ngay_thuong_chinh_thuc2, 0) +
+            COALESCE(f.ngay_thuong_thu_viec3, 0) +
+            COALESCE(f.nghi_tuan4, 0) +
+            COALESCE(f.le_tet5, 0) +
+            COALESCE(f.nghi_nl, 0)
+        ) = 0 THEN 0 ELSE
+            SUM(CAST(REPLACE(f.tong_thu_nhap::text, ',', '') AS DOUBLE PRECISION)) /
+            SUM(
+                COALESCE(f.ngay_thuong_chinh_thuc, 0) +
+                COALESCE(f.ngay_thuong_thu_viec, 0) +
+                COALESCE(f.nghi_tuan, 0) +
+                COALESCE(f.le_tet, 0) +
+                COALESCE(f.ngay_thuong_chinh_thuc2, 0) +
+                COALESCE(f.ngay_thuong_thu_viec3, 0) +
+                COALESCE(f.nghi_tuan4, 0) +
+                COALESCE(f.le_tet5, 0) +
+                COALESCE(f.nghi_nl, 0)
+            )
+        END AS salary_per_workday
+    FROM "Fulltime" f
+    JOIN "MS_CBNV" m ON f.ma_nhan_vien = m."Mã nhân viên"
+    JOIN "MS_Org_chucdanh" o ON TRIM(UPPER(m."Job title")) = TRIM(UPPER(o."CHỨC DANH CÔNG VIỆC (JOB TITLE)"))
+    JOIN "Time" t ON f.nam::INTEGER = t."Năm"::INTEGER AND LPAD(regexp_replace(f.thang, '\\D', '', 'g'), 2, '0') = LPAD(regexp_replace(t."Thang_x", '\\D', '', 'g'), 2, '0')
+    WHERE (p_filter_year IS NULL OR f.nam::INTEGER = p_filter_year)
+      AND f.thang IS NOT NULL
+      AND regexp_replace(f.thang, '\\D', '', 'g') ~ '^\\d{1,2}'
+    GROUP BY t."Thang_x", o."CHỨC DANH CÔNG VIỆC (JOB TITLE)"
+    HAVING SUM(
+        COALESCE(f.ngay_thuong_chinh_thuc, 0) +
+        COALESCE(f.ngay_thuong_thu_viec, 0) +
+        COALESCE(f.nghi_tuan, 0) +
+        COALESCE(f.le_tet, 0) +
+        COALESCE(f.ngay_thuong_chinh_thuc2, 0) +
+        COALESCE(f.ngay_thuong_thu_viec3, 0) +
+        COALESCE(f.nghi_tuan4, 0) +
+        COALESCE(f.le_tet5, 0) +
+        COALESCE(f.nghi_nl, 0)
+    ) > 0
+    ORDER BY t."Thang_x", job_title;
+END;
+$$;
+```
+
+- Hàm này trả về lương/công trung bình cho từng chức danh công việc theo từng tháng trong năm được chọn.
+- Chỉ tính các chức danh có tổng số công > 0 trong tháng đó.
+- Đảm bảo các bảng và cột liên quan đã tồn tại đúng như tên trong hàm.
+
+#### `get_doctor_salary_ranking_latest_year`
+
+Hàm này trả về danh sách xếp hạng các bác sĩ fulltime theo tổng lương và lương/công trong năm mới nhất. Kết quả gồm:
+- Mã nhân viên
+- Họ và tên
+- Chuyên môn (Job title)
+- Tổng chi phí lương năm nay
+- Lương/công năm nay
+
+**SQL Code:**
+```sql
+DROP FUNCTION IF EXISTS get_doctor_salary_ranking_latest_year();
+CREATE OR REPLACE FUNCTION get_doctor_salary_ranking_latest_year()
+RETURNS TABLE(
+    ma_nv TEXT,
+    ho_ten TEXT,
+    job_title TEXT,
+    total_salary DOUBLE PRECISION,
+    salary_per_workday DOUBLE PRECISION
+)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_max_year INTEGER;
+BEGIN
+    SELECT MAX(nam) INTO v_max_year FROM "Fulltime";
+    RETURN QUERY
+    SELECT
+        f.ma_nhan_vien AS ma_nv,
+        f.ho_va_ten AS ho_ten,
+        m."Job title" AS job_title,
+        SUM(CAST(REPLACE(f.tong_thu_nhap::text, ',', '') AS DOUBLE PRECISION)) AS total_salary,
+        CASE WHEN SUM(
+            COALESCE(f.ngay_thuong_chinh_thuc, 0) +
+            COALESCE(f.ngay_thuong_thu_viec, 0) +
+            COALESCE(f.nghi_tuan, 0) +
+            COALESCE(f.le_tet, 0) +
+            COALESCE(f.ngay_thuong_chinh_thuc2, 0) +
+            COALESCE(f.ngay_thuong_thu_viec3, 0) +
+            COALESCE(f.nghi_tuan4, 0) +
+            COALESCE(f.le_tet5, 0) +
+            COALESCE(f.nghi_nl, 0)
+        ) = 0 THEN 0 ELSE
+            SUM(CAST(REPLACE(f.tong_thu_nhap::text, ',', '') AS DOUBLE PRECISION)) /
+            SUM(
+                COALESCE(f.ngay_thuong_chinh_thuc, 0) +
+                COALESCE(f.ngay_thuong_thu_viec, 0) +
+                COALESCE(f.nghi_tuan, 0) +
+                COALESCE(f.le_tet, 0) +
+                COALESCE(f.ngay_thuong_chinh_thuc2, 0) +
+                COALESCE(f.ngay_thuong_thu_viec3, 0) +
+                COALESCE(f.nghi_tuan4, 0) +
+                COALESCE(f.le_tet5, 0) +
+                COALESCE(f.nghi_nl, 0)
+            )
+        END AS salary_per_workday
+    FROM "Fulltime" f
+    JOIN "MS_CBNV" m ON f.ma_nhan_vien = m."Mã nhân viên"
+    JOIN "MS_Org_chucdanh" o ON TRIM(UPPER(m."Job title")) = TRIM(UPPER(o."CHỨC DANH CÔNG VIỆC (JOB TITLE)"))
+    WHERE f.nam = v_max_year
+      AND o."JOB TYPE" = 'Bác sĩ'
+      AND f.thang IS NOT NULL
+      AND regexp_replace(f.thang, '\\D', '', 'g') ~ '^\\d{1,2}'
+    GROUP BY f.ma_nhan_vien, f.ho_va_ten, m."Job title"
+    HAVING SUM(CAST(REPLACE(f.tong_thu_nhap::text, ',', '') AS DOUBLE PRECISION)) > 0
+    ORDER BY total_salary DESC, salary_per_workday DESC;
+END;
+$$;
+```
+
+---
+
 Once these functions are successfully created (or updated) in your Supabase SQL Editor, the application should be able to correctly filter and aggregate data. If you continue to encounter "unterminated dollar-quoted string" errors, please double-check for any invisible characters or ensure the entire function block is being processed correctly by the SQL editor, especially ensuring no comments are between `END;` and the final `$$;`.
 Additionally, for the `get_monthly_salary_trend_fulltime`, `get_monthly_salary_trend_parttime`, `get_monthly_revenue_trend`, `get_monthly_employee_trend_fulltime`, and `get_monthly_ft_salary_revenue_per_employee_trend` functions, ensure you have a `Time` table (capital T) with appropriate columns (`"Năm"`, `thangpro` (TEXT), `"Thang_x"` (TEXT)) as described in the function's comments.
     

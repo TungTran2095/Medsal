@@ -169,31 +169,20 @@ const RenderTableRow: React.FC<RenderTableRowProps> = ({
   const isExpanded = expandedKeys.has(node.id);
   const isHTKCBNode = node.id === HETHONG_KHAMCHUABENH_ID;
 
+  // SỬA: Luôn render tất cả các node con trong cây tổ chức, kể cả khi không có dữ liệu lương
   const hierarchicalChildren = useMemo(() =>
-    node.children?.filter(child => {
-        // Never render dynamic children names as hierarchical children of ANY node.
-        if (DYNAMIC_CHILDREN_NAMES.includes(child.name.trim())) {
-            return false;
-        }
-        // General exclusion for other hierarchical children
-        return !EXCLUDED_NGANHDOC_KEYS_SET.has(child.name.trim());
-    }) || [],
+    node.children || [],
     [node.children, node.id]
   );
   
-  const hasDisplayableHierarchicalChildrenWithData = useMemo(() => 
-    hierarchicalChildren.some(child => {
-        const aggData = getAggregatedDataForNode(child, dataMap);
-        return aggData !== null && (aggData.total_salary_2024 !== 0 || aggData.total_salary_2025 !== 0);
-    }),
-    [hierarchicalChildren, dataMap]
-  );
+  const hasDisplayableHierarchicalChildrenWithData = hierarchicalChildren.length > 0;
   
   const hasDynamicChildrenToPotentiallyShow = false; // Không hiển thị các phòng khám con
 
   const canExpand = hasDisplayableHierarchicalChildrenWithData || (isHTKCBNode && hasDynamicChildrenToPotentiallyShow);
 
-  const shouldRenderRow = (aggregatedNodeData && (aggregatedNodeData.total_salary_2024 !== 0 || aggregatedNodeData.total_salary_2025 !== 0)) || canExpand;
+  // SỬA: Luôn render row nếu là node trong cây tổ chức (không cần kiểm tra có dữ liệu lương hay không)
+  const shouldRenderRow = true;
 
   if (!shouldRenderRow) {
     return null;
@@ -359,19 +348,17 @@ export default function NganhDocComparisonTable({
         const msg = ftRpcError.message ? String(ftRpcError.message).toLowerCase() : '';
         yearError = { type: (ftRpcError.code === '42883' || msg.includes(ftFunctionName.toLowerCase()) || (msg.includes(ftFunctionName.toLowerCase()) && msg.includes('does not exist')) ) ? 'rpcMissing' : 'generic', message: `Lỗi RPC (${ftFunctionName}, ${year}): ${ftRpcError.message}` };
       } else {
-        // Lọc bỏ các phòng khám trùng lặp
-        const uniqueKeys = new Set<string>();
-        ftSalaryData = (Array.isArray(ftRpcData) ? ftRpcData : [])
-          .filter((item: any) => {
-            const key = String(item.nganh_doc_key);
-            if (uniqueKeys.has(key)) return false;
-            uniqueKeys.add(key);
-            return true;
-          })
-          .map((item: any) => ({
-            key: String(item.nganh_doc_key),
-            ft_salary: Number(item.ft_salary) || 0,
-          }));
+        // Merge các bản ghi có cùng tên phòng khám
+        const mergedByName = new Map<string, number>();
+        (Array.isArray(ftRpcData) ? ftRpcData : []).forEach((item: any) => {
+          const name = String(item.nganh_doc_name || item.nganh_doc_key);
+          const salary = Number(item.ft_salary) || 0;
+          mergedByName.set(name, (mergedByName.get(name) || 0) + salary);
+        });
+        ftSalaryData = Array.from(mergedByName.entries()).map(([name, salary]) => ({
+          key: name,
+          ft_salary: salary,
+        }));
       }
     } catch (e: any) {
       if (!yearError) yearError = { type: 'generic', message: `Lỗi không xác định khi gọi RPC Lương FT (năm ${year}): ${e.message}` };
@@ -385,19 +372,17 @@ export default function NganhDocComparisonTable({
                 const msg = ptRpcError.message ? String(ptRpcError.message).toLowerCase() : '';
                 yearError = { type: (ptRpcError.code === '42883' || msg.includes(ptFunctionName.toLowerCase()) || (msg.includes(ptFunctionName.toLowerCase()) && msg.includes('does not exist')) ) ? 'rpcMissing' : 'generic', message: `Lỗi RPC (${ptFunctionName}, ${year}): ${ptRpcError.message}` };
             } else {
-                // Lọc bỏ các phòng khám trùng lặp
-                const uniqueKeys = new Set<string>();
-                ptSalaryData = (Array.isArray(ptRpcData) ? ptRpcData : [])
-                  .filter((item: any) => {
-                    const key = String(item.don_vi_2_key);
-                    if (uniqueKeys.has(key)) return false;
-                    uniqueKeys.add(key);
-                    return true;
-                  })
-                  .map((item: any) => ({
-                    key: String(item.don_vi_2_key),
-                    pt_salary: Number(item.pt_salary) || 0,
-                  }));
+                // Merge các bản ghi có cùng tên phòng khám
+                const mergedByName = new Map<string, number>();
+                (Array.isArray(ptRpcData) ? ptRpcData : []).forEach((item: any) => {
+                  const name = String(item.don_vi_2_name || item.don_vi_2_key);
+                  const salary = Number(item.pt_salary) || 0;
+                  mergedByName.set(name, (mergedByName.get(name) || 0) + salary);
+                });
+                ptSalaryData = Array.from(mergedByName.entries()).map(([name, salary]) => ({
+                  key: name,
+                  pt_salary: salary,
+                }));
             }
         } catch (e: any) {
             if (!yearError) yearError = { type: 'generic', message: `Lỗi không xác định khi gọi RPC Lương PT (năm ${year}): ${e.message}` };

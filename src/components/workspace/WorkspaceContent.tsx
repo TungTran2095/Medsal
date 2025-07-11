@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, ChangeEvent, useEffect, useCallback, useMemo } from 'react';
@@ -39,7 +38,17 @@ import RevenuePerWorkdayCard from '@/components/dashboard/RevenuePerWorkdayCard'
 import LocationWorkloadEfficiencyScatterChart from '@/components/charts/LocationWorkloadEfficiencyScatterChart';
 import LocationSalaryPerWorkdayVsTotalWorkdaysScatterChart from '@/components/charts/LocationSalaryPerWorkdayVsTotalWorkdaysScatterChart';
 import DetailedSalaryTable from '@/components/workspace/DetailedSalaryTable';
-
+import DoctorCountCard from '@/components/dashboard/DoctorCountCard';
+import DoctorSalaryCard from '@/components/dashboard/DoctorSalaryCard';
+import DoctorSalaryPerWorkdayCard from '@/components/dashboard/DoctorSalaryPerWorkdayCard';
+import MonthlyDoctorSalaryPerWorkdayChart from '@/components/charts/MonthlyDoctorSalaryPerWorkdayChart';
+import DoctorSalaryPerWorkdayByJobTitleChart from '@/components/charts/DoctorSalaryPerWorkdayByJobTitleChart';
+import DoctorSalaryRankingTable from '@/components/dashboard/DoctorSalaryRankingTable';
+import BackOfficeEmployeeRatioCard from '@/components/dashboard/BackOfficeEmployeeRatioCard';
+import BackOfficeEmployeeRatioTrendChart from '@/components/charts/BackOfficeEmployeeRatioTrendChart';
+import BackOfficeSalaryRatioCard from '@/components/dashboard/BackOfficeSalaryRatioCard';
+import BackOfficeSalaryRatioTrendChart from '@/components/charts/BackOfficeSalaryRatioTrendChart';
+import NganhDocKpiComparisonTable from '@/components/comparison/NganhDocKpiComparisonTable';
 
 import {
   DropdownMenu,
@@ -70,7 +79,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type WorkspaceView = 'dbManagement' | 'dashboard' | 'aiTools';
-type DashboardTab = 'payrollOverview' | 'comparison' | 'kpiComparison' | 'salaryAnalysisTab' | 'salaryWorkloadAnalysis' | 'detailedSalaryAnalysis';
+type DashboardTab = 'payrollOverview' | 'comparison' | 'kpiComparison' | 'salaryAnalysisTab' | 'salaryWorkloadAnalysis' | 'detailedSalaryAnalysis' | 'doctorSalaryAnalysis';
 
 interface NavItem {
   id: WorkspaceView;
@@ -152,7 +161,7 @@ export default function WorkspaceContent() {
            console.warn(`Error fetching years from ${tableName} using column ${yearColumn}:`, error);
         }
         if (data && data.length > 0) {
-          yearsData.push(...data.map(item => item[yearColumn]).filter(nam => nam !== null && nam !== undefined));
+          yearsData.push(...data.map((item: any) => item[yearColumn]).filter((nam: any) => nam !== null && nam !== undefined));
         }
       }
 
@@ -206,7 +215,7 @@ export default function WorkspaceContent() {
 
       if (loaiError) throw loaiError;
 
-      const distinctLoai = [...new Set(loaiData?.map(item => item.Loại).filter(Boolean) as string[])].sort();
+      const distinctLoai = [...new Set(loaiData?.map((item: any) => item.Loại).filter(Boolean) as string[])].sort();
       setAvailableLocationTypes(distinctLoai);
 
       const deptsByLoai: Record<string, string[]> = {};
@@ -217,7 +226,7 @@ export default function WorkspaceContent() {
           .eq('Division', 'Company')
           .eq('Loại', loai);
         if (deptError) throw deptError;
-        deptsByLoai[loai] = [...new Set(deptData?.map(item => item.Department).filter(Boolean) as string[])].sort();
+        deptsByLoai[loai] = [...new Set(deptData?.map((item: any) => item.Department).filter(Boolean) as string[])].sort();
       }
       setAvailableDepartmentsByLoai(deptsByLoai);
 
@@ -976,6 +985,9 @@ export default function WorkspaceContent() {
                        <TabsTrigger value="detailedSalaryAnalysis" className="text-xs px-2.5 py-1.5 flex items-center gap-1">
                         <ListChecks className="h-3.5 w-3.5"/> Chi tiết lương
                       </TabsTrigger>
+                      <TabsTrigger value="doctorSalaryAnalysis" className="text-xs px-2.5 py-1.5 flex items-center gap-1">
+                        <UserCheck className="h-3.5 w-3.5"/> Phân tích lương bác sĩ
+                      </TabsTrigger>
                     </TabsList>
                   </div>
 
@@ -1020,22 +1032,33 @@ export default function WorkspaceContent() {
                         orgHierarchyData={orgHierarchyData}
                         flatOrgUnits={flatOrgUnits}
                     />
-                     <LocationComparisonTable selectedMonths={selectedMonths} selectedDepartments={selectedDepartmentsFromLoaiFilter} />
+                     <LocationComparisonTable selectedMonths={selectedMonths} selectedDepartmentsForDiadiem={selectedDepartmentsFromLoaiFilter} />
                   </TabsContent>
 
                    {/* Tab: So sánh với Chỉ Tiêu */}
                   <TabsContent value="kpiComparison" className="flex-grow overflow-y-auto space-y-3 mt-2">
-                     <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-6">
-                       <AlertTriangle className="h-16 w-16 mb-4 opacity-50 text-yellow-500" />
-                        <h3 className="text-xl font-semibold mb-2">Chức năng này đang được xây dựng.</h3>
-                     </div>
+                     <NganhDocKpiComparisonTable
+                        selectedMonths={selectedMonths}
+                        selectedNganhDoc={selectedNganhDocForFilter}
+                        selectedDonVi2={selectedDonVi2ForFilter}
+                        orgHierarchyData={orgHierarchyData}
+                        flatOrgUnits={flatOrgUnits}
+                      />
                   </TabsContent>
                   <TabsContent value="salaryAnalysisTab" className="flex-grow overflow-y-auto space-y-3 mt-2">
-                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-6">
-                      <FolderKanban className="h-16 w-16 mb-4 opacity-50" />
-                      <h3 className="text-xl font-semibold mb-2">Phân tích lương</h3>
-                      <p className="text-sm text-center">Chức năng này đang được phát triển và sẽ sớm có mặt.</p>
-                      <p className="text-sm text-center mt-1">Tại đây bạn sẽ có thể xem các phân tích chi tiết về lương.</p>
+                    <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+                      <BackOfficeEmployeeRatioCard 
+                        selectedYear={selectedYear} 
+                        selectedMonths={selectedMonths} 
+                        selectedDepartmentsForDiadiem={selectedDepartmentsFromLoaiFilter} 
+                        selectedNganhDoc={selectedNganhDocForFilter} 
+                        selectedDonVi2={selectedDonVi2ForFilter} 
+                      />
+                      <BackOfficeSalaryRatioCard selectedYear={selectedYear} />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <BackOfficeEmployeeRatioTrendChart selectedYear={selectedYear} />
+                      <BackOfficeSalaryRatioTrendChart selectedYear={selectedYear} />
                     </div>
                   </TabsContent>
 
@@ -1112,6 +1135,23 @@ export default function WorkspaceContent() {
                         selectedDepartmentsForDiadiem={selectedDepartmentsFromLoaiFilter}
                         selectedNganhDoc={selectedNganhDocForFilter}
                     />
+                  </TabsContent>
+                  {/* Tab: Phân tích lương bác sĩ */}
+                  <TabsContent value="doctorSalaryAnalysis" className="flex-grow overflow-y-auto space-y-3 mt-2">
+                    <div className="space-y-4 mt-2">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <DoctorCountCard />
+                        <DoctorSalaryCard />
+                        <DoctorSalaryPerWorkdayCard />
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <MonthlyDoctorSalaryPerWorkdayChart selectedYear={selectedYear} />
+                        <DoctorSalaryPerWorkdayByJobTitleChart selectedYear={selectedYear} />
+                      </div>
+                      <div className="mt-4">
+                        <DoctorSalaryRankingTable />
+                      </div>
+                    </div>
                   </TabsContent>
                 </Tabs>
               </CardContent>
