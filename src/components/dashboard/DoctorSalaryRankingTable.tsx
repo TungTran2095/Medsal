@@ -18,6 +18,22 @@ type SortKey = 'total_salary' | 'salary_per_workday' | 'ma_nv' | 'ho_ten' | 'job
 
 type SortDir = 'asc' | 'desc';
 
+// Hàm rút gọn số: 2.000.000 => 2tr
+const compactNumber = (value: number) => {
+  if (value == null) return '';
+  if (value >= 1_000_000_000) return (value / 1_000_000_000).toFixed(1).replace(/\.0$/, '') + 'tỷ';
+  if (value >= 1_000_000) return (value / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'tr';
+  if (value >= 1_000) return (value / 1_000).toFixed(1).replace(/\.0$/, '') + 'k';
+  return value.toString();
+};
+
+const CustomLineLabel = ({ x, y, value, color }: { x: number, y: number, value: any, color: string }) => {
+  if (value === undefined || value === null) return null;
+  return (
+    <text x={x} y={y - 8} fontSize={11} textAnchor="middle" fill={color}>{compactNumber(Number(value))}</text>
+  );
+};
+
 export default function DoctorSalaryRankingTable() {
   const [data, setData] = useState<DoctorRankingRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -38,6 +54,8 @@ export default function DoctorSalaryRankingTable() {
   const [detailData, setDetailData] = useState<Record<string, any>>({});
   const [salaryMonthData, setSalaryMonthData] = useState<Record<string, any[]>>({});
   const [salaryMonthLoading, setSalaryMonthLoading] = useState(false);
+  const [cchnLoading, setCchnLoading] = useState(false);
+  const [cchnData, setCchnData] = useState<Record<string, any>>({});
 
   // Hàm lấy chi tiết bác sĩ từ MS_CBNV
   const fetchDoctorDetail = async (ma_nv: string) => {
@@ -119,7 +137,25 @@ export default function DoctorSalaryRankingTable() {
     }
   };
 
-  // Khi expand row thì fetch thêm dữ liệu lương tháng
+  // Hàm lấy thông tin chứng chỉ hành nghề từ CCHN
+  const fetchCchnDetail = async (ma_nv: string) => {
+    setCchnLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('CCHN')
+        .select('*')
+        .eq('ID', ma_nv)
+        .limit(1);
+      if (error) throw error;
+      setCchnData(prev => ({ ...prev, [ma_nv]: data?.[0] || null }));
+    } catch (e) {
+      setCchnData(prev => ({ ...prev, [ma_nv]: null }));
+    } finally {
+      setCchnLoading(false);
+    }
+  };
+
+  // Khi expand row thì fetch thêm dữ liệu lương tháng và CCHN
   const handleExpand = (ma_nv: string) => {
     if (expandedRow === ma_nv) {
       setExpandedRow(null);
@@ -127,6 +163,7 @@ export default function DoctorSalaryRankingTable() {
       setExpandedRow(ma_nv);
       if (!detailData[ma_nv]) fetchDoctorDetail(ma_nv);
       if (!salaryMonthData[ma_nv]) fetchSalaryMonthData(ma_nv);
+      if (!cchnData[ma_nv]) fetchCchnDetail(ma_nv);
     }
   };
 
@@ -191,15 +228,6 @@ export default function DoctorSalaryRankingTable() {
   };
   const formatNumber = (value: number) => {
     return new Intl.NumberFormat('vi-VN', { minimumFractionDigits: 0, maximumFractionDigits: 1 }).format(value);
-  };
-
-  // Hàm rút gọn số: 2.000.000 => 2tr
-  const compactNumber = (value: number) => {
-    if (value == null) return '';
-    if (value >= 1_000_000_000) return (value / 1_000_000_000).toFixed(1).replace(/\.0$/, '') + 'tỷ';
-    if (value >= 1_000_000) return (value / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'tr';
-    if (value >= 1_000) return (value / 1_000).toFixed(1).replace(/\.0$/, '') + 'k';
-    return value.toString();
   };
 
   const handleSort = (key: SortKey) => {
@@ -372,6 +400,33 @@ export default function DoctorSalaryRankingTable() {
                                   <div className="text-xs text-destructive">Không tìm thấy thông tin chi tiết.</div>
                                 )}
                               </div>
+                              {/* Section 1.1: Chứng chỉ hành nghề */}
+                              <div className="mb-2">
+                                <div className="font-semibold mb-1 text-sm">Chứng chỉ hành nghề</div>
+                                {cchnLoading && !cchnData[row.ma_nv] && (
+                                  <div className="text-xs text-muted-foreground">Đang tải thông tin CCHN...</div>
+                                )}
+                                {cchnData[row.ma_nv] && (
+                                  <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-1 text-xs">
+                                    {[
+                                      { label: 'Trường đào tạo', key: 'Trường đào tạo' },
+                                      { label: 'Chuyên ngành', key: 'Chuyên ngành' },
+                                      { label: 'Số CCHN', key: 'Số CCHN' },
+                                      { label: 'Ngày cấp', key: 'Ngày cấp' },
+                                      { label: 'Phạm vi hoạt động chuyên môn', key: 'Phạm vi hoạt động chuyên môn' },
+                                      { label: 'Nơi đăng kí Hành nghề', key: 'Nơi đăng kí Hành nghề' },
+                                    ].map(field => (
+                                      <div key={field.key} className="flex gap-1">
+                                        <span className="font-semibold whitespace-nowrap">{field.label}:</span>
+                                        <span className="truncate">{cchnData[row.ma_nv][field.key] || '-'}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                                {!cchnLoading && !cchnData[row.ma_nv] && (
+                                  <div className="text-xs text-destructive">Không tìm thấy thông tin CCHN.</div>
+                                )}
+                              </div>
                               {/* Section 2: Lương & lương/công theo tháng */}
                               <div>
                                 <div className="font-semibold mb-1 text-sm">Lương & lương/công theo tháng</div>
@@ -403,8 +458,12 @@ export default function DoctorSalaryRankingTable() {
                                           {/* Không có YAxis */}
                                           <Tooltip formatter={v => compactNumber(Number(v))} labelFormatter={m => `Tháng ${m}`} />
                                           <Legend />
-                                          <Line type="monotone" dataKey="per_workday" stroke="#3b82f6" name="Năm nay" dot={{ r: 3 }} activeDot={{ r: 5 }} label={({ x, y, value }) => value ? <text x={x} y={y - 8} fontSize={11} textAnchor="middle" fill="#3b82f6">{compactNumber(Number(value))}</text> : null} />
-                                          <Line type="monotone" dataKey="per_workday_prev" stroke="#f59e42" name="Năm ngoái" dot={{ r: 3 }} activeDot={{ r: 5 }} label={({ x, y, value }) => value ? <text x={x} y={y - 8} fontSize={11} textAnchor="middle" fill="#f59e42">{compactNumber(Number(value))}</text> : null} />
+                                          <Line type="monotone" dataKey="per_workday" stroke="#3b82f6" name="Năm nay" dot={{ r: 3 }} activeDot={{ r: 5 }}
+                                            label={props => props.value !== undefined && props.value !== null ? <CustomLineLabel {...props} color="#3b82f6" /> : null}
+                                          />
+                                          <Line type="monotone" dataKey="per_workday_prev" stroke="#f59e42" name="Năm ngoái" dot={{ r: 3 }} activeDot={{ r: 5 }}
+                                            label={props => props.value !== undefined && props.value !== null ? <CustomLineLabel {...props} color="#f59e42" /> : null}
+                                          />
                                         </LineChart>
                                       </ResponsiveContainer>
                                     </div>
