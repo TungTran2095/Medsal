@@ -12,9 +12,11 @@ interface DoctorRankingRow {
   job_title: string;
   total_salary: number;
   salary_per_workday: number;
+  total_revenue?: number; // Tổng doanh thu từ năm 2025
+  salary_revenue_ratio?: number; // % lương/doanh thu
 }
 
-type SortKey = 'total_salary' | 'salary_per_workday' | 'ma_nv' | 'ho_ten' | 'job_title';
+type SortKey = 'total_salary' | 'salary_per_workday' | 'ma_nv' | 'ho_ten' | 'job_title' | 'total_revenue' | 'salary_revenue_ratio';
 
 type SortDir = 'asc' | 'desc';
 
@@ -56,6 +58,8 @@ export default function DoctorSalaryRankingTable() {
   const [salaryMonthLoading, setSalaryMonthLoading] = useState(false);
   const [cchnLoading, setCchnLoading] = useState(false);
   const [cchnData, setCchnData] = useState<Record<string, any>>({});
+  const [revenueMonthData, setRevenueMonthData] = useState<Record<string, any[]>>({});
+  const [revenueMonthLoading, setRevenueMonthLoading] = useState(false);
 
   // Hàm lấy chi tiết bác sĩ từ MS_CBNV
   const fetchDoctorDetail = async (ma_nv: string) => {
@@ -155,7 +159,62 @@ export default function DoctorSalaryRankingTable() {
     }
   };
 
-  // Khi expand row thì fetch thêm dữ liệu lương tháng và CCHN
+  // Hàm lấy dữ liệu doanh thu theo tháng cho 1 bác sĩ
+  const fetchRevenueMonthData = async (ma_nv: string) => {
+    setRevenueMonthLoading(true);
+    try {
+      // Lấy tổng doanh thu từng tháng cho bác sĩ (tính sum cột TT2)
+      const { data, error } = await supabase
+        .from('DTBS')
+        .select('Thang, TT2')
+        .eq('ID', ma_nv);
+      if (error) throw error;
+      
+      // Xử lý dữ liệu - gom nhóm theo tháng và tính tổng
+      const parseMonth = (thang: string) => {
+        const match = thang?.match(/Tháng\s*(\d+)/i);
+        return match ? parseInt(match[1], 10) : null;
+      };
+      
+      // Gom nhóm theo tháng và tính tổng TT2
+      const monthGroups: Record<number, number> = {};
+      (data || []).forEach(row => {
+        const month = parseMonth(row.Thang);
+        if (month !== null) {
+          monthGroups[month] = (monthGroups[month] || 0) + Number(row.TT2 || 0);
+        }
+      });
+      
+      // Chuyển thành array và sắp xếp theo tháng
+      const chartData = Object.entries(monthGroups)
+        .map(([month, revenue]) => ({
+          month: parseInt(month, 10),
+          revenue: revenue
+        }))
+        .filter(item => item.revenue > 0)
+        .sort((a, b) => a.month - b.month);
+      
+      setRevenueMonthData(prev => ({ ...prev, [ma_nv]: chartData }));
+    } catch (e) {
+      setRevenueMonthData(prev => ({ ...prev, [ma_nv]: [] }));
+    } finally {
+      setRevenueMonthLoading(false);
+    }
+  };
+
+  // Hàm lấy tổng doanh thu năm 2025 cho tất cả bác sĩ từ function SQL
+  const fetchTotalRevenue2025 = async () => {
+    const { data, error } = await supabase.rpc('get_doctor_total_revenue_2025');
+    if (error) throw error;
+    // data: [{ ma_nv: '123', total_revenue: 1000000 }, ...]
+    const revenueMap: Record<string, number> = {};
+    (data || []).forEach((row: { ma_nv: string; total_revenue: number }) => {
+      revenueMap[row.ma_nv] = Number(row.total_revenue || 0);
+    });
+    return revenueMap;
+  };
+
+  // Khi expand row thì fetch thêm dữ liệu lương tháng, CCHN và doanh thu
   const handleExpand = (ma_nv: string) => {
     if (expandedRow === ma_nv) {
       setExpandedRow(null);
@@ -164,6 +223,7 @@ export default function DoctorSalaryRankingTable() {
       if (!detailData[ma_nv]) fetchDoctorDetail(ma_nv);
       if (!salaryMonthData[ma_nv]) fetchSalaryMonthData(ma_nv);
       if (!cchnData[ma_nv]) fetchCchnDetail(ma_nv);
+      if (!revenueMonthData[ma_nv]) fetchRevenueMonthData(ma_nv);
     }
   };
 
@@ -172,15 +232,27 @@ export default function DoctorSalaryRankingTable() {
     setError(null);
     (async () => {
       try {
-        const { data, error } = await supabase.rpc('get_doctor_salary_ranking_latest_year');
-        if (error) throw error;
-        setData((data || []).map((row: any) => ({
-          ma_nv: String(row.ma_nv),
-          ho_ten: String(row.ho_ten),
-          job_title: String(row.job_title),
-          total_salary: row.total_salary !== null ? Number(row.total_salary) : 0,
-          salary_per_workday: row.salary_per_workday !== null ? Number(row.salary_per_workday) : 0,
-        })));
+        // Lấy dữ liệu ranking (không lấy tổng doanh thu)
+        const rankingResult = await supabase.rpc('get_doctor_salary_ranking_latest_year');
+        if (rankingResult.error) throw rankingResult.error;
+        // Lấy tổng doanh thu cho từng bác sĩ năm 2025
+        const revenueMap = await fetchTotalRevenue2025();
+        setData((rankingResult.data || []).map((row: any) => {
+          const total_revenue = revenueMap[String(row.ma_nv)] || 0;
+          const salary = row.total_salary !== null ? Number(row.total_salary) : 0;
+          return {
+            ma_nv: String(row.ma_nv),
+            ho_ten: String(row.ho_ten),
+            job_title: String(row.job_title),
+            total_salary: salary,
+            salary_per_workday: row.salary_per_workday !== null ? Number(row.salary_per_workday) : 0,
+            total_revenue,
+            salary_revenue_ratio:
+              total_revenue > 0 && isFinite(salary / total_revenue)
+                ? salary / total_revenue
+                : 0,
+          };
+        }));
       } catch (e: any) {
         setError(e.message || 'Không thể tải dữ liệu ranking bác sĩ.');
         setData([]);
@@ -343,144 +415,183 @@ export default function DoctorSalaryRankingTable() {
             </div>
           )}
           {!isLoading && !error && data.length > 0 && (
-            <div className="border rounded-md" style={{ maxHeight: maxTableHeight, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <div className="border rounded-md" style={{ maxHeight: maxTableHeight, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
               <Table>
                 <TableHeader className="sticky top-0 bg-card z-10">
                   <TableRow>
-                    <TableHead></TableHead>
-                    <TableHead className={cn('text-xs py-1.5 px-2 cursor-pointer whitespace-nowrap', sortKey === 'ma_nv' && 'font-bold')} onClick={() => handleSort('ma_nv')}>Mã NV</TableHead>
-                    <TableHead className={cn('text-xs py-1.5 px-2 cursor-pointer whitespace-nowrap', sortKey === 'ho_ten' && 'font-bold')} onClick={() => handleSort('ho_ten')}>Họ và Tên</TableHead>
-                    <TableHead className={cn('text-xs py-1.5 px-2 cursor-pointer whitespace-nowrap', sortKey === 'job_title' && 'font-bold')} onClick={() => handleSort('job_title')}>Chuyên môn</TableHead>
-                    <TableHead className={cn('text-xs py-1.5 px-2 cursor-pointer whitespace-nowrap text-right', sortKey === 'total_salary' && 'font-bold')} onClick={() => handleSort('total_salary')}>
-                      Tổng lương {renderSortIcon('total_salary')}
-                    </TableHead>
-                    <TableHead className={cn('text-xs py-1.5 px-2 cursor-pointer whitespace-nowrap text-right', sortKey === 'salary_per_workday' && 'font-bold')} onClick={() => handleSort('salary_per_workday')}>
-                      Lương/Công {renderSortIcon('salary_per_workday')}
+                    <TableHead className="w-8" />
+                    <TableHead className="text-xs py-1.5 px-2 cursor-pointer whitespace-nowrap">Mã NV</TableHead>
+                    <TableHead className="text-xs py-1.5 px-2 cursor-pointer whitespace-nowrap">Họ và Tên</TableHead>
+                    <TableHead className="text-xs py-1.5 px-2 cursor-pointer whitespace-nowrap">Chuyên môn</TableHead>
+                    <TableHead className="text-xs py-1.5 px-2 cursor-pointer whitespace-nowrap text-right">Tổng lương {renderSortIcon('total_salary')}</TableHead>
+                    <TableHead className="text-xs py-1.5 px-2 cursor-pointer whitespace-nowrap text-right">Lương/Công {renderSortIcon('salary_per_workday')}</TableHead>
+                    <TableHead className="text-xs py-1.5 px-2 cursor-pointer whitespace-nowrap text-right">Tổng doanh thu (từ 2025) {renderSortIcon('total_revenue')}</TableHead>
+                    <TableHead
+                      className={cn('text-xs py-1.5 px-2 cursor-pointer whitespace-nowrap text-right', sortKey === 'salary_revenue_ratio' && 'font-bold')}
+                      onClick={() => handleSort('salary_revenue_ratio')}
+                    >
+                      % Lương/Doanh thu {renderSortIcon('salary_revenue_ratio')}
                     </TableHead>
                   </TableRow>
                 </TableHeader>
-              </Table>
-              <div style={{ overflowY: 'auto', flex: 1 }}>
-                <Table>
-                  <TableBody>
-                    {sortedData.map((row, idx) => (
-                      <React.Fragment key={row.ma_nv + row.job_title + idx}>
-                        <TableRow className={idx < 3 ? 'bg-yellow-50 dark:bg-yellow-900/10' : ''}>
-                          <TableCell className="text-xs py-1.5 px-2">
-                            <button onClick={() => handleExpand(row.ma_nv)} className="focus:outline-none">
-                              {expandedRow === row.ma_nv ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                            </button>
+                <TableBody>
+                  {sortedData.map((row, idx) => (
+                    <React.Fragment key={row.ma_nv + row.job_title + idx}>
+                      <TableRow className={idx < 3 ? 'bg-yellow-50 dark:bg-yellow-900/10' : ''}>
+                        <TableCell className="w-8 text-xs py-1.5 px-2">
+                          <button onClick={() => handleExpand(row.ma_nv)} className="focus:outline-none">
+                            {expandedRow === row.ma_nv ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                          </button>
+                        </TableCell>
+                        <TableCell className="text-xs py-1.5 px-2 whitespace-nowrap">{row.ma_nv}</TableCell>
+                        <TableCell className="text-xs py-1.5 px-2 whitespace-nowrap">{row.ho_ten}</TableCell>
+                        <TableCell className="text-xs py-1.5 px-2 whitespace-nowrap">{row.job_title}</TableCell>
+                        <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap font-semibold">{formatCurrency(row.total_salary)}</TableCell>
+                        <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap">{formatCurrency(row.salary_per_workday)}</TableCell>
+                        <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap font-semibold">{formatCurrency(row.total_revenue ?? 0)}</TableCell>
+                        <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap font-semibold">
+                          {row.salary_revenue_ratio && isFinite(row.salary_revenue_ratio)
+                            ? (row.salary_revenue_ratio * 100).toFixed(1) + '%'
+                            : '0%'}
+                        </TableCell>
+                      </TableRow>
+                      {expandedRow === row.ma_nv && (
+                        <TableRow>
+                          <TableCell colSpan={7} className="bg-muted px-4 py-2 animate-slideDown">
+                            {/* Section 1: Thông tin hành chính */}
+                            <div className="mb-2">
+                              <div className="font-semibold mb-1 text-sm">Thông tin hành chính</div>
+                              {detailLoading && !detailData[row.ma_nv] && (
+                                <div className="text-xs text-muted-foreground">Đang tải thông tin chi tiết...</div>
+                              )}
+                              {detailData[row.ma_nv] && (
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-1 text-xs">
+                                  {Object.entries(detailData[row.ma_nv]).map(([k, v]) => (
+                                    <div key={k} className="flex gap-1">
+                                      <span className="font-semibold whitespace-nowrap">{k}:</span>
+                                      <span className="truncate">{String(v)}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {!detailLoading && !detailData[row.ma_nv] && (
+                                <div className="text-xs text-destructive">Không tìm thấy thông tin chi tiết.</div>
+                              )}
+                            </div>
+                            {/* Section 1.1: Chứng chỉ hành nghề */}
+                            <div className="mb-2">
+                              <div className="font-semibold mb-1 text-sm">Chứng chỉ hành nghề</div>
+                              {cchnLoading && !cchnData[row.ma_nv] && (
+                                <div className="text-xs text-muted-foreground">Đang tải thông tin CCHN...</div>
+                              )}
+                              {cchnData[row.ma_nv] && (
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-1 text-xs">
+                                  {[
+                                    { label: 'Trường đào tạo', key: 'Trường đào tạo' },
+                                    { label: 'Chuyên ngành', key: 'Chuyên ngành' },
+                                    { label: 'Số CCHN', key: 'Số CCHN' },
+                                    { label: 'Ngày cấp', key: 'Ngày cấp' },
+                                    { label: 'Phạm vi hoạt động chuyên môn', key: 'Phạm vi hoạt động chuyên môn' },
+                                    { label: 'Nơi đăng kí Hành nghề', key: 'Nơi đăng kí Hành nghề' },
+                                  ].map(field => (
+                                    <div key={field.key} className="flex gap-1">
+                                      <span className="font-semibold whitespace-nowrap">{field.label}:</span>
+                                      <span className="truncate">{cchnData[row.ma_nv][field.key] || '-'}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {!cchnLoading && !cchnData[row.ma_nv] && (
+                                <div className="text-xs text-destructive">Không tìm thấy thông tin CCHN.</div>
+                              )}
+                            </div>
+                            {/* Section 2: Lương & lương/công theo tháng */}
+                            <div>
+                              <div className="font-semibold mb-1 text-sm">Lương & lương/công theo tháng</div>
+                              {salaryMonthLoading && (!salaryMonthData[row.ma_nv] || salaryMonthData[row.ma_nv].length === 0) && (
+                                <div className="text-xs text-muted-foreground">Đang tải dữ liệu lương theo tháng...</div>
+                              )}
+                              {salaryMonthData[row.ma_nv] && salaryMonthData[row.ma_nv].length > 0 && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  {/* Bar chart: Lương theo tháng */}
+                                  <div>
+                                    <div className="text-xs font-semibold mb-1">Lương theo tháng (năm hiện tại)</div>
+                                    <ResponsiveContainer width="100%" height={180}>
+                                      <BarChart data={salaryMonthData[row.ma_nv]}>
+                                        <XAxis dataKey="month" tickFormatter={m => `Th${m}`} fontSize={11} />
+                                        {/* Không có YAxis */}
+                                        <Tooltip formatter={v => compactNumber(Number(v))} labelFormatter={m => `Tháng ${m}`} />
+                                        <Bar dataKey="salary" fill="#3b82f6" name="Lương">
+                                          <LabelList dataKey="salary" position="top" formatter={compactNumber} fontSize={11} />
+                                        </Bar>
+                                      </BarChart>
+                                    </ResponsiveContainer>
+                                  </div>
+                                  {/* Line chart: Lương/công theo tháng */}
+                                  <div>
+                                    <div className="text-xs font-semibold mb-1">Lương/Công theo tháng (so sánh 2 năm)</div>
+                                    <ResponsiveContainer width="100%" height={180}>
+                                      <LineChart data={salaryMonthData[row.ma_nv]}>
+                                        <XAxis dataKey="month" tickFormatter={m => `Th${m}`} fontSize={11} />
+                                        {/* Không có YAxis */}
+                                        <Tooltip formatter={v => compactNumber(Number(v))} labelFormatter={m => `Tháng ${m}`} />
+                                        <Legend />
+                                        <Line type="monotone" dataKey="per_workday" stroke="#3b82f6" name="Năm nay" dot={{ r: 3 }} activeDot={{ r: 5 }}>
+                                          <LabelList dataKey="per_workday" position="top" formatter={compactNumber} fontSize={11} />
+                                        </Line>
+                                        <Line type="monotone" dataKey="per_workday_prev" stroke="#f59e42" name="Năm ngoái" dot={{ r: 3 }} activeDot={{ r: 5 }}>
+                                          <LabelList dataKey="per_workday_prev" position="top" formatter={compactNumber} fontSize={11} />
+                                        </Line>
+                                      </LineChart>
+                                    </ResponsiveContainer>
+                                  </div>
+                                </div>
+                              )}
+                              {salaryMonthData[row.ma_nv] && salaryMonthData[row.ma_nv].length === 0 && !salaryMonthLoading && (
+                                <div className="text-xs text-destructive">Không có dữ liệu lương theo tháng.</div>
+                              )}
+                            </div>
+                            {/* Section 3: Doanh thu theo tháng */}
+                            <div className="mb-2">
+                              <div className="font-semibold mb-1 text-sm">Doanh thu theo tháng</div>
+                              {revenueMonthLoading && (!revenueMonthData[row.ma_nv] || revenueMonthData[row.ma_nv].length === 0) && (
+                                <div className="text-xs text-muted-foreground">Đang tải dữ liệu doanh thu theo tháng...</div>
+                              )}
+                              {revenueMonthData[row.ma_nv] && revenueMonthData[row.ma_nv].length > 0 && (
+                                <div>
+                                  <div className="text-xs font-semibold mb-1">Doanh thu theo tháng</div>
+                                  <ResponsiveContainer width="100%" height={180}>
+                                    <LineChart data={revenueMonthData[row.ma_nv]}>
+                                      <XAxis dataKey="month" tickFormatter={m => `Th${m}`} fontSize={11} />
+                                      <Tooltip formatter={v => compactNumber(Number(v))} labelFormatter={m => `Tháng ${m}`} />
+                                      <Line type="monotone" dataKey="revenue" stroke="#10b981" name="Doanh thu" dot={{ r: 3 }} activeDot={{ r: 5 }}>
+                                        <LabelList
+                                          dataKey="revenue"
+                                          position="top"
+                                          content={({ x, y, value }) =>
+                                            value !== undefined && value !== null && y !== undefined ? (
+                                              <text x={x} y={(y as number) - 8} fontSize={11} textAnchor="middle" fill="#10b981">
+                                                {compactNumber(Number(value))}
+                                              </text>
+                                            ) : null
+                                          }
+                                        />
+                                      </Line>
+                                    </LineChart>
+                                  </ResponsiveContainer>
+                                </div>
+                              )}
+                              {revenueMonthData[row.ma_nv] && revenueMonthData[row.ma_nv].length === 0 && !revenueMonthLoading && (
+                                <div className="text-xs text-destructive">Không có dữ liệu doanh thu theo tháng.</div>
+                              )}
+                            </div>
                           </TableCell>
-                          <TableCell className="text-xs py-1.5 px-2 whitespace-nowrap">{row.ma_nv}</TableCell>
-                          <TableCell className="text-xs py-1.5 px-2 whitespace-nowrap">{row.ho_ten}</TableCell>
-                          <TableCell className="text-xs py-1.5 px-2 whitespace-nowrap">{row.job_title}</TableCell>
-                          <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap font-semibold">{formatCurrency(row.total_salary)}</TableCell>
-                          <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap">{formatCurrency(row.salary_per_workday)}</TableCell>
                         </TableRow>
-                        {expandedRow === row.ma_nv && (
-                          <TableRow>
-                            <TableCell colSpan={6} className="bg-muted px-4 py-2 animate-slideDown">
-                              {/* Section 1: Thông tin hành chính */}
-                              <div className="mb-2">
-                                <div className="font-semibold mb-1 text-sm">Thông tin hành chính</div>
-                                {detailLoading && !detailData[row.ma_nv] && (
-                                  <div className="text-xs text-muted-foreground">Đang tải thông tin chi tiết...</div>
-                                )}
-                                {detailData[row.ma_nv] && (
-                                  <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-1 text-xs">
-                                    {Object.entries(detailData[row.ma_nv]).map(([k, v]) => (
-                                      <div key={k} className="flex gap-1">
-                                        <span className="font-semibold whitespace-nowrap">{k}:</span>
-                                        <span className="truncate">{String(v)}</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                                {!detailLoading && !detailData[row.ma_nv] && (
-                                  <div className="text-xs text-destructive">Không tìm thấy thông tin chi tiết.</div>
-                                )}
-                              </div>
-                              {/* Section 1.1: Chứng chỉ hành nghề */}
-                              <div className="mb-2">
-                                <div className="font-semibold mb-1 text-sm">Chứng chỉ hành nghề</div>
-                                {cchnLoading && !cchnData[row.ma_nv] && (
-                                  <div className="text-xs text-muted-foreground">Đang tải thông tin CCHN...</div>
-                                )}
-                                {cchnData[row.ma_nv] && (
-                                  <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-1 text-xs">
-                                    {[
-                                      { label: 'Trường đào tạo', key: 'Trường đào tạo' },
-                                      { label: 'Chuyên ngành', key: 'Chuyên ngành' },
-                                      { label: 'Số CCHN', key: 'Số CCHN' },
-                                      { label: 'Ngày cấp', key: 'Ngày cấp' },
-                                      { label: 'Phạm vi hoạt động chuyên môn', key: 'Phạm vi hoạt động chuyên môn' },
-                                      { label: 'Nơi đăng kí Hành nghề', key: 'Nơi đăng kí Hành nghề' },
-                                    ].map(field => (
-                                      <div key={field.key} className="flex gap-1">
-                                        <span className="font-semibold whitespace-nowrap">{field.label}:</span>
-                                        <span className="truncate">{cchnData[row.ma_nv][field.key] || '-'}</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                                {!cchnLoading && !cchnData[row.ma_nv] && (
-                                  <div className="text-xs text-destructive">Không tìm thấy thông tin CCHN.</div>
-                                )}
-                              </div>
-                              {/* Section 2: Lương & lương/công theo tháng */}
-                              <div>
-                                <div className="font-semibold mb-1 text-sm">Lương & lương/công theo tháng</div>
-                                {salaryMonthLoading && (!salaryMonthData[row.ma_nv] || salaryMonthData[row.ma_nv].length === 0) && (
-                                  <div className="text-xs text-muted-foreground">Đang tải dữ liệu lương theo tháng...</div>
-                                )}
-                                {salaryMonthData[row.ma_nv] && salaryMonthData[row.ma_nv].length > 0 && (
-                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {/* Bar chart: Lương theo tháng */}
-                                    <div>
-                                      <div className="text-xs font-semibold mb-1">Lương theo tháng (năm hiện tại)</div>
-                                      <ResponsiveContainer width="100%" height={180}>
-                                        <BarChart data={salaryMonthData[row.ma_nv]}>
-                                          <XAxis dataKey="month" tickFormatter={m => `Th${m}`} fontSize={11} />
-                                          {/* Không có YAxis */}
-                                          <Tooltip formatter={v => compactNumber(Number(v))} labelFormatter={m => `Tháng ${m}`} />
-                                          <Bar dataKey="salary" fill="#3b82f6" name="Lương">
-                                            <LabelList dataKey="salary" position="top" formatter={compactNumber} fontSize={11} />
-                                          </Bar>
-                                        </BarChart>
-                                      </ResponsiveContainer>
-                                    </div>
-                                    {/* Line chart: Lương/công theo tháng */}
-                                    <div>
-                                      <div className="text-xs font-semibold mb-1">Lương/Công theo tháng (so sánh 2 năm)</div>
-                                      <ResponsiveContainer width="100%" height={180}>
-                                        <LineChart data={salaryMonthData[row.ma_nv]}>
-                                          <XAxis dataKey="month" tickFormatter={m => `Th${m}`} fontSize={11} />
-                                          {/* Không có YAxis */}
-                                          <Tooltip formatter={v => compactNumber(Number(v))} labelFormatter={m => `Tháng ${m}`} />
-                                          <Legend />
-                                          <Line type="monotone" dataKey="per_workday" stroke="#3b82f6" name="Năm nay" dot={{ r: 3 }} activeDot={{ r: 5 }}
-                                            label={props => props.value !== undefined && props.value !== null ? <CustomLineLabel {...props} color="#3b82f6" /> : null}
-                                          />
-                                          <Line type="monotone" dataKey="per_workday_prev" stroke="#f59e42" name="Năm ngoái" dot={{ r: 3 }} activeDot={{ r: 5 }}
-                                            label={props => props.value !== undefined && props.value !== null ? <CustomLineLabel {...props} color="#f59e42" /> : null}
-                                          />
-                                        </LineChart>
-                                      </ResponsiveContainer>
-                                    </div>
-                                  </div>
-                                )}
-                                {salaryMonthData[row.ma_nv] && salaryMonthData[row.ma_nv].length === 0 && !salaryMonthLoading && (
-                                  <div className="text-xs text-destructive">Không có dữ liệu lương theo tháng.</div>
-                                )}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        )}
-                      </React.Fragment>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                      )}
+                    </React.Fragment>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
           )}
         </div>
