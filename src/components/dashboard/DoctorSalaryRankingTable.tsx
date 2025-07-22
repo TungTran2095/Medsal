@@ -366,9 +366,11 @@ export default function DoctorSalaryRankingTable() {
       // Lọc lương/công
       if (filterPerWorkdayMin && row.salary_per_workday < Number(filterPerWorkdayMin)) return false;
       if (filterPerWorkdayMax && row.salary_per_workday > Number(filterPerWorkdayMax)) return false;
-      // Lọc theo CCHN
-      if (filterCchn === 'has' && (!cchnData[row.ma_nv] || Object.keys(cchnData[row.ma_nv] || {}).length === 0)) return false;
-      if (filterCchn === 'none' && cchnData[row.ma_nv] && Object.keys(cchnData[row.ma_nv] || {}).length > 0) return false;
+      // Lọc theo CCHN (dựa vào cột 'Số CCHN')
+      const soCchn = cchnData[row.ma_nv]?.['Số CCHN'];
+      const hasCchn = soCchn !== null && soCchn !== undefined && String(soCchn).trim() !== '';
+      if (filterCchn === 'has' && !hasCchn) return false;
+      if (filterCchn === 'none' && hasCchn) return false;
       return true;
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
