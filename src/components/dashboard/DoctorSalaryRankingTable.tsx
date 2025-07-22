@@ -68,6 +68,8 @@ export default function DoctorSalaryRankingTable() {
   const [filterSalaryMax, setFilterSalaryMax] = useState('');
   const [filterPerWorkdayMin, setFilterPerWorkdayMin] = useState('');
   const [filterPerWorkdayMax, setFilterPerWorkdayMax] = useState('');
+  // Thêm filter CCHN
+  const [filterCchn, setFilterCchn] = useState<'all' | 'has' | 'none'>('all');
 
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -341,6 +343,16 @@ export default function DoctorSalaryRankingTable() {
     })();
   }, []);
 
+  // Tự động fetch CCHN cho tất cả bác sĩ khi có data mới
+  useEffect(() => {
+    if (data.length > 0) {
+      data.forEach(row => {
+        if (!cchnData[row.ma_nv]) fetchCchnDetail(row.ma_nv);
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
+
   // Lọc dữ liệu theo filter
   const filteredData = useMemo(() => {
     return data.filter(row => {
@@ -354,9 +366,13 @@ export default function DoctorSalaryRankingTable() {
       // Lọc lương/công
       if (filterPerWorkdayMin && row.salary_per_workday < Number(filterPerWorkdayMin)) return false;
       if (filterPerWorkdayMax && row.salary_per_workday > Number(filterPerWorkdayMax)) return false;
+      // Lọc theo CCHN
+      if (filterCchn === 'has' && (!cchnData[row.ma_nv] || Object.keys(cchnData[row.ma_nv] || {}).length === 0)) return false;
+      if (filterCchn === 'none' && cchnData[row.ma_nv] && Object.keys(cchnData[row.ma_nv] || {}).length > 0) return false;
       return true;
     });
-  }, [data, filterName, filterJobTitle, filterSalaryMin, filterSalaryMax, filterPerWorkdayMin, filterPerWorkdayMax]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, filterName, filterJobTitle, filterSalaryMin, filterSalaryMax, filterPerWorkdayMin, filterPerWorkdayMax, filterCchn, cchnData]);
 
   const sortedData = useMemo(() => {
     const arr = [...filteredData];
@@ -524,6 +540,18 @@ export default function DoctorSalaryRankingTable() {
               value={filterPerWorkdayMax}
               onChange={e => setFilterPerWorkdayMax(e.target.value)}
             />
+          </div>
+          <div className="flex flex-col">
+            <label className="text-xs mb-1">Chứng chỉ hành nghề</label>
+            <select
+              className="border rounded px-2 py-1 text-xs min-w-[120px]"
+              value={filterCchn}
+              onChange={e => setFilterCchn(e.target.value as 'all' | 'has' | 'none')}
+            >
+              <option value="all">Tất cả</option>
+              <option value="has">Có CCHN</option>
+              <option value="none">Không có CCHN</option>
+            </select>
           </div>
         </div>
         <div className="flex-grow min-h-0">
