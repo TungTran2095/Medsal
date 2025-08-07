@@ -49,6 +49,7 @@ import BackOfficeEmployeeRatioTrendChart from '@/components/charts/BackOfficeEmp
 import BackOfficeSalaryRatioCard from '@/components/dashboard/BackOfficeSalaryRatioCard';
 import BackOfficeSalaryRatioTrendChart from '@/components/charts/BackOfficeSalaryRatioTrendChart';
 import NganhDocKpiComparisonTable from '@/components/comparison/NganhDocKpiComparisonTable';
+import SystemWideNganhDocComparisonTable from '@/components/comparison/SystemWideNganhDocComparisonTable';
 
 import {
   DropdownMenu,
@@ -1042,6 +1043,13 @@ export default function WorkspaceContent() {
                         <ComparisonSalaryRevenueRatioCard selectedMonths={selectedMonths} selectedDepartmentsForDiadiem={selectedDepartmentsFromLoaiFilter} selectedNganhDoc={selectedNganhDocForFilter} selectedDonVi2={selectedDonVi2ForFilter} />
                     </div>
                     <NganhDocComparisonTable
+                        selectedMonths={selectedMonths}
+                        selectedNganhDoc={selectedNganhDocForFilter}
+                        selectedDonVi2={selectedDonVi2ForFilter}
+                        orgHierarchyData={orgHierarchyData}
+                        flatOrgUnits={flatOrgUnits}
+                    />
+                    <SystemWideNganhDocComparisonTable
                         selectedMonths={selectedMonths}
                         selectedNganhDoc={selectedNganhDocForFilter}
                         selectedDonVi2={selectedDonVi2ForFilter}
