@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import LoginForm from '@/components/auth/LoginForm';
 import { Loader2 } from 'lucide-react';
 
-export default function AuthPage() {
+// Component con để sử dụng useSearchParams
+function LoginContent() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -50,14 +51,34 @@ export default function AuthPage() {
           </p>
         </div>
 
-                 {/* Auth Forms */}
-         <LoginForm />
+        {/* Auth Forms */}
+        <LoginForm />
 
-                 {/* Footer */}
-         <div className="text-center mt-8 text-sm text-muted-foreground">
-           <p>&copy; 2024 Med Sal. Tất cả quyền được bảo lưu.</p>
-         </div>
+        {/* Footer */}
+        <div className="text-center mt-8 text-sm text-muted-foreground">
+          <p>&copy; 2024 Med Sal. Tất cả quyền được bảo lưu.</p>
+        </div>
       </div>
     </div>
+  );
+}
+
+// Loading fallback cho Suspense
+function LoginLoading() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+      <div className="flex flex-col items-center space-y-4">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-muted-foreground">Đang tải...</p>
+      </div>
+    </div>
+  );
+}
+
+export default function AuthPage() {
+  return (
+    <Suspense fallback={<LoginLoading />}>
+      <LoginContent />
+    </Suspense>
   );
 }
