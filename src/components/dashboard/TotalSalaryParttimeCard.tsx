@@ -34,6 +34,11 @@ export default function TotalSalaryParttimeCard({ selectedMonths, selectedYear, 
     setIsLoading(true);
     setError(null);
 
+    // Debug: Log authentication status
+    const { data: { session } } = await supabase.auth.getSession();
+    console.log('TotalSalaryParttimeCard - Auth session:', session ? 'Authenticated' : 'Not authenticated');
+    console.log('TotalSalaryParttimeCard - User:', session?.user?.email);
+
     const yearSegment = selectedYear ? `Năm ${selectedYear}` : "Tất cả các năm";
     let monthSegment: string;
     if (selectedMonths && selectedMonths.length > 0) {
@@ -59,24 +64,43 @@ export default function TotalSalaryParttimeCard({ selectedMonths, selectedYear, 
     setFilterDescription(`${monthSegment} của ${yearSegment} tại ${locationSegment}`);
 
     try {
-      const rpcArgs: { 
-        filter_year?: number; 
-        filter_months?: number[] | null; 
-        filter_locations?: string[] | null;
-        filter_donvi2?: string[] | null; // New parameter for RPC
-      } = {};
-      
-      if (selectedYear !== null) rpcArgs.filter_year = selectedYear;
-      rpcArgs.filter_months = (selectedMonths && selectedMonths.length > 0) ? selectedMonths : null;
-      rpcArgs.filter_locations = (selectedDepartmentsForDiadiem && selectedDepartmentsForDiadiem.length > 0) ? selectedDepartmentsForDiadiem : null;
-      rpcArgs.filter_donvi2 = (selectedDonVi2 && selectedDonVi2.length > 0) ? selectedDonVi2 : null;
+      const rpcArgs: { filter_year?: number; filter_months?: number[] | null; filter_locations?: string[] | null; filter_donvi2?: string[] | null } = {};
+      if (selectedYear !== null) {
+        rpcArgs.filter_year = selectedYear;
+      }
+      if (selectedMonths && selectedMonths.length > 0) {
+        rpcArgs.filter_months = selectedMonths;
+      } else {
+        rpcArgs.filter_months = null;
+      }
+      if (selectedDepartmentsForDiadiem && selectedDepartmentsForDiadiem.length > 0) {
+        rpcArgs.filter_locations = selectedDepartmentsForDiadiem;
+      } else {
+        rpcArgs.filter_locations = null;
+      }
+      if (selectedDonVi2 && selectedDonVi2.length > 0) {
+        rpcArgs.filter_donvi2 = selectedDonVi2;
+      } else {
+        rpcArgs.filter_donvi2 = null;
+      }
 
+      console.log('TotalSalaryParttimeCard - RPC args:', rpcArgs);
+
+      // Test: Try to access basic data first
+      console.log('TotalSalaryParttimeCard - Testing basic data access...');
+      const { data: testData, error: testError } = await supabase
+        .from('Parttime')
+        .select('*')
+        .limit(1);
+      console.log('TotalSalaryParttimeCard - Test data access:', { testData, testError });
 
       const functionName = 'get_total_salary_parttime';
       const { data, error: rpcError } = await supabase.rpc(
         functionName,
         rpcArgs
       );
+
+      console.log('TotalSalaryParttimeCard - RPC response:', { data, error: rpcError });
 
       if (rpcError) {
         const rpcMessageText = rpcError.message ? String(rpcError.message).toLowerCase() : '';
@@ -112,6 +136,8 @@ export default function TotalSalaryParttimeCard({ selectedMonths, selectedYear, 
       const numericTotal = typeof rawTotal === 'string'
         ? parseFloat(rawTotal.replace(/,/g, ''))
         : (typeof rawTotal === 'number' ? rawTotal : 0);
+
+      console.log('TotalSalaryParttimeCard - Processed data:', { rawTotal, numericTotal });
 
       setTotalSalary(numericTotal || 0);
 

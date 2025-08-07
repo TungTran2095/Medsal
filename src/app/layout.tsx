@@ -4,6 +4,7 @@ import { Inter } from 'next/font/google'; // Changed from Montserrat
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { ThemeProvider } from '@/contexts/ThemeContext';
+import { AuthProvider } from '@/contexts/AuthContext';
 
 // Changed font to Inter
 const inter = Inter({
@@ -25,10 +26,12 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>{/* suppressHydrationWarning might be needed if theme causes initial mismatch */}
       <body className={`${inter.variable} font-sans antialiased flex flex-col min-h-screen`}> {/* Used Inter variable */}
         <ThemeProvider>
-          <main className="flex-grow flex flex-col">
-          {children}
-          </main>
-          <Toaster />
+          <AuthProvider>
+            <main className="flex-grow flex flex-col">
+            {children}
+            </main>
+            <Toaster />
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

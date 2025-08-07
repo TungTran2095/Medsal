@@ -77,6 +77,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import ConfigError from "@/components/ui/ConfigError";
 
 type WorkspaceView = 'dbManagement' | 'dashboard' | 'aiTools';
 type DashboardTab = 'payrollOverview' | 'comparison' | 'kpiComparison' | 'salaryAnalysisTab' | 'salaryWorkloadAnalysis' | 'detailedSalaryAnalysis' | 'doctorSalaryAnalysis';
@@ -106,6 +107,7 @@ export default function WorkspaceContent() {
   const { toast } = useToast();
   const [activeView, setActiveView] = useState<WorkspaceView>('dashboard');
   const { theme, toggleTheme } = useTheme();
+  const [configError, setConfigError] = useState<string | null>(null);
 
   const [selectedMonths, setSelectedMonths] = useState<number[]>([]);
   const [availableYears, setAvailableYears] = useState<number[]>([]);
@@ -145,6 +147,12 @@ export default function WorkspaceContent() {
     if (activeView !== 'dashboard') return;
     setIsLoadingYears(true);
     try {
+      // Kiểm tra cấu hình Supabase
+      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+        setConfigError('Environment variables cho Supabase chưa được cấu hình');
+        return;
+      }
+
       let yearsData: (number | string)[] = [];
       const tablesToQuery = ['Fulltime', 'Parttime', 'Doanh_thu'];
       const yearColumns = {
@@ -597,6 +605,11 @@ export default function WorkspaceContent() {
     }
     return label || "Chọn địa điểm";
   };
+
+  // Hiển thị lỗi cấu hình nếu có
+  if (configError) {
+    return <ConfigError type="supabase" message={configError} />;
+  }
 
   return (
     <SidebarProvider defaultOpen={false} >

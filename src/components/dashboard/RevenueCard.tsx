@@ -33,6 +33,11 @@ export default function RevenueCard({ selectedMonths, selectedYear, selectedDepa
     setIsLoading(true);
     setError(null);
 
+    // Debug: Log authentication status
+    const { data: { session } } = await supabase.auth.getSession();
+    console.log('RevenueCard - Auth session:', session ? 'Authenticated' : 'Not authenticated');
+    console.log('RevenueCard - User:', session?.user?.email);
+
     const departmentNames = selectedDepartments?.map(depId => depId.split('__')[1]).filter(Boolean) || [];
 
     let finalFilterDescription: string;
@@ -90,11 +95,23 @@ export default function RevenueCard({ selectedMonths, selectedYear, selectedDepa
         rpcArgs.filter_locations = null;
       }
 
+      console.log('RevenueCard - RPC args:', rpcArgs);
+
+      // Test: Try to access basic data first
+      console.log('RevenueCard - Testing basic data access...');
+      const { data: testData, error: testError } = await supabase
+        .from('Doanh_thu')
+        .select('*')
+        .limit(1);
+      console.log('RevenueCard - Test data access:', { testData, testError });
+
       const functionName = 'get_total_revenue';
       const { data, error: rpcError } = await supabase.rpc(
         functionName,
         rpcArgs
       );
+
+      console.log('RevenueCard - RPC response:', { data, error: rpcError });
 
       if (rpcError) {
         const rpcMessageText = rpcError.message ? String(rpcError.message).toLowerCase() : '';
@@ -131,6 +148,8 @@ export default function RevenueCard({ selectedMonths, selectedYear, selectedDepa
       const numericTotal = typeof rawTotal === 'string'
         ? parseFloat(rawTotal.replace(/,/g, ''))
         : (typeof rawTotal === 'number' ? rawTotal : 0);
+
+      console.log('RevenueCard - Processed data:', { rawTotal, numericTotal });
 
       setTotalRevenue(numericTotal || 0);
 
