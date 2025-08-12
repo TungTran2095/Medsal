@@ -95,3 +95,4 @@ export default function ConfigError({ type, message }: ConfigErrorProps) {
     </div>
   );
 }
+

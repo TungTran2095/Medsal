@@ -210,3 +210,4 @@ curl -X GET 'https://your-project.supabase.co/auth/v1/admin/users' \
   -H "apikey: YOUR_SERVICE_ROLE_KEY" \
   -H "Authorization: Bearer YOUR_SERVICE_ROLE_KEY"
 ```
+

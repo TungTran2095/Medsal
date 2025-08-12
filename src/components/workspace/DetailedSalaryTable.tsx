@@ -6,9 +6,10 @@ import { supabase } from '@/lib/supabaseClient';
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, AlertTriangle, ListChecks, ArrowUpDown, ArrowUp, ArrowDown, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { Loader2, AlertTriangle, ListChecks, ArrowUpDown, ArrowUp, ArrowDown, TrendingUp, TrendingDown, Minus, ChevronDown, ChevronRight } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { LineChart, Line, XAxis, Tooltip, Legend, ResponsiveContainer, LabelList } from 'recharts';
 
 interface DetailedSalaryData {
   ma_nv: string;
@@ -31,20 +32,21 @@ interface DetailedSalaryTableProps {
   selectedNganhDoc?: string[];
 }
 
-type SortableColumn = 
-  | 'ma_nv' 
-  | 'ho_ten' 
-  | 'tong_cong_cy' 
-  | 'tien_linh_cy' 
-  | 'tien_linh_per_cong_cy'
-  | 'growth_tong_cong'
-  | 'growth_tien_linh'
-  | 'growth_tien_linh_per_cong';
+type SortableColumn = 'ma_nv' | 'ho_ten' | 'tong_cong_cy' | 'tien_linh_cy' | 'tien_linh_per_cong_cy' | 'growth_tong_cong' | 'growth_tien_linh' | 'growth_tien_linh_per_cong';
 
 interface SortConfig {
-  key: SortableColumn | null;
+  key: SortableColumn;
   direction: 'ascending' | 'descending';
 }
+
+// Hàm rút gọn số: 2.000.000 => 2tr
+const compactNumber = (value: number) => {
+  if (value == null) return '';
+  if (value >= 1_000_000_000) return (value / 1_000_000_000).toFixed(1).replace(/\.0$/, '') + 'tỷ';
+  if (value >= 1_000_000) return (value / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'tr';
+  if (value >= 1_000) return (value / 1_000).toFixed(1).replace(/\.0$/, '') + 'k';
+  return value.toString();
+};
 
 export default function DetailedSalaryTable({
   selectedYear,
@@ -58,6 +60,119 @@ export default function DetailedSalaryTable({
   const [totalRecords, setTotalRecords] = useState(0);
   const { toast } = useToast();
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'ma_nv', direction: 'ascending' });
+
+  // States cho nút mở rộng
+  const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailData, setDetailData] = useState<Record<string, any>>({});
+  const [salaryMonthData, setSalaryMonthData] = useState<Record<string, any[]>>({});
+  const [salaryMonthLoading, setSalaryMonthLoading] = useState(false);
+
+  // Hàm lấy thông tin hành chính từ MS_CBNV
+  const fetchEmployeeDetail = async (ma_nv: string) => {
+    setDetailLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('MS_CBNV')
+        .select('*')
+        .eq('Mã nhân viên', ma_nv)
+        .limit(1);
+      if (error) throw error;
+      setDetailData(prev => ({ ...prev, [ma_nv]: data?.[0] || null }));
+    } catch (e) {
+      setDetailData(prev => ({ ...prev, [ma_nv]: null }));
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  // Hàm lấy dữ liệu lương theo tháng cho nhân viên
+  const fetchSalaryMonthData = async (ma_nv: string) => {
+    setSalaryMonthLoading(true);
+    try {
+      // Lấy năm mới nhất
+      const { data: yearData } = await supabase.from('Fulltime').select('nam').eq('ma_nhan_vien', ma_nv).order('nam', { ascending: false }).limit(1);
+      const maxYear = yearData?.[0]?.nam;
+      if (!maxYear) throw new Error('Không tìm thấy năm');
+      
+      // Lấy lương từng tháng năm nay
+      const { data: curData, error: curErr } = await supabase
+        .from('Fulltime')
+        .select('thang, tong_thu_nhap, ngay_thuong_chinh_thuc, ngay_thuong_thu_viec, nghi_tuan, le_tet, ngay_thuong_chinh_thuc2, ngay_thuong_thu_viec3, nghi_tuan4, le_tet5, nghi_nl')
+        .eq('ma_nhan_vien', ma_nv)
+        .eq('nam', maxYear);
+      if (curErr) throw curErr;
+      
+      // Lấy lương/công từng tháng năm ngoái
+      const { data: prevData, error: prevErr } = await supabase
+        .from('Fulltime')
+        .select('thang, tong_thu_nhap, ngay_thuong_chinh_thuc, ngay_thuong_thu_viec, nghi_tuan, le_tet, ngay_thuong_chinh_thuc2, ngay_thuong_thu_viec3, nghi_tuan4, le_tet5, nghi_nl')
+        .eq('ma_nhan_vien', ma_nv)
+        .eq('nam', maxYear - 1);
+      if (prevErr) throw prevErr;
+      
+      // Xử lý dữ liệu
+      const parseMonth = (thang: string) => parseInt((thang || '').replace(/\D/g, ''), 10);
+      const groupByMonth = (arr: any[]) => {
+        const map: Record<number, any> = {};
+        arr.forEach(row => {
+          const m = parseMonth(row.thang);
+          if (!m) return;
+          if (!map[m]) map[m] = { month: m, salary: 0, workdays: 0, per_workday: 0 };
+          map[m].salary += Number((row.tong_thu_nhap || '0').toString().replace(/,/g, ''));
+          map[m].workdays +=
+            (Number(row.ngay_thuong_chinh_thuc) || 0) +
+            (Number(row.ngay_thuong_thu_viec) || 0) +
+            (Number(row.nghi_tuan) || 0) +
+            (Number(row.le_tet) || 0) +
+            (Number(row.ngay_thuong_chinh_thuc2) || 0) +
+            (Number(row.ngay_thuong_thu_viec3) || 0) +
+            (Number(row.nghi_tuan4) || 0) +
+            (Number(row.le_tet5) || 0) +
+            (Number(row.nghi_nl) || 0);
+        });
+        return map;
+      };
+
+      const curMonthMap = groupByMonth(curData || []);
+      const prevMonthMap = groupByMonth(prevData || []);
+
+      // Tạo dữ liệu cho biểu đồ
+      const chartData = [];
+      for (let month = 1; month <= 12; month++) {
+        const curMonth = curMonthMap[month];
+        const prevMonth = prevMonthMap[month];
+        
+        if (curMonth || prevMonth) {
+          chartData.push({
+            month,
+            salary: curMonth?.salary || 0,
+            workdays: curMonth?.workdays || 0,
+            per_workday: curMonth?.workdays > 0 ? curMonth.salary / curMonth.workdays : 0,
+            per_workday_prev: prevMonth?.workdays > 0 ? prevMonth.salary / prevMonth.workdays : 0
+          });
+        }
+      }
+
+      setSalaryMonthData(prev => ({ ...prev, [ma_nv]: chartData }));
+    } catch (e) {
+      console.error('Error fetching salary month data:', e);
+      setSalaryMonthData(prev => ({ ...prev, [ma_nv]: [] }));
+    } finally {
+      setSalaryMonthLoading(false);
+    }
+  };
+
+  // Hàm xử lý mở rộng dòng
+  const handleExpand = (ma_nv: string) => {
+    if (expandedRow === ma_nv) {
+      setExpandedRow(null);
+    } else {
+      setExpandedRow(ma_nv);
+      if (!detailData[ma_nv]) fetchEmployeeDetail(ma_nv);
+      if (!salaryMonthData[ma_nv]) fetchSalaryMonthData(ma_nv);
+    }
+  };
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -252,7 +367,6 @@ export default function DetailedSalaryTable({
     </TableHead>
   );
 
-
   return (
     <Card className="flex-grow flex flex-col h-full">
       <CardHeader className="pb-2 pt-3">
@@ -294,6 +408,7 @@ export default function DetailedSalaryTable({
               <Table>
                 <TableHeader className="sticky top-0 bg-card z-10">
                   <TableRow>
+                    <TableHead className="w-8" />
                     <SortableHeader columnKey="ma_nv" label="Mã NV" />
                     <SortableHeader columnKey="ho_ten" label="Họ và Tên" />
                     <SortableHeader columnKey="tong_cong_cy" label="Tổng Công (CY)" align="right" />
@@ -306,16 +421,94 @@ export default function DetailedSalaryTable({
                 </TableHeader>
                 <TableBody>
                   {sortedData.map((row) => (
-                    <TableRow key={row.ma_nv}>
-                      <TableCell className="text-xs py-1.5 px-2 whitespace-nowrap">{row.ma_nv}</TableCell>
-                      <TableCell className="text-xs py-1.5 px-2 whitespace-nowrap">{row.ho_ten}</TableCell>
-                      <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap">{formatNumber(row.tong_cong_cy)}</TableCell>
-                      <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap">{formatCurrency(row.tien_linh_cy)}</TableCell>
-                      <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap">{formatCurrency(row.tien_linh_per_cong_cy)}</TableCell>
-                      {renderGrowthCell(row.growth_tong_cong)}
-                      {renderGrowthCell(row.growth_tien_linh)}
-                      {renderGrowthCell(row.growth_tien_linh_per_cong)}
-                    </TableRow>
+                    <React.Fragment key={row.ma_nv}>
+                      <TableRow>
+                        <TableCell className="w-8 text-xs py-1.5 px-2">
+                          <button onClick={() => handleExpand(row.ma_nv)} className="focus:outline-none">
+                            {expandedRow === row.ma_nv ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                          </button>
+                        </TableCell>
+                        <TableCell className="text-xs py-1.5 px-2 whitespace-nowrap">{row.ma_nv}</TableCell>
+                        <TableCell className="text-xs py-1.5 px-2 whitespace-nowrap">{row.ho_ten}</TableCell>
+                        <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap">{formatNumber(row.tong_cong_cy)}</TableCell>
+                        <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap">{formatCurrency(row.tien_linh_cy)}</TableCell>
+                        <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap">{formatCurrency(row.tien_linh_per_cong_cy)}</TableCell>
+                        {renderGrowthCell(row.growth_tong_cong)}
+                        {renderGrowthCell(row.growth_tien_linh)}
+                        {renderGrowthCell(row.growth_tien_linh_per_cong)}
+                      </TableRow>
+                      {expandedRow === row.ma_nv && (
+                        <TableRow>
+                          <TableCell colSpan={9} className="bg-muted px-4 py-2 animate-slideDown">
+                            {/* Section 1: Thông tin hành chính */}
+                            <div className="mb-4">
+                              <div className="font-semibold mb-2 text-sm">Thông tin hành chính</div>
+                              {detailLoading && !detailData[row.ma_nv] && (
+                                <div className="text-xs text-muted-foreground">Đang tải thông tin chi tiết...</div>
+                              )}
+                              {detailData[row.ma_nv] && (
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-1 text-xs">
+                                  {Object.entries(detailData[row.ma_nv]).map(([k, v]) => (
+                                    <div key={k} className="flex gap-1">
+                                      <span className="font-semibold whitespace-nowrap">{k}:</span>
+                                      <span className="truncate">{String(v)}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {!detailLoading && !detailData[row.ma_nv] && (
+                                <div className="text-xs text-destructive">Không tìm thấy thông tin chi tiết.</div>
+                              )}
+                            </div>
+                            
+                            {/* Section 2: Biểu đồ lương Fulltime theo tháng */}
+                            <div>
+                              <div className="font-semibold mb-2 text-sm">Lương Fulltime theo tháng</div>
+                              {salaryMonthLoading && (!salaryMonthData[row.ma_nv] || salaryMonthData[row.ma_nv].length === 0) && (
+                                <div className="text-xs text-muted-foreground">Đang tải dữ liệu lương theo tháng...</div>
+                              )}
+                              {salaryMonthData[row.ma_nv] && salaryMonthData[row.ma_nv].length > 0 && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  {/* Line chart: Lương theo tháng */}
+                                  <div>
+                                    <div className="text-xs font-semibold mb-1">Lương theo tháng (năm hiện tại)</div>
+                                    <ResponsiveContainer width="100%" height={180}>
+                                      <LineChart data={salaryMonthData[row.ma_nv]}>
+                                        <XAxis dataKey="month" tickFormatter={m => `Th${m}`} fontSize={11} />
+                                        <Tooltip formatter={v => compactNumber(Number(v))} labelFormatter={m => `Tháng ${m}`} />
+                                        <Line type="monotone" dataKey="salary" stroke="#3b82f6" name="Lương" dot={{ r: 3 }} activeDot={{ r: 5 }}>
+                                          <LabelList dataKey="salary" position="top" formatter={compactNumber} fontSize={11} />
+                                        </Line>
+                                      </LineChart>
+                                    </ResponsiveContainer>
+                                  </div>
+                                  {/* Line chart: Lương/công theo tháng */}
+                                  <div>
+                                    <div className="text-xs font-semibold mb-1">Lương/Công theo tháng (so sánh 2 năm)</div>
+                                    <ResponsiveContainer width="100%" height={180}>
+                                      <LineChart data={salaryMonthData[row.ma_nv]}>
+                                        <XAxis dataKey="month" tickFormatter={m => `Th${m}`} fontSize={11} />
+                                        <Tooltip formatter={v => compactNumber(Number(v))} labelFormatter={m => `Tháng ${m}`} />
+                                        <Legend />
+                                        <Line type="monotone" dataKey="per_workday" stroke="#3b82f6" name="Năm nay" dot={{ r: 3 }} activeDot={{ r: 5 }}>
+                                          <LabelList dataKey="per_workday" position="top" formatter={compactNumber} fontSize={11} />
+                                        </Line>
+                                        <Line type="monotone" dataKey="per_workday_prev" stroke="#f59e42" name="Năm ngoái" dot={{ r: 3 }} activeDot={{ r: 5 }}>
+                                          <LabelList dataKey="per_workday_prev" position="top" formatter={compactNumber} fontSize={11} />
+                                        </Line>
+                                      </LineChart>
+                                    </ResponsiveContainer>
+                                  </div>
+                                </div>
+                              )}
+                              {salaryMonthData[row.ma_nv] && salaryMonthData[row.ma_nv].length === 0 && !salaryMonthLoading && (
+                                <div className="text-xs text-destructive">Không có dữ liệu lương theo tháng.</div>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </React.Fragment>
                   ))}
                 </TableBody>
               </Table>
