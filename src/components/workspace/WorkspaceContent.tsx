@@ -38,6 +38,7 @@ import RevenuePerWorkdayCard from '@/components/dashboard/RevenuePerWorkdayCard'
 import LocationWorkloadEfficiencyScatterChart from '@/components/charts/LocationWorkloadEfficiencyScatterChart';
 import LocationSalaryPerWorkdayVsTotalWorkdaysScatterChart from '@/components/charts/LocationSalaryPerWorkdayVsTotalWorkdaysScatterChart';
 import DetailedSalaryTable from '@/components/workspace/DetailedSalaryTable';
+import SalaryMechanismCheckTable from '@/components/workspace/SalaryMechanismCheckTable';
 import DoctorCountCard from '@/components/dashboard/DoctorCountCard';
 import DoctorSalaryCard from '@/components/dashboard/DoctorSalaryCard';
 import DoctorSalaryPerWorkdayCard from '@/components/dashboard/DoctorSalaryPerWorkdayCard';
@@ -50,6 +51,7 @@ import BackOfficeSalaryRatioCard from '@/components/dashboard/BackOfficeSalaryRa
 import BackOfficeSalaryRatioTrendChart from '@/components/charts/BackOfficeSalaryRatioTrendChart';
 import NganhDocKpiComparisonTable from '@/components/comparison/NganhDocKpiComparisonTable';
 import SystemWideNganhDocComparisonTable from '@/components/comparison/SystemWideNganhDocComparisonTable';
+
 
 import {
   DropdownMenu,
@@ -81,7 +83,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ConfigError from "@/components/ui/ConfigError";
 
 type WorkspaceView = 'dbManagement' | 'dashboard' | 'aiTools';
-type DashboardTab = 'payrollOverview' | 'comparison' | 'kpiComparison' | 'salaryAnalysisTab' | 'salaryWorkloadAnalysis' | 'detailedSalaryAnalysis' | 'doctorSalaryAnalysis';
+type DashboardTab = 'payrollOverview' | 'comparison' | 'kpiComparison' | 'salaryAnalysisTab' | 'salaryWorkloadAnalysis' | 'detailedSalaryAnalysis' | 'doctorSalaryAnalysis' | 'salaryMechanismCheck';
 
 interface NavItem {
   id: WorkspaceView;
@@ -1005,6 +1007,9 @@ export default function WorkspaceContent() {
                       <TabsTrigger value="homeSalaryAnalysis" className="text-xs px-2.5 py-1.5 flex items-center gap-1">
                         <UsersRound className="h-3.5 w-3.5"/> Phân tích lương tại nhà
                       </TabsTrigger>
+                      <TabsTrigger value="salaryMechanismCheck" className="text-xs px-2.5 py-1.5 flex items-center gap-1">
+                        <AlertTriangle className="h-3.5 w-3.5"/> Check cơ chế lương
+                      </TabsTrigger>
                     </TabsList>
                   </div>
 
@@ -1181,6 +1186,16 @@ export default function WorkspaceContent() {
                   <TabsContent value="homeSalaryAnalysis" className="flex-grow overflow-y-auto space-y-3 mt-2">
                     <div className="mt-4 text-base font-semibold text-center text-primary">Phân tích lương tại nhà (đang phát triển)</div>
                   </TabsContent>
+                  
+                  {/* Tab: Check cơ chế lương */}
+                  <TabsContent value="salaryMechanismCheck" className="flex-grow overflow-y-auto space-y-3 mt-2">
+                    <SalaryMechanismCheckTable 
+                      selectedYear={selectedYear}
+                      selectedMonths={selectedMonths}
+                    />
+                  </TabsContent>
+                  
+
                 </Tabs>
               </CardContent>
             </Card>

@@ -1,0 +1,235 @@
+-- SQL Function để kiểm tra rule lấy dữ liệu Fulltime cho cột "Lương đơn vị đề xuất"
+-- Sử dụng để debug và kiểm tra tại sao một số ID không hiện số liệu
+
+-- Function 1: Kiểm tra dữ liệu Fulltime theo tháng và năm cụ thể
+CREATE OR REPLACE FUNCTION check_fulltime_data_by_month_year(
+    p_thang VARCHAR(10),  -- Ví dụ: '01', '02', '05'
+    p_nam VARCHAR(4)       -- Ví dụ: '2024', '2025'
+)
+RETURNS TABLE (
+    ma_nhan_vien VARCHAR,
+    ho_va_ten VARCHAR,
+    thang VARCHAR,
+    nam VARCHAR,
+    tong_thu_nhap NUMERIC,
+    don_vi VARCHAR,
+    chuc_vu VARCHAR
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        ft.ma_nhan_vien,
+        ft.ho_va_ten,
+        ft.thang,
+        ft.nam,
+        ft.tong_thu_nhap,
+        ft.don_vi,
+        ft.chuc_vu
+    FROM "Fulltime" ft
+    WHERE ft.thang = CONCAT('Tháng ', p_thang)
+      AND ft.nam = p_nam
+    ORDER BY ft.ma_nhan_vien, ft.tong_thu_nhap DESC;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function 2: Kiểm tra dữ liệu Fulltime cho một nhân viên cụ thể
+CREATE OR REPLACE FUNCTION check_fulltime_data_by_employee(
+    p_ma_nhan_vien VARCHAR,
+    p_thang VARCHAR(10),
+    p_nam VARCHAR(4)
+)
+RETURNS TABLE (
+    ma_nhan_vien VARCHAR,
+    ho_va_ten VARCHAR,
+    thang VARCHAR,
+    nam VARCHAR,
+    tong_thu_nhap NUMERIC,
+    don_vi VARCHAR,
+    chuc_vu VARCHAR,
+    record_count BIGINT,
+    total_salary NUMERIC
+) AS $$
+BEGIN
+    RETURN QUERY
+    WITH employee_data AS (
+        SELECT 
+            ft.ma_nhan_vien,
+            ft.ho_va_ten,
+            ft.thang,
+            ft.nam,
+            ft.tong_thu_nhap,
+            ft.don_vi,
+            ft.chuc_vu
+        FROM "Fulltime" ft
+        WHERE ft.ma_nhan_vien = p_ma_nhan_vien
+          AND ft.thang = CONCAT('Tháng ', p_thang)
+          AND ft.nam = p_nam
+    )
+    SELECT 
+        ed.ma_nhan_vien,
+        ed.ho_va_ten,
+        ed.thang,
+        ed.nam,
+        ed.tong_thu_nhap,
+        ed.don_vi,
+        ed.chuc_vu,
+        COUNT(*) OVER() as record_count,
+        SUM(ed.tong_thu_nhap) OVER() as total_salary
+    FROM employee_data ed;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function 3: So sánh dữ liệu giữa co_che_luong và Fulltime
+CREATE OR REPLACE FUNCTION compare_salary_data(
+    p_thang VARCHAR(10),
+    p_nam VARCHAR(4)
+)
+RETURNS TABLE (
+    id VARCHAR,
+    ho_va_ten VARCHAR,
+    don_vi VARCHAR,
+    luong_co_che NUMERIC,
+    fulltime_record_count BIGINT,
+    fulltime_total_salary NUMERIC,
+    status VARCHAR
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        ccl.ID as id,
+        ccl.Ho_va_ten as ho_va_ten,
+        ccl.Don_vi as don_vi,
+        ccl.Gross as luong_co_che,
+        COALESCE(ft_stats.record_count, 0) as fulltime_record_count,
+        COALESCE(ft_stats.total_salary, 0) as fulltime_total_salary,
+        CASE 
+            WHEN ft_stats.record_count > 0 THEN 'CÓ DỮ LIỆU'
+            ELSE 'KHÔNG CÓ DỮ LIỆU'
+        END as status
+    FROM "co_che_luong" ccl
+    LEFT JOIN (
+        SELECT 
+            ft.ma_nhan_vien,
+            COUNT(*) as record_count,
+            SUM(ft.tong_thu_nhap) as total_salary
+        FROM "Fulltime" ft
+        WHERE ft.thang = CONCAT('Tháng ', p_thang)
+          AND ft.nam = p_nam
+        GROUP BY ft.ma_nhan_vien
+    ) ft_stats ON ccl.ID = ft_stats.ma_nhan_vien
+    WHERE ccl.Loai_co_che = 'GĐ tỉnh'
+    ORDER BY ccl.ID;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function 4: Kiểm tra tất cả các định dạng tháng có trong bảng Fulltime
+CREATE OR REPLACE FUNCTION check_fulltime_month_formats()
+RETURNS TABLE (
+    thang VARCHAR,
+    nam VARCHAR,
+    record_count BIGINT,
+    sample_ma_nhan_vien VARCHAR
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        ft.thang,
+        ft.nam,
+        COUNT(*) as record_count,
+        MAX(ft.ma_nhan_vien) as sample_ma_nhan_vien
+    FROM "Fulltime" ft
+    GROUP BY ft.thang, ft.nam
+    ORDER BY ft.nam, ft.thang;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function 5: Kiểm tra mapping giữa ID và ma_nhan_vien
+CREATE OR REPLACE FUNCTION check_id_mapping(
+    p_thang VARCHAR(10),
+    p_nam VARCHAR(4)
+)
+RETURNS TABLE (
+    co_che_id VARCHAR,
+    co_che_ho_va_ten VARCHAR,
+    co_che_don_vi VARCHAR,
+    fulltime_ma_nhan_vien VARCHAR,
+    fulltime_ho_va_ten VARCHAR,
+    fulltime_tong_thu_nhap NUMERIC,
+    mapping_status VARCHAR
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        ccl.ID as co_che_id,
+        ccl.Ho_va_ten as co_che_ho_va_ten,
+        ccl.Don_vi as co_che_don_vi,
+        ft.ma_nhan_vien as fulltime_ma_nhan_vien,
+        ft.ho_va_ten as fulltime_ho_va_ten,
+        ft.tong_thu_nhap as fulltime_tong_thu_nhap,
+        CASE 
+            WHEN ft.ma_nhan_vien IS NOT NULL THEN 'MATCH'
+            ELSE 'NO MATCH'
+        END as mapping_status
+    FROM "co_che_luong" ccl
+    LEFT JOIN "Fulltime" ft ON ccl.ID = ft.ma_nhan_vien
+        AND ft.thang = CONCAT('Tháng ', p_thang)
+        AND ft.nam = p_nam
+    WHERE ccl.Loai_co_che = 'GĐ tỉnh'
+    ORDER BY ccl.ID;
+END;
+$$ LANGUAGE plpgsql;
+
+-- ========================================
+-- CÁCH SỬ DỤNG CÁC FUNCTION
+-- ========================================
+
+-- 1. Kiểm tra dữ liệu Fulltime cho tháng 05, năm 2025
+-- SELECT * FROM check_fulltime_data_by_month_year('05', '2025');
+
+-- 2. Kiểm tra dữ liệu Fulltime cho một nhân viên cụ thể
+-- SELECT * FROM check_fulltime_data_by_employee('001', '05', '2025');
+
+-- 3. So sánh dữ liệu giữa co_che_luong và Fulltime
+-- SELECT * FROM compare_salary_data('05', '2025');
+
+-- 4. Kiểm tra tất cả các định dạng tháng có trong bảng Fulltime
+-- SELECT * FROM check_fulltime_month_formats();
+
+-- 5. Kiểm tra mapping giữa ID và ma_nhan_vien
+-- SELECT * FROM check_id_mapping('05', '2025');
+
+-- ========================================
+-- QUERIES TRỰC TIẾP ĐỂ DEBUG
+-- ========================================
+
+-- Kiểm tra cấu trúc bảng Fulltime
+-- SELECT column_name, data_type, is_nullable 
+-- FROM information_schema.columns 
+-- WHERE table_name = 'Fulltime' 
+-- ORDER BY ordinal_position;
+
+-- Kiểm tra dữ liệu mẫu từ bảng Fulltime
+-- SELECT DISTINCT thang, nam, COUNT(*) as record_count
+-- FROM "Fulltime"
+-- GROUP BY thang, nam
+-- ORDER BY nam, thang;
+
+-- Kiểm tra dữ liệu mẫu từ bảng co_che_luong
+-- SELECT ID, Ho_va_ten, Don_vi, Loai_co_che, Gross
+-- FROM "co_che_luong"
+-- WHERE Loai_co_che = 'GĐ tỉnh'
+-- ORDER BY ID;
+
+-- Kiểm tra mapping trực tiếp
+-- SELECT 
+--     ccl.ID as co_che_id,
+--     ccl.Ho_va_ten as co_che_ho_va_ten,
+--     ft.ma_nhan_vien as fulltime_ma_nhan_vien,
+--     ft.ho_va_ten as fulltime_ho_va_ten,
+--     ft.tong_thu_nhap
+-- FROM "co_che_luong" ccl
+-- LEFT JOIN "Fulltime" ft ON ccl.ID = ft.ma_nhan_vien
+--     AND ft.thang = 'Tháng 05'
+--     AND ft.nam = '2025'
+-- WHERE ccl.Loai_co_che = 'GĐ tỉnh'
+-- ORDER BY ccl.ID;
