@@ -6,9 +6,10 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, AlertTriangle, TrendingUp, TrendingDown, Minus, BarChart3, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+import { Loader2, AlertTriangle, TrendingUp, TrendingDown, Minus, BarChart3, ArrowUp, ArrowDown, ArrowUpDown, ChevronDown, ChevronRight } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { LineChart, Line, XAxis, Tooltip, Legend, ResponsiveContainer, LabelList } from 'recharts';
 
 interface SalaryMechanismData {
   id: string;
@@ -62,6 +63,13 @@ export default function SalaryMechanismCheckTable({
   const [filterDonVi, setFilterDonVi] = useState('');
   const [filterChenhLechMin, setFilterChenhLechMin] = useState('');
   const [filterChenhLechMax, setFilterChenhLechMax] = useState('');
+
+  // Thêm state cho nút mở rộng
+  const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailData, setDetailData] = useState<Record<string, any>>({});
+  const [salaryMonthData, setSalaryMonthData] = useState<Record<string, any[]>>({});
+  const [salaryMonthLoading, setSalaryMonthLoading] = useState(false);
 
   const months = [
     { value: 1, label: "Tháng 01" },
@@ -889,6 +897,220 @@ export default function SalaryMechanismCheckTable({
     return <Minus className="h-4 w-4 text-gray-600" />;
   };
 
+  // Hàm xử lý mở rộng dòng
+  const handleExpand = async (employeeId: string) => {
+    if (expandedRow === employeeId) {
+      setExpandedRow(null);
+      return;
+    }
+    
+    setExpandedRow(employeeId);
+    
+    // Lấy thông tin chi tiết nhân viên nếu chưa có
+    if (!detailData[employeeId]) {
+      await fetchEmployeeDetail(employeeId);
+    }
+    
+    // Lấy dữ liệu lương theo tháng nếu chưa có
+    if (!salaryMonthData[employeeId]) {
+      await fetchSalaryMonthData(employeeId);
+    }
+  };
+
+  // Hàm lấy thông tin chi tiết nhân viên từ MS_CBNV
+  const fetchEmployeeDetail = async (employeeId: string) => {
+    setDetailLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('MS_CBNV')
+        .select('*')
+        .eq('Mã nhân viên', employeeId)
+        .limit(1);
+      if (error) throw error;
+      setDetailData(prev => ({ ...prev, [employeeId]: data?.[0] || null }));
+    } catch (e) {
+      setDetailData(prev => ({ ...prev, [employeeId]: null }));
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  // Hàm lấy dữ liệu lương theo tháng cho nhân viên
+  const fetchSalaryMonthData = async (employeeId: string) => {
+    setSalaryMonthLoading(true);
+    try {
+      console.log(`Bắt đầu fetchSalaryMonthData cho nhân viên: ${employeeId}`);
+      
+      // Chuyển đổi employeeId từ text sang int để khớp với ma_nhan_vien trong Fulltime
+      const employeeIdInt = parseInt(employeeId, 10);
+      if (isNaN(employeeIdInt)) {
+        throw new Error(`ID nhân viên không hợp lệ: ${employeeId}`);
+      }
+      
+      console.log(`Employee ID đã chuyển đổi: ${employeeIdInt}`);
+
+      // Kiểm tra xem bảng Fulltime có tồn tại không
+      console.log('Kiểm tra bảng Fulltime...');
+      const { data: tableCheck, error: tableError } = await supabase
+        .from('Fulltime')
+        .select('ma_nhan_vien')
+        .limit(1);
+      
+      if (tableError) {
+        console.error('Lỗi khi kiểm tra bảng Fulltime:', tableError);
+        if (tableError.message && tableError.message.includes('does not exist')) {
+          throw new Error('Bảng Fulltime không tồn tại trong cơ sở dữ liệu');
+        }
+        throw new Error(`Lỗi truy cập bảng Fulltime: ${tableError.message}`);
+      }
+      
+      console.log('Bảng Fulltime tồn tại, tiếp tục...');
+
+      // Lấy năm mới nhất
+      console.log('Lấy năm mới nhất...');
+      const { data: yearData, error: yearError } = await supabase
+        .from('Fulltime')
+        .select('nam')
+        .eq('ma_nhan_vien', employeeIdInt)
+        .order('nam', { ascending: false })
+        .limit(1);
+      
+      if (yearError) {
+        console.error('Lỗi khi lấy năm:', yearError);
+        throw new Error(`Lỗi khi lấy năm: ${yearError.message}`);
+      }
+      
+      console.log('Dữ liệu năm:', yearData);
+      
+      const maxYear = yearData?.[0]?.nam;
+      if (!maxYear) {
+        console.warn(`Không tìm thấy dữ liệu năm cho nhân viên ${employeeIdInt}`);
+        // Tạo dữ liệu mẫu nếu không có dữ liệu
+        const sampleData = Array.from({ length: 12 }, (_, i) => ({
+          month: i + 1,
+          salary: 0,
+          per_workday: 0,
+          per_workday_prev: 0
+        }));
+        setSalaryMonthData(prev => ({ ...prev, [employeeId]: sampleData }));
+        return;
+      }
+      
+      console.log(`Năm mới nhất: ${maxYear}`);
+      
+      // Lấy lương từng tháng năm nay
+      console.log('Lấy dữ liệu năm nay...');
+      const { data: curData, error: curErr } = await supabase
+        .from('Fulltime')
+        .select('ma_nhan_vien, tong_thu_nhap, thang, nam')
+        .eq('ma_nhan_vien', employeeIdInt)
+        .eq('nam', maxYear)
+        .order('thang', { ascending: true });
+
+      if (curErr) {
+        console.error('Lỗi khi lấy dữ liệu năm nay:', curErr);
+        throw new Error(`Lỗi khi lấy dữ liệu năm nay: ${curErr.message}`);
+      }
+      
+      console.log('Dữ liệu năm nay:', curData);
+
+      // Lấy lương từng tháng năm ngoái
+      console.log('Lấy dữ liệu năm ngoái...');
+      const { data: prevData, error: prevErr } = await supabase
+        .from('Fulltime')
+        .select('ma_nhan_vien, tong_thu_nhap, thang, nam')
+        .eq('ma_nhan_vien', employeeIdInt)
+        .eq('nam', maxYear - 1)
+        .order('thang', { ascending: true });
+
+      if (prevErr) {
+        console.error('Lỗi khi lấy dữ liệu năm ngoái:', prevErr);
+        // Không throw error cho năm ngoái, chỉ log warning
+        console.warn('Không thể lấy dữ liệu năm ngoái, tiếp tục với dữ liệu rỗng');
+      }
+      
+      console.log('Dữ liệu năm ngoái:', prevData);
+
+      // Lấy dữ liệu doanh thu theo tháng từ bảng Doanh_thu
+      console.log('Lấy dữ liệu doanh thu theo tháng...');
+      let doanhThuMonthData = null;
+      try {
+        // Lấy dữ liệu doanh thu cho đơn vị của nhân viên này
+        const employeeData = data.find(item => item.id === employeeId);
+        if (employeeData) {
+          const { data: doanhThuData, error: doanhThuError } = await supabase
+            .from('Doanh_thu')
+            .select('"Tên Đơn vị", "Tháng pro", "Chỉ tiêu", "Kỳ báo cáo"')
+            .eq('"Tên Đơn vị"', employeeData.don_vi)
+            .like('"Tháng pro"', `%2025`);
+
+          if (!doanhThuError && doanhThuData) {
+            console.log('Dữ liệu doanh thu theo tháng:', doanhThuData);
+            doanhThuMonthData = doanhThuData;
+          } else {
+            console.warn('Không thể lấy dữ liệu doanh thu theo tháng:', doanhThuError);
+          }
+        }
+      } catch (e) {
+        console.warn('Lỗi khi lấy dữ liệu doanh thu theo tháng:', e);
+      }
+
+      // Xử lý dữ liệu để tạo biểu đồ
+      console.log('Xử lý dữ liệu để tạo biểu đồ...');
+      const monthData = Array.from({ length: 12 }, (_, i) => {
+        const month = i + 1;
+        const curMonthData = curData?.find(d => {
+          if (!d.thang) return false;
+          const thangNumber = parseInt((d.thang || '').replace(/\D/g, ''), 10);
+          return thangNumber === month;
+        });
+        const prevMonthData = prevData?.find(d => {
+          if (!d.thang) return false;
+          const thangNumber = parseInt((d.thang || '').replace(/\D/g, ''), 10);
+          return thangNumber === month;
+        });
+
+        const salary = curMonthData ? parseFloat((curMonthData.tong_thu_nhap || '0').toString().replace(/,/g, '')) : 0;
+        // Không có tong_cong, chỉ hiển thị lương tổng
+        const salaryPerWorkday = salary; // Chỉ hiển thị lương tổng
+        
+        const prevSalary = prevMonthData ? parseFloat((prevMonthData.tong_thu_nhap || '0').toString().replace(/,/g, '')) : 0;
+        // Không có tong_cong, chỉ hiển thị lương tổng
+        const prevSalaryPerWorkday = prevSalary; // Chỉ hiển thị lương tổng
+
+        return {
+          month,
+          salary,
+          per_workday: salaryPerWorkday,
+          per_workday_prev: prevSalaryPerWorkday,
+          doanhThuMonthData // Thêm dữ liệu doanh thu theo tháng
+        };
+      });
+
+      console.log('Dữ liệu tháng đã xử lý:', monthData);
+      setSalaryMonthData(prev => ({ ...prev, [employeeId]: monthData }));
+      
+    } catch (error) {
+      console.error('Lỗi chi tiết khi lấy dữ liệu lương theo tháng:', {
+        employeeId,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        fullError: error
+      });
+      
+      // Hiển thị thông báo lỗi cho người dùng
+      toast({
+        title: "Lỗi",
+        description: `Không thể tải dữ liệu lương theo tháng: ${error instanceof Error ? error.message : 'Lỗi không xác định'}`,
+        variant: "destructive",
+      });
+      
+      setSalaryMonthData(prev => ({ ...prev, [employeeId]: [] }));
+    } finally {
+      setSalaryMonthLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <Card className="flex-grow flex flex-col h-full">
@@ -1014,6 +1236,7 @@ export default function SalaryMechanismCheckTable({
               <Table>
                 <TableHeader className="sticky top-0 bg-card z-10">
                   <TableRow>
+                    <TableHead className="w-8" />
                     <TableHead className={cn('text-xs py-1.5 px-2 cursor-pointer whitespace-nowrap', sortKey === 'id' && 'font-bold')} onClick={() => handleSort('id')}>
                       ID {renderSortIcon('id')}
                     </TableHead>
@@ -1066,27 +1289,319 @@ export default function SalaryMechanismCheckTable({
                 </TableHeader>
                 <TableBody>
                   {sortedData.map((row, index) => (
-                    <TableRow key={index} className={index < 3 ? 'bg-yellow-50 dark:bg-yellow-900/10' : ''}>
-                      <TableCell className="text-xs py-1.5 px-2 font-medium">{row.id}</TableCell>
-                      <TableCell className="text-xs py-1.5 px-2 whitespace-nowrap">{row.ho_va_ten}</TableCell>
-                      <TableCell className="text-xs py-1.5 px-2 whitespace-nowrap">{row.don_vi}</TableCell>
-                      <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap">{formatCurrency(row.luong_co_ban)}</TableCell>
-                      <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap">{formatCurrency(row.uu_dai_nghe)}</TableCell>
-                      <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap">{formatCurrency(row.xang_xe)}</TableCell>
-                      <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap">{formatCurrency(row.dien_thoai)}</TableCell>
-                      <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap">{formatCurrency(row.thuong_hieu_suat)}</TableCell>
-                      <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap font-semibold">{formatCurrency(row.gross_theo_co_che)}</TableCell>
-                      <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap">{formatCurrency(row.doanh_thu_chi_tieu)}</TableCell>
-                      <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap">{formatCurrency(row.doanh_thu_thuc_hien)}</TableCell>
-                      <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap font-semibold">{formatPercentage(row.phan_tram_hoan_thanh)}</TableCell>
-                      <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap">{formatCurrency(row.thuong_hieu_suat_theo_co_che)}</TableCell>
-                      <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap font-semibold">{formatCurrency(row.luong_gross_thuc_te)}</TableCell>
-                      <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap">{formatCurrency(row.luong_gross_don_vi_de_xuat)}</TableCell>
-                      <TableCell className={cn("text-xs py-1.5 px-2 text-right whitespace-nowrap flex items-center gap-1 justify-end", getChenhLechColor(row.chenh_lech_co_che))}>
-                        {getChenhLechIcon(row.chenh_lech_co_che)}
-                        {formatCurrency(row.chenh_lech_co_che)}
-                      </TableCell>
-                    </TableRow>
+                    <React.Fragment key={index}>
+                      <TableRow className={index < 3 ? 'bg-yellow-50 dark:bg-yellow-900/10' : ''}>
+                        <TableCell className="w-8 text-xs py-1.5 px-2">
+                          <button onClick={() => handleExpand(row.id)} className="focus:outline-none">
+                            {expandedRow === row.id ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                          </button>
+                        </TableCell>
+                        <TableCell className="text-xs py-1.5 px-2 font-medium">{row.id}</TableCell>
+                        <TableCell className="text-xs py-1.5 px-2 whitespace-nowrap">{row.ho_va_ten}</TableCell>
+                        <TableCell className="text-xs py-1.5 px-2 whitespace-nowrap">{row.don_vi}</TableCell>
+                        <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap">{formatCurrency(row.luong_co_ban)}</TableCell>
+                        <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap">{formatCurrency(row.uu_dai_nghe)}</TableCell>
+                        <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap">{formatCurrency(row.xang_xe)}</TableCell>
+                        <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap">{formatCurrency(row.dien_thoai)}</TableCell>
+                        <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap">{formatCurrency(row.thuong_hieu_suat)}</TableCell>
+                        <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap font-semibold">{formatCurrency(row.gross_theo_co_che)}</TableCell>
+                        <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap">{formatCurrency(row.doanh_thu_chi_tieu)}</TableCell>
+                        <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap">{formatCurrency(row.doanh_thu_thuc_hien)}</TableCell>
+                        <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap font-semibold">{formatPercentage(row.phan_tram_hoan_thanh)}</TableCell>
+                        <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap">{formatCurrency(row.thuong_hieu_suat_theo_co_che)}</TableCell>
+                        <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap font-semibold">{formatCurrency(row.luong_gross_thuc_te)}</TableCell>
+                        <TableCell className="text-xs py-1.5 px-2 text-right whitespace-nowrap">{formatCurrency(row.luong_gross_don_vi_de_xuat)}</TableCell>
+                        <TableCell className={cn("text-xs py-1.5 px-2 text-right whitespace-nowrap flex items-center gap-1 justify-end", getChenhLechColor(row.chenh_lech_co_che))}>
+                          {getChenhLechIcon(row.chenh_lech_co_che)}
+                          {formatCurrency(row.chenh_lech_co_che)}
+                        </TableCell>
+                      </TableRow>
+                      {expandedRow === row.id && (
+                        <TableRow>
+                          <TableCell colSpan={17} className="bg-muted px-4 py-2 animate-slideDown">
+                            {/* Section 1: Thông tin hành chính */}
+                            <div className="mb-4">
+                              <div className="font-semibold mb-2 text-sm">Thông tin hành chính</div>
+                              {detailLoading && !detailData[row.id] && (
+                                <div className="text-xs text-muted-foreground">Đang tải thông tin chi tiết...</div>
+                              )}
+                              {detailData[row.id] && (
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-1 text-xs">
+                                  {Object.entries(detailData[row.id]).map(([k, v]) => (
+                                    <div key={k} className="flex gap-1">
+                                      <span className="font-semibold whitespace-nowrap">{k}:</span>
+                                      <span className="truncate">{String(v)}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {!detailLoading && !detailData[row.id] && (
+                                <div className="text-xs text-destructive">Không tìm thấy thông tin chi tiết.</div>
+                              )}
+                            </div>
+                            
+                            {/* Section 2: Thông tin cơ chế lương */}
+                            <div className="mb-4">
+                              <div className="font-semibold mb-2 text-sm">Thông tin cơ chế lương</div>
+                              <div className="border rounded-md overflow-hidden">
+                                <table className="w-full text-xs">
+                                  <thead className="bg-muted">
+                                    <tr>
+                                      <th className="px-2 py-1.5 text-left font-semibold">Thành phần</th>
+                                      <th className="px-2 py-1.5 text-right font-semibold">Số tiền</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    <tr className="border-b">
+                                      <td className="px-2 py-1.5">Lương cơ bản</td>
+                                      <td className="px-2 py-1.5 text-right">{formatCurrency(row.luong_co_ban)}</td>
+                                    </tr>
+                                    <tr className="border-b">
+                                      <td className="px-2 py-1.5">Ưu đãi nghề</td>
+                                      <td className="px-2 py-1.5 text-right">{formatCurrency(row.uu_dai_nghe)}</td>
+                                    </tr>
+                                    <tr className="border-b">
+                                      <td className="px-2 py-1.5">Xăng xe</td>
+                                      <td className="px-2 py-1.5 text-right">{formatCurrency(row.xang_xe)}</td>
+                                    </tr>
+                                    <tr className="border-b">
+                                      <td className="px-2 py-1.5">Điện thoại</td>
+                                      <td className="px-2 py-1.5 text-right">{formatCurrency(row.dien_thoai)}</td>
+                                    </tr>
+                                    <tr className="border-b">
+                                      <td className="px-2 py-1.5">Thưởng hiệu suất</td>
+                                      <td className="px-2 py-1.5 text-right">{formatCurrency(row.thuong_hieu_suat)}</td>
+                                    </tr>
+                                    <tr className="bg-primary/5 font-semibold">
+                                      <td className="px-2 py-1.5">Gross theo cơ chế</td>
+                                      <td className="px-2 py-1.5 text-right">{formatCurrency(row.gross_theo_co_che)}</td>
+                                    </tr>
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+
+                                                         {/* Section 3: Thông tin doanh thu */}
+                             <div className="mb-4">
+                               <div className="font-semibold mb-2 text-sm">Thông tin doanh thu theo tháng (2025)</div>
+                               <div className="border rounded-md overflow-hidden">
+                                 <table className="w-full text-xs">
+                                   <thead className="bg-muted">
+                                     <tr>
+                                       <th className="px-2 py-1.5 text-left font-semibold">Tháng</th>
+                                       <th className="px-2 py-1.5 text-right font-semibold">DT chỉ tiêu</th>
+                                       <th className="px-2 py-1.5 text-right font-semibold">DT thực hiện</th>
+                                       <th className="px-2 py-1.5 text-right font-semibold">% hoàn thành</th>
+                                       <th className="px-2 py-1.5 text-right font-semibold">Thưởng HS theo cơ chế</th>
+                                       <th className="px-2 py-1.5 text-right font-semibold">Lương Gross thực tế</th>
+                                       <th className="px-2 py-1.5 text-right font-semibold">Lương Gross đơn vị đề xuất</th>
+                                       <th className="px-2 py-1.5 text-right font-semibold">Chênh lệch cơ chế</th>
+                                     </tr>
+                                   </thead>
+                                   <tbody>
+                                     {(() => {
+                                       // Tạo mảng dữ liệu cho từng tháng và lọc những tháng có lương Fulltime
+                                       const monthlyData = Array.from({ length: 12 }, (_, i) => {
+                                         const month = i + 1;
+                                         const monthName = `Tháng ${month.toString().padStart(2, '0')}`;
+                                         
+                                                                                // Lấy dữ liệu doanh thu thực tế từ bảng Doanh_thu cho tháng này
+                                       const monthData = salaryMonthData[row.id]?.[month - 1];
+                                       const doanhThuData = monthData?.doanhThuMonthData;
+                                       
+                                       // Debug logging cho Đoàn Văn Thuyết - ID 9
+                                       if (row.id === '9' && row.ho_va_ten === 'Đoàn Văn Thuyết') {
+                                         console.log(`=== DEBUG Đoàn Văn Thuyết - Tháng ${month} ===`);
+                                         console.log('monthData:', monthData);
+                                         console.log('doanhThuData:', doanhThuData);
+                                         console.log('row.doanh_thu_chi_tieu:', row.doanh_thu_chi_tieu);
+                                         console.log('row.doanh_thu_thuc_hien:', row.doanh_thu_thuc_hien);
+                                       }
+                                       
+                                       // Tìm dữ liệu doanh thu cho tháng cụ thể
+                                       let monthlyChiTieu = 0;
+                                       let monthlyThucHien = 0;
+                                       
+                                       if (doanhThuData) {
+                                         const monthDoanhThu = doanhThuData.find((dt: any) => {
+                                           const thangPro = dt['Tháng pro'];
+                                           if (!thangPro || typeof thangPro !== 'string') return false;
+                                           const thangMatch = thangPro.match(/Tháng\s*(\d+)-(\d+)/);
+                                           if (!thangMatch) return false;
+                                           const thangNumber = parseInt(thangMatch[1], 10);
+                                           const namNumber = parseInt(thangMatch[2], 10);
+                                           
+                                           // Debug logging cho Đoàn Văn Thuyết
+                                           if (row.id === '9' && row.ho_va_ten === 'Đoàn Văn Thuyết') {
+                                             console.log(`Checking doanh thu record:`, dt);
+                                             console.log(`thangPro: ${thangPro}, thangNumber: ${thangNumber}, namNumber: ${namNumber}`);
+                                             console.log(`Match: thangNumber === month (${thangNumber} === ${month}) = ${thangNumber === month}`);
+                                             console.log(`Match: namNumber === 2025 (${namNumber} === 2025) = ${namNumber === 2025}`);
+                                           }
+                                           
+                                           return thangNumber === month && namNumber === 2025;
+                                         });
+                                         
+                                         if (monthDoanhThu) {
+                                           monthlyChiTieu = parseFloat((monthDoanhThu['Chỉ tiêu'] || '0').toString().replace(/,/g, '')) || 0;
+                                           monthlyThucHien = parseFloat((monthDoanhThu['Kỳ báo cáo'] || '0').toString().replace(/,/g, '')) || 0;
+                                           
+                                           // Debug logging cho Đoàn Văn Thuyết
+                                           if (row.id === '9' && row.ho_va_ten === 'Đoàn Văn Thuyết') {
+                                             console.log(`Found doanh thu data for month ${month}:`, monthDoanhThu);
+                                             console.log(`monthlyChiTieu: ${monthlyChiTieu}, monthlyThucHien: ${monthlyThucHien}`);
+                                           }
+                                         } else {
+                                           // Debug logging cho Đoàn Văn Thuyết
+                                           if (row.id === '9' && row.ho_va_ten === 'Đoàn Văn Thuyết') {
+                                             console.log(`No doanh thu data found for month ${month}`);
+                                           }
+                                         }
+                                       }
+                                       
+                                       // Nếu không có dữ liệu thực tế, sử dụng dữ liệu tổng chia đều
+                                       if (monthlyChiTieu === 0 && monthlyThucHien === 0) {
+                                         monthlyChiTieu = row.doanh_thu_chi_tieu / 12;
+                                         monthlyThucHien = row.doanh_thu_thuc_hien / 12;
+                                         
+                                         // Debug logging cho Đoàn Văn Thuyết
+                                         if (row.id === '9' && row.ho_va_ten === 'Đoàn Văn Thuyết') {
+                                           console.log(`Using fallback data for month ${month}: monthlyChiTieu=${monthlyChiTieu}, monthlyThucHien=${monthlyThucHien}`);
+                                         }
+                                       }
+                                         
+                                         const monthlyPhanTram = monthlyChiTieu > 0 ? (monthlyThucHien / monthlyChiTieu) * 100 : 0;
+                                         
+                                         // Tính thưởng hiệu suất theo tháng dựa trên % hoàn thành
+                                         let monthlyHeSo = 0;
+                                         if (monthlyPhanTram < 70) {
+                                           monthlyHeSo = 0.7;
+                                         } else if (monthlyPhanTram < 95) {
+                                           monthlyHeSo = monthlyPhanTram / 100;
+                                         } else {
+                                           monthlyHeSo = Math.min((monthlyPhanTram / 100) + 0.05, 1.3);
+                                         }
+                                         
+                                         const monthlyThuongHieuSuat = row.thuong_hieu_suat * monthlyHeSo;
+                                         const monthlyLuongGrossThucTe = row.luong_co_ban + row.uu_dai_nghe + row.xang_xe + row.dien_thoai + monthlyThuongHieuSuat;
+                                         
+                                         // Lấy lương Fulltime theo tháng từ dữ liệu đã có
+                                         const monthlyFulltimeSalary = monthData?.salary || 0;
+                                         const monthlyChenhLech = monthlyLuongGrossThucTe - monthlyFulltimeSalary;
+                                         
+                                         return {
+                                           month,
+                                           monthName,
+                                           monthlyChiTieu,
+                                           monthlyThucHien,
+                                           monthlyPhanTram,
+                                           monthlyThuongHieuSuat,
+                                           monthlyLuongGrossThucTe,
+                                           monthlyFulltimeSalary,
+                                           monthlyChenhLech,
+                                           hasFulltimeSalary: monthlyFulltimeSalary > 0
+                                         };
+                                       });
+                                       
+                                       // Lọc chỉ những tháng có lương Fulltime
+                                       const filteredMonthlyData = monthlyData.filter(item => item.hasFulltimeSalary);
+                                       
+                                       // Tính tổng cộng từ những tháng có doanh thu
+                                       const totalChiTieu = filteredMonthlyData.reduce((sum, item) => sum + item.monthlyChiTieu, 0);
+                                       const totalThucHien = filteredMonthlyData.reduce((sum, item) => sum + item.monthlyThucHien, 0);
+                                       const totalPhanTram = totalChiTieu > 0 ? (totalThucHien / totalChiTieu) * 100 : 0;
+                                       const totalThuongHieuSuat = filteredMonthlyData.reduce((sum, item) => sum + item.monthlyThuongHieuSuat, 0);
+                                       const totalLuongGrossThucTe = filteredMonthlyData.reduce((sum, item) => sum + item.monthlyLuongGrossThucTe, 0);
+                                       const totalFulltimeSalary = filteredMonthlyData.reduce((sum, item) => sum + item.monthlyFulltimeSalary, 0);
+                                       const totalChenhLech = totalLuongGrossThucTe - totalFulltimeSalary;
+                                       
+                                       return (
+                                         <>
+                                           {/* Hiển thị các tháng có lương Fulltime */}
+                                           {filteredMonthlyData.map((item) => (
+                                             <tr key={item.month} className="border-b hover:bg-muted/50">
+                                               <td className="px-2 py-1.5 font-medium">{item.monthName}</td>
+                                               <td className="px-2 py-1.5 text-right">{formatCurrency(item.monthlyChiTieu)}</td>
+                                               <td className="px-2 py-1.5 text-right">{formatCurrency(item.monthlyThucHien)}</td>
+                                               <td className="px-2 py-1.5 text-right font-semibold">{formatPercentage(item.monthlyPhanTram)}</td>
+                                               <td className="px-2 py-1.5 text-right">{formatCurrency(item.monthlyThuongHieuSuat)}</td>
+                                               <td className="px-2 py-1.5 text-right font-semibold">{formatCurrency(item.monthlyLuongGrossThucTe)}</td>
+                                               <td className="px-2 py-1.5 text-right">{formatCurrency(item.monthlyFulltimeSalary)}</td>
+                                               <td className={cn("px-2 py-1.5 text-right font-semibold", getChenhLechColor(item.monthlyChenhLech))}>
+                                                 {getChenhLechIcon(item.monthlyChenhLech)}
+                                                 {formatCurrency(item.monthlyChenhLech)}
+                                               </td>
+                                             </tr>
+                                           ))}
+                                           
+                                           {/* Dòng tổng cộng từ những tháng có doanh thu */}
+                                           {filteredMonthlyData.length > 0 && (
+                                             <tr className="border-t-2 border-primary bg-primary/5 font-semibold">
+                                               <td className="px-2 py-1.5 font-medium">Tổng cộng</td>
+                                               <td className="px-2 py-1.5 text-right">{formatCurrency(totalChiTieu)}</td>
+                                               <td className="px-2 py-1.5 text-right">{formatCurrency(totalThucHien)}</td>
+                                               <td className="px-2 py-1.5 text-right font-semibold">{formatPercentage(totalPhanTram)}</td>
+                                               <td className="px-2 py-1.5 text-right">{formatCurrency(totalThuongHieuSuat)}</td>
+                                               <td className="px-2 py-1.5 text-right font-semibold">{formatCurrency(totalLuongGrossThucTe)}</td>
+                                               <td className="px-2 py-1.5 text-right">{formatCurrency(totalFulltimeSalary)}</td>
+                                               <td className={cn("px-2 py-1.5 text-right font-semibold", getChenhLechColor(totalChenhLech))}>
+                                                 {getChenhLechIcon(totalChenhLech)}
+                                                 {formatCurrency(totalChenhLech)}
+                                               </td>
+                                             </tr>
+                                           )}
+                                           
+                                           {/* Thông báo nếu không có tháng nào có lương Fulltime */}
+                                           {filteredMonthlyData.length === 0 && (
+                                             <tr>
+                                               <td colSpan={8} className="px-2 py-3 text-center text-muted-foreground">
+                                                 Không có dữ liệu lương Fulltime cho bất kỳ tháng nào trong năm 2025
+                                               </td>
+                                             </tr>
+                                           )}
+                                         </>
+                                       );
+                                     })()}
+                                   </tbody>
+                                 </table>
+                               </div>
+                             </div>
+
+                             {/* Section 4: Biểu đồ lương Fulltime theo tháng */}
+                             <div>
+                               <div className="font-semibold mb-2 text-sm">Lương Fulltime theo tháng</div>
+                               {salaryMonthLoading && (!salaryMonthData[row.id] || salaryMonthData[row.id].length === 0) && (
+                                 <div className="text-xs text-muted-foreground">Đang tải dữ liệu lương theo tháng...</div>
+                               )}
+                               {salaryMonthData[row.id] && salaryMonthData[row.id].length > 0 && (
+                                 <div>
+                                   {/* Line chart: Lương theo tháng (so sánh 2 năm) */}
+                                   <div>
+                                     <div className="text-xs font-semibold mb-1">Lương theo tháng (so sánh 2 năm)</div>
+                                     <ResponsiveContainer width="100%" height={180}>
+                                       <LineChart data={salaryMonthData[row.id]}>
+                                         <XAxis dataKey="month" tickFormatter={(m: any) => `Th${m}`} fontSize={11} />
+                                         <Tooltip formatter={(v: any) => formatCurrency(Number(v))} labelFormatter={(m: any) => `Tháng ${m}`} />
+                                         <Legend />
+                                         <Line type="monotone" dataKey="per_workday" stroke="#3b82f6" name="Năm nay" dot={{ r: 3 }} activeDot={{ r: 5 }}>
+                                           <LabelList dataKey="per_workday" position="top" formatter={(v: any) => formatCurrency(Number(v))} fontSize={11} />
+                                         </Line>
+                                         <Line type="monotone" dataKey="per_workday_prev" stroke="#f59e42" name="Năm ngoái" dot={{ r: 3 }} activeDot={{ r: 5 }}>
+                                           <LabelList dataKey="per_workday_prev" position="top" formatter={(v: any) => formatCurrency(Number(v))} fontSize={11} />
+                                         </Line>
+                                       </LineChart>
+                                     </ResponsiveContainer>
+                                   </div>
+                                 </div>
+                               )}
+                               {salaryMonthData[row.id] && salaryMonthData[row.id].length === 0 && !salaryMonthLoading && (
+                                 <div className="text-xs text-destructive">Không có dữ liệu lương theo tháng.</div>
+                               )}
+                             </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </React.Fragment>
                   ))}
                 </TableBody>
               </Table>
