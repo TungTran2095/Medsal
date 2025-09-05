@@ -32,9 +32,9 @@ export default function DashboardPage() {
       return;
     }
 
-    // Redirect to dashboard if authenticated
+    // Redirect to dashboard doanh thu if authenticated
     if (!loading && user) {
-      router.push('/dashboard');
+      router.push('/dashboard/revenue');
       return;
     }
   }, [user, loading, router]);

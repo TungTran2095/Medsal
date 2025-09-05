@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, ChevronDown, FilterIcon, GanttChartSquare, MapPin, Settings2, Circle, Percent, Target, FolderKanban, BarChart3, Filter as FilterIconLucide, Briefcase, ListChecks, UserCheck, Users, LineChart, Banknote, ScatterChart as ScatterChartIconLucide, CalendarDays, UsersRound, AlertTriangle } from "lucide-react";
+import { UploadCloud, FileText, Loader2, LayoutDashboard, Database, Sun, Moon, ChevronDown, FilterIcon, GanttChartSquare, MapPin, Settings2, Circle, Percent, Target, FolderKanban, BarChart3, Filter as FilterIconLucide, Briefcase, ListChecks, UserCheck, Users, LineChart, Banknote, ScatterChart as ScatterChartIconLucide, CalendarDays, UsersRound, AlertTriangle, DollarSign } from "lucide-react";
 import type { PayrollEntry, FlatOrgUnit, OrgNode } from '@/types';
 import { supabase } from '@/lib/supabaseClient';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -21,6 +21,7 @@ import SalaryToRevenueRatioCard from '@/components/dashboard/SalaryToRevenueRati
 import CombinedMonthlyTrendChart from '@/components/charts/MonthlySalaryTrendChart';
 import SalaryProportionPieChart from '@/components/charts/SalaryProportionPieChart';
 import LocationSalaryRevenueColumnChart from '@/components/charts/LocationSalaryRevenueColumnChart';
+import TargetRevenueChart from '@/components/charts/TargetRevenueChart';
 import ComparisonFulltimeSalaryCard from '@/components/comparison/ComparisonFulltimeSalaryCard';
 import ComparisonParttimeSalaryCard from '@/components/comparison/ComparisonParttimeSalaryCard';
 import ComparisonCombinedSalaryCard from '@/components/comparison/ComparisonCombinedSalaryCard';
@@ -51,6 +52,7 @@ import BackOfficeSalaryRatioCard from '@/components/dashboard/BackOfficeSalaryRa
 import BackOfficeSalaryRatioTrendChart from '@/components/charts/BackOfficeSalaryRatioTrendChart';
 import NganhDocKpiComparisonTable from '@/components/comparison/NganhDocKpiComparisonTable';
 import SystemWideNganhDocComparisonTable from '@/components/comparison/SystemWideNganhDocComparisonTable';
+import MonthlySalaryProvinceTable from '@/components/comparison/MonthlySalaryProvinceTable';
 
 
 import {
@@ -83,7 +85,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ConfigError from "@/components/ui/ConfigError";
 
 type WorkspaceView = 'dbManagement' | 'dashboard' | 'aiTools';
-type DashboardTab = 'payrollOverview' | 'comparison' | 'kpiComparison' | 'salaryAnalysisTab' | 'salaryWorkloadAnalysis' | 'detailedSalaryAnalysis' | 'doctorSalaryAnalysis' | 'salaryMechanismCheck';
+type DashboardTab = 'payrollOverview' | 'comparison' | 'kpiComparison' | 'salaryReview' | 'salaryAnalysisTab' | 'salaryWorkloadAnalysis' | 'detailedSalaryAnalysis' | 'doctorSalaryAnalysis' | 'homeSalaryAnalysis' | 'revenueAnalysis';
 
 interface NavItem {
   id: WorkspaceView;
@@ -764,9 +766,13 @@ export default function WorkspaceContent() {
                   <div className="flex-1">
                     <CardTitle className="text-lg font-semibold text-primary flex items-center gap-1.5">
                       <LayoutDashboard className="h-5 w-5" />
-                       Phân Tích Lương & Doanh Thu Tổng Hợp
+                       Phân Tích Lương Tổng Hợp
                     </CardTitle>
+                    <CardDescription className="text-sm text-muted-foreground mt-1">
+                      Phân tích chi tiết lương theo thời gian, địa điểm và các chỉ số KPI quan trọng
+                    </CardDescription>
                   </div>
+
                   <div className="flex items-center gap-2 mt-2 sm:mt-0 flex-wrap">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -984,13 +990,16 @@ export default function WorkspaceContent() {
                   <div className="flex justify-start">
                     <TabsList className="shrink-0">
                       <TabsTrigger value="payrollOverview" className="text-xs px-2.5 py-1.5 flex items-center gap-1">
-                        <LayoutDashboard className="h-3.5 w-3.5"/> Tổng Quan Lương & Doanh Thu
+                        <LayoutDashboard className="h-3.5 w-3.5"/> Tổng Quan Lương
                       </TabsTrigger>
                       <TabsTrigger value="comparison" className="text-xs px-2.5 py-1.5 flex items-center gap-1">
                         <GanttChartSquare className="h-3.5 w-3.5"/> So sánh cùng kỳ
                       </TabsTrigger>
                        <TabsTrigger value="kpiComparison" className="text-xs px-2.5 py-1.5 flex items-center gap-1">
-                        <Target className="h-3.5 w-3.5"/> So sánh với Chỉ Tiêu
+                        <Target className="h-3.5 w-3.5"/> Quỹ lương lũy kế
+                      </TabsTrigger>
+                      <TabsTrigger value="salaryReview" className="text-xs px-2.5 py-1.5 flex items-center gap-1">
+                        <FileText className="h-3.5 w-3.5"/> Duyệt lương tháng ĐVTV
                       </TabsTrigger>
                       <TabsTrigger value="salaryAnalysisTab" className="text-xs px-2.5 py-1.5 flex items-center gap-1">
                         <FolderKanban className="h-3.5 w-3.5"/> Phân tích lương
@@ -1007,9 +1016,7 @@ export default function WorkspaceContent() {
                       <TabsTrigger value="homeSalaryAnalysis" className="text-xs px-2.5 py-1.5 flex items-center gap-1">
                         <UsersRound className="h-3.5 w-3.5"/> Phân tích lương tại nhà
                       </TabsTrigger>
-                      <TabsTrigger value="salaryMechanismCheck" className="text-xs px-2.5 py-1.5 flex items-center gap-1">
-                        <AlertTriangle className="h-3.5 w-3.5"/> Check cơ chế lương
-                      </TabsTrigger>
+                      
                     </TabsList>
                   </div>
 
@@ -1064,16 +1071,26 @@ export default function WorkspaceContent() {
                      <LocationComparisonTable selectedMonths={selectedMonths} selectedDepartmentsForDiadiem={selectedDepartmentsFromLoaiFilter} />
                   </TabsContent>
 
-                   {/* Tab: So sánh với Chỉ Tiêu */}
+                   {/* Tab: Quỹ lương lũy kế */}
                   <TabsContent value="kpiComparison" className="flex-grow overflow-y-auto space-y-3 mt-2">
                      <NganhDocKpiComparisonTable
-                        selectedMonths={selectedMonths}
-                        selectedNganhDoc={selectedNganhDocForFilter}
-                        selectedDonVi2={selectedDonVi2ForFilter}
                         orgHierarchyData={orgHierarchyData}
                         flatOrgUnits={flatOrgUnits}
                       />
                   </TabsContent>
+
+                  {/* Tab: Duyệt lương tháng ĐVTV */}
+                  <TabsContent value="salaryReview" className="flex-grow overflow-y-auto space-y-3 mt-2">
+                    <MonthlySalaryProvinceTable
+                      orgHierarchyData={orgHierarchyData}
+                      flatOrgUnits={flatOrgUnits}
+                    />
+                    <SalaryMechanismCheckTable 
+                      selectedYear={selectedYear}
+                      selectedMonths={selectedMonths}
+                    />
+                  </TabsContent>
+
                   <TabsContent value="salaryAnalysisTab" className="flex-grow overflow-y-auto space-y-3 mt-2">
                     <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
                       <BackOfficeEmployeeRatioCard 
@@ -1187,13 +1204,8 @@ export default function WorkspaceContent() {
                     <div className="mt-4 text-base font-semibold text-center text-primary">Phân tích lương tại nhà (đang phát triển)</div>
                   </TabsContent>
                   
-                  {/* Tab: Check cơ chế lương */}
-                  <TabsContent value="salaryMechanismCheck" className="flex-grow overflow-y-auto space-y-3 mt-2">
-                    <SalaryMechanismCheckTable 
-                      selectedYear={selectedYear}
-                      selectedMonths={selectedMonths}
-                    />
-                  </TabsContent>
+                  
+
                   
 
                 </Tabs>

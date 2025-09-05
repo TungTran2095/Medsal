@@ -23,11 +23,9 @@ export default function Header() {
           </div>
         </div>
         
-        <div className="flex flex-1 items-center justify-between space-x-2 md:justify-end">
-          <div className="w-full flex-1 md:w-auto md:flex-none">
-            {/* Search hoặc navigation có thể thêm vào đây */}
-          </div>
-          <nav className="flex items-center space-x-2">
+                  <div className="flex flex-1 items-center justify-between space-x-2 md:justify-end">
+
+            <nav className="flex items-center space-x-2">
             <Button
               variant="ghost"
               size="icon"

@@ -2,11 +2,10 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { Loader2, AlertTriangle, TrendingUp, TrendingDown, Minus, BarChart3, ChevronDown, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Loader2, AlertTriangle, TrendingUp, TrendingDown, Minus, BarChart3, ChevronDown, ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { OrgNode, FlatOrgUnit } from '@/types';
 
@@ -44,6 +43,162 @@ const calculateChange = (valNew: number | null, valOld: number | null): number |
     return (valNew - valOld) / valOld;
 };
 
+const getAggregatedDataForNode = (
+  node: OrgNode,
+  dataMap: Map<string, MergedNganhDocData>
+): MergedNganhDocData | null => {
+  const nodeNameTrimmed = node.name.trim();
+
+  let aggregated: MergedNganhDocData = {
+    grouping_key: node.name,
+    ft_salary_2024: 0, ft_salary_2025: 0,
+    pt_salary_2024: 0, pt_salary_2025: 0,
+    total_salary_2024: 0, total_salary_2025: 0,
+    ft_salary_change_val: null, pt_salary_change_val: null, total_salary_change_val: null,
+  };
+
+  let hasAnyData = false;
+
+  // Add data of the current node itself if it exists in dataMap
+  const directData = dataMap.get(node.name);
+  console.log(`SystemWide - Looking for node "${node.name}" in dataMap:`, directData);
+  if (directData) {
+    aggregated.ft_salary_2024 += directData.ft_salary_2024;
+    aggregated.ft_salary_2025 += directData.ft_salary_2025;
+    aggregated.pt_salary_2024 += directData.pt_salary_2024;
+    aggregated.pt_salary_2025 += directData.pt_salary_2025;
+    if (directData.ft_salary_2024 !== 0 || directData.ft_salary_2025 !== 0 || directData.pt_salary_2024 !== 0 || directData.pt_salary_2025 !== 0) {
+      hasAnyData = true;
+    }
+  }
+
+  if (node.children && node.children.length > 0) {
+    for (const childNode of node.children) {
+      const childAggregatedData = getAggregatedDataForNode(childNode, dataMap);
+      if (childAggregatedData) {
+        aggregated.ft_salary_2024 += childAggregatedData.ft_salary_2024;
+        aggregated.ft_salary_2025 += childAggregatedData.ft_salary_2025;
+        aggregated.pt_salary_2024 += childAggregatedData.pt_salary_2024;
+        aggregated.pt_salary_2025 += childAggregatedData.pt_salary_2025;
+        hasAnyData = true;
+      }
+    }
+  }
+  
+  // Luôn trả về dữ liệu ngay cả khi không có dữ liệu lương để hiển thị cấu trúc cây
+  // if (!hasAnyData) {
+  //   return null; // No data for this node or any of its children
+  // }
+
+  aggregated.total_salary_2024 = aggregated.ft_salary_2024 + aggregated.pt_salary_2024;
+  aggregated.total_salary_2025 = aggregated.ft_salary_2025 + aggregated.pt_salary_2025;
+  
+  aggregated.ft_salary_change_val = calculateChange(aggregated.ft_salary_2025, aggregated.ft_salary_2024);
+  aggregated.pt_salary_change_val = calculateChange(aggregated.pt_salary_2025, aggregated.pt_salary_2024);
+  aggregated.total_salary_change_val = calculateChange(aggregated.total_salary_2025, aggregated.total_salary_2024);
+
+  return aggregated;
+};
+
+interface RenderTableRowProps {
+  node: OrgNode;
+  level: number;
+  dataMap: Map<string, MergedNganhDocData>;
+  expandedKeys: Set<string>;
+  toggleExpand: (key: string) => void;
+  formatCurrency: (value: number | null) => string;
+  renderChangeCell: (change: number | null, isCost: boolean) => JSX.Element;
+}
+
+const RenderTableRow: React.FC<RenderTableRowProps> = ({
+  node,
+  level,
+  dataMap,
+  expandedKeys,
+  toggleExpand,
+  formatCurrency,
+  renderChangeCell,
+}) => {
+  const aggregatedNodeData = useMemo(() => getAggregatedDataForNode(node, dataMap), [node, dataMap]);
+  const isExpanded = expandedKeys.has(node.id);
+
+  // Get hierarchical children
+  const hierarchicalChildren = useMemo(() =>
+    node.children || [],
+    [node.children, node.id]
+  );
+  
+  const hasDisplayableHierarchicalChildrenWithData = hierarchicalChildren.length > 0;
+  const canExpand = hasDisplayableHierarchicalChildrenWithData;
+
+  // Luôn render row nếu là node trong cây tổ chức (không cần kiểm tra có dữ liệu lương hay không)
+  const shouldRenderRow = true;
+
+  if (!shouldRenderRow) {
+    return null;
+  }
+
+  const rowContent = aggregatedNodeData ? (
+    <>
+      <TableCell className="text-right py-1.5 px-2 text-xs whitespace-nowrap">{formatCurrency(aggregatedNodeData.ft_salary_2024)}</TableCell>
+      <TableCell className="text-right py-1.5 px-2 text-xs whitespace-nowrap">{formatCurrency(aggregatedNodeData.ft_salary_2025)}</TableCell>
+      {renderChangeCell(aggregatedNodeData.ft_salary_change_val, true)}
+      <TableCell className="text-right py-1.5 px-2 text-xs whitespace-nowrap">{formatCurrency(aggregatedNodeData.pt_salary_2024)}</TableCell>
+      <TableCell className="text-right py-1.5 px-2 text-xs whitespace-nowrap">{formatCurrency(aggregatedNodeData.pt_salary_2025)}</TableCell>
+      {renderChangeCell(aggregatedNodeData.pt_salary_change_val, true)}
+      <TableCell className="text-right py-1.5 px-2 text-xs whitespace-nowrap font-semibold">{formatCurrency(aggregatedNodeData.total_salary_2024)}</TableCell>
+      <TableCell className="text-right py-1.5 px-2 text-xs whitespace-nowrap font-semibold">{formatCurrency(aggregatedNodeData.total_salary_2025)}</TableCell>
+      {renderChangeCell(aggregatedNodeData.total_salary_change_val, true)}
+    </>
+  ) : ( 
+    Array(9).fill(null).map((_, idx) => (
+      <TableCell key={`empty-${node.id}-${idx}`} className="text-center py-1.5 px-2 text-xs whitespace-nowrap text-muted-foreground">-</TableCell>
+    ))
+  );
+
+  return (
+    <>
+      <TableRow>
+        <TableCell
+          className="py-1.5 px-2 text-xs font-medium sticky left-0 bg-card z-10 whitespace-nowrap min-w-[200px] text-left"
+          style={{ paddingLeft: `${0.5 + level * 1.25}rem` }}
+        >
+          <div className="flex items-center">
+            {canExpand ? (
+              <button
+                type="button"
+                onClick={() => toggleExpand(node.id)}
+                className="p-0.5 rounded hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring mr-1 shrink-0"
+                aria-expanded={isExpanded}
+                title={isExpanded ? "Thu gọn" : "Mở rộng"}
+              >
+                {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+              </button>
+            ) : (
+              <span className="inline-block w-[calc(0.875rem+0.125rem+0.25rem)] mr-1 shrink-0"></span>
+            )}
+            <span className="truncate" title={node.name}>{node.name}</span>
+          </div>
+        </TableCell>
+        {rowContent}
+      </TableRow>
+
+      {isExpanded && hasDisplayableHierarchicalChildrenWithData && hierarchicalChildren.map(childNode => (
+        <RenderTableRow
+          key={childNode.id}
+          node={childNode}
+          level={level + 1}
+          dataMap={dataMap}
+          expandedKeys={expandedKeys}
+          toggleExpand={toggleExpand}
+          formatCurrency={formatCurrency}
+          renderChangeCell={renderChangeCell}
+        />
+      ))}
+    </>
+  );
+};
+
 interface SystemWideNganhDocComparisonTableProps {
   selectedMonths?: number[];
   selectedNganhDoc?: string[];
@@ -63,7 +218,19 @@ export default function SystemWideNganhDocComparisonTable({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<FetchError | null>(null);
   const [filterDescription, setFilterDescription] = useState<string>("kỳ được chọn");
-  const [sortConfig, setSortConfig] = useState<{ key: string | null; direction: 'ascending' | 'descending' }>({ key: 'grouping_key', direction: 'ascending' });
+  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
+
+  const toggleExpand = useCallback((key: string) => {
+    setExpandedKeys(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(key)) {
+        newSet.delete(key);
+      } else {
+        newSet.add(key);
+      }
+      return newSet;
+    });
+  }, []);
 
   const fetchDataForYear = useCallback(async (year: number): Promise<{ ftData: NganhDocMetric[], ptData: NganhDocMetric[] } | FetchError> => {
     try {
@@ -118,14 +285,30 @@ export default function SystemWideNganhDocComparisonTable({
         return { type: 'rpcMissing', message: `Lỗi RPC PT salary: ${ptError.message}` } as FetchError;
       }
 
+      // Merge các bản ghi có cùng tên phòng khám cho FT
+      const mergedFTByName = new Map<string, number>();
+      (Array.isArray(ftData) ? ftData : []).forEach((item: any) => {
+        const name = String(item.nganh_doc_name || item.nganh_doc_key || item.nganh_doc || item.department_name || '');
+        const salary = Number(item.ft_salary) || 0;
+        mergedFTByName.set(name, (mergedFTByName.get(name) || 0) + salary);
+      });
+
+      // Merge các bản ghi có cùng tên phòng khám cho PT
+      const mergedPTByName = new Map<string, number>();
+      (Array.isArray(ptData) ? ptData : []).forEach((item: any) => {
+        const name = String(item.don_vi_2_name || item.don_vi_2_key || item.don_vi_2 || item.department_name || '');
+        const salary = Number(item.pt_salary) || 0;
+        mergedPTByName.set(name, (mergedPTByName.get(name) || 0) + salary);
+      });
+
       return {
-        ftData: (ftData || []).map((item: any) => ({
-          key: String(item.nganh_doc_key || item.nganh_doc || item.department_name || ''),
-          ft_salary: Number(item.ft_salary) || 0,
+        ftData: Array.from(mergedFTByName.entries()).map(([name, salary]) => ({
+          key: name,
+          ft_salary: salary,
         })),
-        ptData: (ptData || []).map((item: any) => ({
-          key: String(item.don_vi_2_key || item.don_vi_2 || item.department_name || ''),
-          pt_salary: Number(item.pt_salary) || 0,
+        ptData: Array.from(mergedPTByName.entries()).map(([name, salary]) => ({
+          key: name,
+          pt_salary: salary,
         }))
       };
     } catch (e: any) {
@@ -163,6 +346,12 @@ export default function SystemWideNganhDocComparisonTable({
     if (data2024Result.error) { setError(data2024Result.error); setIsLoading(false); return; }
     if (data2025Result.error) { setError(data2025Result.error); setIsLoading(false); return; }
 
+    // Debug: Log dữ liệu từ API
+    console.log('SystemWide - FT Data 2024:', data2024Result.ftData);
+    console.log('SystemWide - PT Data 2024:', data2024Result.ptData);
+    console.log('SystemWide - FT Data 2025:', data2025Result.ftData);
+    console.log('SystemWide - PT Data 2025:', data2025Result.ptData);
+
     const mergedMap = new Map<string, MergedNganhDocData>();
     const allKeys = new Set<string>();
 
@@ -171,13 +360,8 @@ export default function SystemWideNganhDocComparisonTable({
     (data2025Result.ftData || []).forEach(item => allKeys.add(item.key));
     (data2025Result.ptData || []).forEach(item => allKeys.add(item.key));
 
-    // Hàm chuẩn hóa tên đơn vị
-    const normalizeUnitName = (name: string): string => {
-        return name.trim().toLowerCase();
-    };
-
-    // Tạo map để gộp các đơn vị có tên chuẩn hóa giống nhau
-    const normalizedMap = new Map<string, MergedNganhDocData>();
+    // Tạo map trực tiếp với tên gốc (không chuẩn hóa)
+    const directMap = new Map<string, MergedNganhDocData>();
 
     allKeys.forEach(key => {
         const ft2024 = data2024Result.ftData.find(d => d.key === key)?.ft_salary || 0;
@@ -196,102 +380,102 @@ export default function SystemWideNganhDocComparisonTable({
         const total_salary_2024 = finalFt2024 + finalPt2024;
         const total_salary_2025 = finalFt2025 + finalPt2025;
 
-        // Only process if it has data
-        if (total_salary_2024 !== 0 || total_salary_2025 !== 0) {
-            const normalizedKey = normalizeUnitName(key);
-            
-            if (normalizedMap.has(normalizedKey)) {
-                // Gộp với dữ liệu đã có
-                const existing = normalizedMap.get(normalizedKey)!;
-                existing.ft_salary_2024 += finalFt2024;
-                existing.ft_salary_2025 += finalFt2025;
-                existing.pt_salary_2024 += finalPt2024;
-                existing.pt_salary_2025 += finalPt2025;
-                existing.total_salary_2024 += total_salary_2024;
-                existing.total_salary_2025 += total_salary_2025;
-                
-                // Recalculate change values
-                existing.ft_salary_change_val = calculateChange(existing.ft_salary_2025, existing.ft_salary_2024);
-                existing.pt_salary_change_val = calculateChange(existing.pt_salary_2025, existing.pt_salary_2024);
-                existing.total_salary_change_val = calculateChange(existing.total_salary_2025, existing.total_salary_2024);
-            } else {
-                // Tạo mới
-                normalizedMap.set(normalizedKey, {
-                    grouping_key: normalizedKey, // Sử dụng tên chuẩn hóa
-                    ft_salary_2024: finalFt2024,
-                    pt_salary_2024: finalPt2024,
-                    total_salary_2024: total_salary_2024,
-                    ft_salary_2025: finalFt2025,
-                    pt_salary_2025: finalPt2025,
-                    total_salary_2025: total_salary_2025,
-                    ft_salary_change_val: calculateChange(finalFt2025, finalFt2024), 
-                    pt_salary_change_val: calculateChange(finalPt2025, finalPt2024),
-                    total_salary_change_val: calculateChange(total_salary_2025, total_salary_2024),
-                });
-            }
-        }
+        // Tạo dữ liệu trực tiếp với tên gốc
+        directMap.set(key, {
+            grouping_key: key, // Sử dụng tên gốc
+            ft_salary_2024: finalFt2024,
+            pt_salary_2024: finalPt2024,
+            total_salary_2024: total_salary_2024,
+            ft_salary_2025: finalFt2025,
+            pt_salary_2025: finalPt2025,
+            total_salary_2025: total_salary_2025,
+            ft_salary_change_val: calculateChange(finalFt2025, finalFt2024), 
+            pt_salary_change_val: calculateChange(finalPt2025, finalPt2024),
+            total_salary_change_val: calculateChange(total_salary_2025, total_salary_2024),
+        });
     });
 
-    // Chuyển từ normalizedMap sang mergedMap
-    normalizedMap.forEach((value, key) => {
+    // Chuyển từ directMap sang mergedMap
+    directMap.forEach((value, key) => {
         mergedMap.set(key, value);
     });
+
+    // Thêm dữ liệu cho tất cả các node trong cây tổ chức, ngay cả khi không có dữ liệu lương
+    if (orgHierarchyData && orgHierarchyData.length > 0) {
+      const addNodeToMap = (node: OrgNode) => {
+        const nodeName = node.name.trim();
+        if (!mergedMap.has(nodeName)) {
+          mergedMap.set(nodeName, {
+            grouping_key: nodeName,
+            ft_salary_2024: 0,
+            ft_salary_2025: 0,
+            pt_salary_2024: 0,
+            pt_salary_2025: 0,
+            total_salary_2024: 0,
+            total_salary_2025: 0,
+            ft_salary_change_val: null,
+            pt_salary_change_val: null,
+            total_salary_change_val: null,
+          });
+        }
+        if (node.children) {
+          node.children.forEach(child => addNodeToMap(child));
+        }
+      };
+      
+      orgHierarchyData.forEach(rootNode => addNodeToMap(rootNode));
+    }
     
-    setComparisonData(Array.from(mergedMap.values())); 
+    const finalData = Array.from(mergedMap.values());
+    console.log('SystemWide - Final merged data:', finalData);
+    console.log('SystemWide - Org hierarchy data:', orgHierarchyData);
+    
+    setComparisonData(finalData); 
     setIsLoading(false);
-  }, [fetchDataForYear, selectedMonths, selectedNganhDoc, selectedDonVi2]);
+  }, [fetchDataForYear, selectedMonths, selectedNganhDoc, selectedDonVi2, orgHierarchyData]);
 
   useEffect(() => {
     fetchAllComparisonData();
   }, [fetchAllComparisonData]);
 
-  const sortedComparisonData = useMemo(() => {
-    if (!sortConfig.key) return comparisonData;
-    
-    return [...comparisonData].sort((a, b) => {
-      const aValue = a[sortConfig.key as keyof MergedNganhDocData];
-      const bValue = b[sortConfig.key as keyof MergedNganhDocData];
-      
-      if (typeof aValue === 'string' && typeof bValue === 'string') {
-        return sortConfig.direction === 'ascending' 
-          ? aValue.localeCompare(bValue)
-          : bValue.localeCompare(aValue);
-      }
-      
-      const aNum = typeof aValue === 'number' ? aValue : 0;
-      const bNum = typeof bValue === 'number' ? bValue : 0;
-      
-      return sortConfig.direction === 'ascending' ? aNum - bNum : bNum - aNum;
+  const dataMapForHierarchy = useMemo(() => {
+    const map = new Map<string, MergedNganhDocData>();
+    comparisonData.forEach(item => {
+      map.set(item.grouping_key, item);
     });
-  }, [comparisonData, sortConfig]);
+    return map;
+  }, [comparisonData]);
+
+  const medlatecGroupNode = useMemo(() => {
+    if (!orgHierarchyData || orgHierarchyData.length === 0) return null;
+    return orgHierarchyData.find(node => String(node.id) === "1" || node.name.trim().toLowerCase() === "medlatec group");
+  }, [orgHierarchyData]);
+
+  const nodesToRender = useMemo(() => {
+    if (!medlatecGroupNode || !medlatecGroupNode.children) return [];
+    return medlatecGroupNode.children;
+  }, [medlatecGroupNode]);
+
+  const hasRenderableNodes = useMemo(() => {
+    if (!medlatecGroupNode || !medlatecGroupNode.children) return false;
+    // Hiển thị tất cả các node trong cây tổ chức, kể cả khi không có dữ liệu lương
+    return nodesToRender.length > 0;
+  }, [medlatecGroupNode, nodesToRender]);
 
   const totals = useMemo(() => {
-    return comparisonData.reduce((acc, item) => ({
-      ft_salary_2024: acc.ft_salary_2024 + item.ft_salary_2024,
-      ft_salary_2025: acc.ft_salary_2025 + item.ft_salary_2025,
-      pt_salary_2024: acc.pt_salary_2024 + item.pt_salary_2024,
-      pt_salary_2025: acc.pt_salary_2025 + item.pt_salary_2025,
-      total_salary_2024: acc.total_salary_2024 + item.total_salary_2024,
-      total_salary_2025: acc.total_salary_2025 + item.total_salary_2025,
-      ft_salary_change_val: calculateChange(
-        acc.ft_salary_2025 + item.ft_salary_2025, 
-        acc.ft_salary_2024 + item.ft_salary_2024
-      ),
-      pt_salary_change_val: calculateChange(
-        acc.pt_salary_2025 + item.pt_salary_2025, 
-        acc.pt_salary_2024 + item.pt_salary_2024
-      ),
-      total_salary_change_val: calculateChange(
-        acc.total_salary_2025 + item.total_salary_2025, 
-        acc.total_salary_2024 + item.total_salary_2024
-      ),
-    }), {
-      ft_salary_2024: 0, ft_salary_2025: 0,
-      pt_salary_2024: 0, pt_salary_2025: 0,
+    const defaultTotals = {
+      ft_salary_2024: 0, ft_salary_2025: 0, pt_salary_2024: 0, pt_salary_2025: 0,
       total_salary_2024: 0, total_salary_2025: 0,
       ft_salary_change_val: null, pt_salary_change_val: null, total_salary_change_val: null,
-    });
-  }, [comparisonData]);
+    };
+    if (!medlatecGroupNode) return defaultTotals;
+    
+    // Calculate totals for Medlatec Group including its hierarchical children
+    const medlatecAggregated = getAggregatedDataForNode(medlatecGroupNode, dataMapForHierarchy);
+    let finalTotals = medlatecAggregated ? { ...medlatecAggregated } : { ...defaultTotals, grouping_key: "Medlatec Group" };
+    
+    return finalTotals;
+  }, [medlatecGroupNode, dataMapForHierarchy]);
 
   const formatCurrency = (value: number | null) => { 
     if (value === null || value === undefined) return 'N/A'; 
@@ -336,32 +520,6 @@ export default function SystemWideNganhDocComparisonTable({
     );
   };
 
-  const handleSort = (key: string) => {
-    setSortConfig(prevConfig => {
-      if (prevConfig.key === key) {
-        // Nếu đang sort theo cột này, đổi hướng
-        return {
-          key,
-          direction: prevConfig.direction === 'ascending' ? 'descending' : 'ascending'
-        };
-      } else {
-        // Nếu sort theo cột mới, mặc định ascending
-        return {
-          key,
-          direction: 'ascending'
-        };
-      }
-    });
-  };
-
-  const getSortIcon = (columnKey: string) => {
-    if (sortConfig.key !== columnKey) {
-      return <ArrowUpDown className="h-3 w-3 ml-1" />;
-    }
-    return sortConfig.direction === 'ascending' 
-      ? <ArrowUp className="h-3 w-3 ml-1" />
-      : <ArrowDown className="h-3 w-3 ml-1" />;
-  };
 
   if (isLoading) { 
     return ( 
@@ -401,7 +559,9 @@ export default function SystemWideNganhDocComparisonTable({
     ); 
   }
 
-  if (comparisonData.length === 0) {
+  const noDataForMedlatecGroup = !medlatecGroupNode;
+
+  if (noDataForMedlatecGroup) {
      return ( 
        <Card className="mt-4 flex-grow flex flex-col"> 
          <CardHeader className="pb-2 pt-3"> 
@@ -414,7 +574,26 @@ export default function SystemWideNganhDocComparisonTable({
            </CardDescription> 
          </CardHeader> 
          <CardContent className="pt-2 flex items-center justify-center flex-grow"> 
-           <p className="text-sm text-muted-foreground">Không có dữ liệu để hiển thị sau khi lọc.</p> 
+           <p className="text-sm text-muted-foreground">Không tìm thấy "Medlatec Group" trong dữ liệu cơ cấu tổ chức hoặc không có dữ liệu cho nhóm này.</p> 
+         </CardContent> 
+       </Card> 
+     ); 
+  }
+
+  if (!hasRenderableNodes) {
+     return ( 
+       <Card className="mt-4 flex-grow flex flex-col"> 
+         <CardHeader className="pb-2 pt-3"> 
+           <CardTitle className="text-base font-semibold text-muted-foreground flex items-center gap-1.5">
+             <BarChart3 className="h-4 w-4" />
+             Bảng So Sánh Chi Tiết Theo Ngành Dọc (Toàn Hệ Thống)
+           </CardTitle> 
+           <CardDescription className="text-xs truncate" title={filterDescription}> 
+             {filterDescription}. 
+           </CardDescription> 
+         </CardHeader> 
+         <CardContent className="pt-2 flex items-center justify-center flex-grow"> 
+           <p className="text-sm text-muted-foreground">Không có đơn vị con nào thuộc "Medlatec Group" có dữ liệu để hiển thị sau khi lọc.</p> 
          </CardContent> 
        </Card> 
      ); 
@@ -428,7 +607,7 @@ export default function SystemWideNganhDocComparisonTable({
           Bảng So Sánh Chi Tiết Theo Ngành Dọc (Toàn Hệ Thống)
         </CardTitle>
         <CardDescription className="text-xs truncate" title={filterDescription}>
-            {filterDescription}. Hiển thị dữ liệu toàn hệ thống.
+            {filterDescription}. Hiển thị dữ liệu toàn hệ thống theo cấu trúc cây tổ chức.
         </CardDescription>
       </CardHeader>
       <CardContent className="pt-2 flex-grow overflow-hidden flex flex-col">
@@ -436,132 +615,56 @@ export default function SystemWideNganhDocComparisonTable({
           <Table>
             <TableHeader className="sticky top-0 bg-card z-20">
               <TableRow>
-                <TableHead 
-                  className="py-1.5 px-2 text-xs font-medium whitespace-nowrap text-left sticky left-0 bg-card z-20 min-w-[200px] cursor-pointer hover:bg-muted/50"
-                  onClick={() => handleSort('grouping_key')}
-                >
-                  <div className="flex items-center">
-                    Ngành dọc/Đơn vị
-                    {getSortIcon('grouping_key')}
-                  </div>
+                <TableHead className="py-1.5 px-2 text-xs font-medium whitespace-nowrap text-left sticky left-0 bg-card z-20 min-w-[200px]">
+                  Ngành dọc/Đơn vị
                 </TableHead>
-                <TableHead 
-                  className="py-1.5 px-2 text-xs font-medium whitespace-nowrap text-right min-w-[120px] cursor-pointer hover:bg-muted/50"
-                  onClick={() => handleSort('ft_salary_2024')}
-                >
-                  <div className="flex items-center justify-end">
-                    Lương FT HN 24
-                    {getSortIcon('ft_salary_2024')}
-                  </div>
+                <TableHead className="py-1.5 px-2 text-xs font-medium whitespace-nowrap text-right min-w-[120px]">
+                  Lương FT HN 24
                 </TableHead>
-                <TableHead 
-                  className="py-1.5 px-2 text-xs font-medium whitespace-nowrap text-right min-w-[120px] cursor-pointer hover:bg-muted/50"
-                  onClick={() => handleSort('ft_salary_2025')}
-                >
-                  <div className="flex items-center justify-end">
-                    Lương FT HN 25
-                    {getSortIcon('ft_salary_2025')}
-                  </div>
+                <TableHead className="py-1.5 px-2 text-xs font-medium whitespace-nowrap text-right min-w-[120px]">
+                  Lương FT HN 25
                 </TableHead>
-                <TableHead 
-                  className="py-1.5 px-2 text-xs font-medium whitespace-nowrap text-center min-w-[100px] cursor-pointer hover:bg-muted/50"
-                  onClick={() => handleSort('ft_salary_change_val')}
-                >
-                  <div className="flex items-center justify-center">
-                    +/- FT HN
-                    {getSortIcon('ft_salary_change_val')}
-                  </div>
+                <TableHead className="py-1.5 px-2 text-xs font-medium whitespace-nowrap text-center min-w-[100px]">
+                  +/- FT HN
                 </TableHead>
-                <TableHead 
-                  className="py-1.5 px-2 text-xs font-medium whitespace-nowrap text-right min-w-[120px] cursor-pointer hover:bg-muted/50"
-                  onClick={() => handleSort('pt_salary_2024')}
-                >
-                  <div className="flex items-center justify-end">
-                    Lương PT ĐV2 24
-                    {getSortIcon('pt_salary_2024')}
-                  </div>
+                <TableHead className="py-1.5 px-2 text-xs font-medium whitespace-nowrap text-right min-w-[120px]">
+                  Lương PT ĐV2 24
                 </TableHead>
-                <TableHead 
-                  className="py-1.5 px-2 text-xs font-medium whitespace-nowrap text-right min-w-[120px] cursor-pointer hover:bg-muted/50"
-                  onClick={() => handleSort('pt_salary_2025')}
-                >
-                  <div className="flex items-center justify-end">
-                    Lương PT ĐV2 25
-                    {getSortIcon('pt_salary_2025')}
-                  </div>
+                <TableHead className="py-1.5 px-2 text-xs font-medium whitespace-nowrap text-right min-w-[120px]">
+                  Lương PT ĐV2 25
                 </TableHead>
-                <TableHead 
-                  className="py-1.5 px-2 text-xs font-medium whitespace-nowrap text-center min-w-[100px] cursor-pointer hover:bg-muted/50"
-                  onClick={() => handleSort('pt_salary_change_val')}
-                >
-                  <div className="flex items-center justify-center">
-                    +/- PT ĐV2
-                    {getSortIcon('pt_salary_change_val')}
-                  </div>
+                <TableHead className="py-1.5 px-2 text-xs font-medium whitespace-nowrap text-center min-w-[100px]">
+                  +/- PT ĐV2
                 </TableHead>
-                <TableHead 
-                  className="py-1.5 px-2 text-xs font-medium whitespace-nowrap text-right min-w-[130px] cursor-pointer hover:bg-muted/50"
-                  onClick={() => handleSort('total_salary_2024')}
-                >
-                  <div className="flex items-center justify-end">
-                    Tổng Lương 24
-                    {getSortIcon('total_salary_2024')}
-                  </div>
+                <TableHead className="py-1.5 px-2 text-xs font-medium whitespace-nowrap text-right min-w-[130px]">
+                  Tổng Lương 24
                 </TableHead>
-                <TableHead 
-                  className="py-1.5 px-2 text-xs font-medium whitespace-nowrap text-right min-w-[130px] cursor-pointer hover:bg-muted/50"
-                  onClick={() => handleSort('total_salary_2025')}
-                >
-                  <div className="flex items-center justify-end">
-                    Tổng Lương 25
-                    {getSortIcon('total_salary_2025')}
-                  </div>
+                <TableHead className="py-1.5 px-2 text-xs font-medium whitespace-nowrap text-right min-w-[130px]">
+                  Tổng Lương 25
                 </TableHead>
-                <TableHead 
-                  className="py-1.5 px-2 text-xs font-medium whitespace-nowrap text-center min-w-[110px] cursor-pointer hover:bg-muted/50"
-                  onClick={() => handleSort('total_salary_change_val')}
-                >
-                  <div className="flex items-center justify-center">
-                    +/- Tổng Lương
-                    {getSortIcon('total_salary_change_val')}
-                  </div>
+                <TableHead className="py-1.5 px-2 text-xs font-medium whitespace-nowrap text-center min-w-[110px]">
+                  +/- Tổng Lương
                 </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sortedComparisonData.map((row) => (
-                <TableRow key={row.grouping_key}>
-                  <TableCell className="py-1.5 px-2 text-xs font-medium sticky left-0 bg-card z-10 whitespace-nowrap min-w-[180px] text-left">
-                    {row.grouping_key}
-                  </TableCell>
-                  <TableCell className="text-right py-1.5 px-2 text-xs whitespace-nowrap">
-                    {formatCurrency(row.ft_salary_2024)}
-                  </TableCell>
-                  <TableCell className="text-right py-1.5 px-2 text-xs whitespace-nowrap">
-                    {formatCurrency(row.ft_salary_2025)}
-                  </TableCell>
-                  {renderChangeCell(row.ft_salary_change_val, true)}
-                  <TableCell className="text-right py-1.5 px-2 text-xs whitespace-nowrap">
-                    {formatCurrency(row.pt_salary_2024)}
-                  </TableCell>
-                  <TableCell className="text-right py-1.5 px-2 text-xs whitespace-nowrap">
-                    {formatCurrency(row.pt_salary_2025)}
-                  </TableCell>
-                  {renderChangeCell(row.pt_salary_change_val, true)}
-                  <TableCell className="text-right py-1.5 px-2 text-xs whitespace-nowrap font-semibold">
-                    {formatCurrency(row.total_salary_2024)}
-                  </TableCell>
-                  <TableCell className="text-right py-1.5 px-2 text-xs whitespace-nowrap font-semibold">
-                    {formatCurrency(row.total_salary_2025)}
-                  </TableCell>
-                  {renderChangeCell(row.total_salary_change_val, true)}
-                </TableRow>
+              {nodesToRender.map(rootNode => (
+                <RenderTableRow
+                  key={rootNode.id}
+                  node={rootNode}
+                  level={0}
+                  dataMap={dataMapForHierarchy}
+                  expandedKeys={expandedKeys}
+                  toggleExpand={toggleExpand}
+                  formatCurrency={formatCurrency}
+                  renderChangeCell={renderChangeCell}
+                />
               ))}
             </TableBody>
             <TableFooter className="sticky bottom-0 bg-card z-10">
               <TableRow>
                 <TableCell className="py-1.5 px-2 text-xs font-bold text-left sticky left-0 bg-card z-10">
-                  Tổng Cộng (Toàn Hệ Thống)
+                  Tổng Cộng (Medlatec Group)
                 </TableCell>
                 <TableCell className="text-right py-1.5 px-2 text-xs font-bold">
                   {formatCurrency(totals.ft_salary_2024)}

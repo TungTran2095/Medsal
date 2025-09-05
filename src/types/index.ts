@@ -4,6 +4,20 @@ export interface Message {
   text: string;
   sender: 'user' | 'ai';
   timestamp: number; // Using number for Date.now() for simplicity, can be Date object
+  user_id?: string; // ID của user
+  session_id?: string; // ID của phiên chat
+}
+
+// Interface cho tin nhắn trong database
+export interface ChatMessage {
+  id: string;
+  user_id: string;
+  message_text: string;
+  sender: 'user' | 'ai';
+  timestamp: string; // ISO string từ database
+  session_id?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface PayrollEntry {
