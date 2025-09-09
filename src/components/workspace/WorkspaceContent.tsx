@@ -53,6 +53,7 @@ import BackOfficeSalaryRatioTrendChart from '@/components/charts/BackOfficeSalar
 import NganhDocKpiComparisonTable from '@/components/comparison/NganhDocKpiComparisonTable';
 import SystemWideNganhDocComparisonTable from '@/components/comparison/SystemWideNganhDocComparisonTable';
 import MonthlySalaryProvinceTable from '@/components/comparison/MonthlySalaryProvinceTable';
+import MonthlySalaryHanoiTable from '@/components/comparison/MonthlySalaryHanoiTable';
 
 
 import {
@@ -85,7 +86,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ConfigError from "@/components/ui/ConfigError";
 
 type WorkspaceView = 'dbManagement' | 'dashboard' | 'aiTools';
-type DashboardTab = 'payrollOverview' | 'comparison' | 'kpiComparison' | 'salaryReview' | 'salaryAnalysisTab' | 'salaryWorkloadAnalysis' | 'detailedSalaryAnalysis' | 'doctorSalaryAnalysis' | 'homeSalaryAnalysis' | 'revenueAnalysis';
+type DashboardTab = 'payrollOverview' | 'comparison' | 'kpiComparison' | 'hanoiSalaryReview' | 'salaryReview' | 'salaryAnalysisTab' | 'salaryWorkloadAnalysis' | 'detailedSalaryAnalysis' | 'doctorSalaryAnalysis' | 'homeSalaryAnalysis' | 'revenueAnalysis';
 
 interface NavItem {
   id: WorkspaceView;
@@ -998,6 +999,9 @@ export default function WorkspaceContent() {
                        <TabsTrigger value="kpiComparison" className="text-xs px-2.5 py-1.5 flex items-center gap-1">
                         <Target className="h-3.5 w-3.5"/> Quỹ lương lũy kế
                       </TabsTrigger>
+                      <TabsTrigger value="hanoiSalaryReview" className="text-xs px-2.5 py-1.5 flex items-center gap-1">
+                        <MapPin className="h-3.5 w-3.5"/> Duyệt lương tháng Hà Nội
+                      </TabsTrigger>
                       <TabsTrigger value="salaryReview" className="text-xs px-2.5 py-1.5 flex items-center gap-1">
                         <FileText className="h-3.5 w-3.5"/> Duyệt lương tháng ĐVTV
                       </TabsTrigger>
@@ -1077,6 +1081,14 @@ export default function WorkspaceContent() {
                         orgHierarchyData={orgHierarchyData}
                         flatOrgUnits={flatOrgUnits}
                       />
+                  </TabsContent>
+
+                  {/* Tab: Duyệt lương tháng Hà Nội */}
+                  <TabsContent value="hanoiSalaryReview" className="flex-grow overflow-y-auto space-y-3 mt-2">
+                    <MonthlySalaryHanoiTable
+                      orgHierarchyData={orgHierarchyData}
+                      flatOrgUnits={flatOrgUnits}
+                    />
                   </TabsContent>
 
                   {/* Tab: Duyệt lương tháng ĐVTV */}

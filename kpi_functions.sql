@@ -21,9 +21,19 @@ AS $$
 BEGIN
     RETURN QUERY
     WITH salary_data AS (
-        -- Get FT salary data for Hanoi
+        -- Get FT salary data for Hanoi - sử dụng nganh_doc và dia_diem
         SELECT 
-            COALESCE(f.nganh_doc, 'Chưa phân loại') AS department_name,
+            CASE 
+                WHEN f.nganh_doc = 'Hệ thống khám chữa bệnh' THEN
+                    CASE 
+                        WHEN f.dia_diem = 'Med Ba Đình' THEN 'Bệnh viện đa khoa Medlatec'
+                        WHEN f.dia_diem = 'Med Cầu Giấy' THEN 'Phòng Khám đa khoa Cầu Giấy'
+                        WHEN f.dia_diem = 'Med Tây Hồ' THEN 'Phòng Khám đa khoa Tây Hồ'
+                        WHEN f.dia_diem = 'Med Thanh Xuân' THEN 'Phòng Khám đa khoa Thanh Xuân'
+                        ELSE f.dia_diem
+                    END
+                ELSE COALESCE(f.nganh_doc, 'Chưa phân loại')
+            END AS department_name,
             SUM(CAST(REPLACE(f.tong_thu_nhap::text, ',', '') AS NUMERIC)) AS ft_salary_2025,
             0 AS pt_salary_2025
         FROM "Fulltime" f
@@ -35,13 +45,34 @@ BEGIN
                 regexp_replace(f.thang, '\D', '', 'g')::INTEGER = ANY(p_filter_months)
             )
             AND f.hn_or_not = 'Hà Nội'
-        GROUP BY COALESCE(f.nganh_doc, 'Chưa phân loại')
+        GROUP BY 
+            CASE 
+                WHEN f.nganh_doc = 'Hệ thống khám chữa bệnh' THEN
+                    CASE 
+                        WHEN f.dia_diem = 'Med Ba Đình' THEN 'Bệnh viện đa khoa Medlatec'
+                        WHEN f.dia_diem = 'Med Cầu Giấy' THEN 'Phòng Khám đa khoa Cầu Giấy'
+                        WHEN f.dia_diem = 'Med Tây Hồ' THEN 'Phòng Khám đa khoa Tây Hồ'
+                        WHEN f.dia_diem = 'Med Thanh Xuân' THEN 'Phòng Khám đa khoa Thanh Xuân'
+                        ELSE f.dia_diem
+                    END
+                ELSE COALESCE(f.nganh_doc, 'Chưa phân loại')
+            END
         
         UNION ALL
         
-        -- Get PT salary data (all units, will be filtered by KPI table)
+        -- Get PT salary data - sử dụng Don vi 2 và Don vi
         SELECT 
-            COALESCE(pt."Don vi  2", 'Chưa phân loại') AS department_name,
+            CASE 
+                WHEN pt."Don vi  2" = 'Hệ thống khám chữa bệnh' THEN
+                    CASE 
+                        WHEN pt."Don vi" = 'Med Ba Đình' THEN 'Bệnh viện đa khoa Medlatec'
+                        WHEN pt."Don vi" = 'Med Cầu Giấy' THEN 'Phòng Khám đa khoa Cầu Giấy'
+                        WHEN pt."Don vi" = 'Med Tây Hồ' THEN 'Phòng Khám đa khoa Tây Hồ'
+                        WHEN pt."Don vi" = 'Med Thanh Xuân' THEN 'Phòng Khám đa khoa Thanh Xuân'
+                        ELSE pt."Don vi"
+                    END
+                ELSE COALESCE(pt."Don vi  2", 'Chưa phân loại')
+            END AS department_name,
             0 AS ft_salary_2025,
             SUM(CAST(REPLACE(pt."Tong tien"::text, ',', '') AS NUMERIC)) AS pt_salary_2025
         FROM "Parttime" pt
@@ -52,16 +83,342 @@ BEGIN
                 array_length(p_filter_months, 1) = 0 OR
                 regexp_replace(pt."Thoi gian", '\D', '', 'g')::INTEGER = ANY(p_filter_months)
             )
-        GROUP BY COALESCE(pt."Don vi  2", 'Chưa phân loại')
+        GROUP BY 
+            CASE 
+                WHEN pt."Don vi  2" = 'Hệ thống khám chữa bệnh' THEN
+                    CASE 
+                        WHEN pt."Don vi" = 'Med Ba Đình' THEN 'Bệnh viện đa khoa Medlatec'
+                        WHEN pt."Don vi" = 'Med Cầu Giấy' THEN 'Phòng Khám đa khoa Cầu Giấy'
+                        WHEN pt."Don vi" = 'Med Tây Hồ' THEN 'Phòng Khám đa khoa Tây Hồ'
+                        WHEN pt."Don vi" = 'Med Thanh Xuân' THEN 'Phòng Khám đa khoa Thanh Xuân'
+                        ELSE pt."Don vi"
+                    END
+                ELSE COALESCE(pt."Don vi  2", 'Chưa phân loại')
+            END
     ),
     aggregated_salary AS (
         SELECT 
-            salary_data.department_name,
+            -- Chuẩn hóa tên đơn vị dựa trên cấu trúc thực tế
+            CASE 
+                -- Ban Tổng Giám đốc
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%ban tổng giám đốc%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%ban tong giam doc%'
+                THEN 'Ban Tổng Giám đốc'
+                
+                -- Ban kế toán
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%ban kế toán%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%ban ke toan%'
+                THEN 'Ban kế toán'
+                
+                -- Ban Ngân Quỹ
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%ban ngân quỹ%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%ban ngan quy%'
+                THEN 'Ban Ngân Quỹ'
+                
+                -- Ban Tài chính
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%ban tài chính%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%ban tai chinh%'
+                THEN 'Ban Tài chính'
+                
+                -- Ban Công nghệ thông tin và Chuyển đổi số
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%ban công nghệ thông tin%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%ban cong nghe thong tin%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%ban công nghệ thông tin và chuyển đổi số%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%ban cong nghe thong tin va chuyen doi so%'
+                THEN 'Ban Công nghệ thông tin và Chuyển đổi số'
+                
+                -- Ban Kiểm soát
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%ban kiểm soát%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%ban kiem soat%'
+                THEN 'Ban Kiểm soát'
+                
+                -- Ban Tổ chức Pháp chế
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%ban tổ chức pháp chế%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%ban to chuc phap che%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%ban tổ chức pháp chế%'
+                THEN 'Ban Tổ chức Pháp chế'
+                
+                -- Trung tâm Marketing
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%trung tâm marketing%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%trung tam marketing%'
+                THEN 'Trung tâm Marketing'
+                
+                -- Ban Trải nghiệm khách hàng
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%ban trải nghiệm khách hàng%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%ban trai nghiem khach hang%'
+                THEN 'Ban Trải nghiệm khách hàng'
+                
+                -- Trung tâm kinh doanh BV/PK
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%trung tâm kinh doanh bv/pk%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%trung tam kinh doanh bv/pk%'
+                THEN 'Trung tâm kinh doanh BV/PK'
+                
+                -- Trung tâm tại nhà toàn quốc
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%trung tâm tại nhà toàn quốc%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%trung tam tai nha toan quoc%'
+                THEN 'Trung tâm tại nhà toàn quốc'
+                
+                -- Trung tâm KHDN
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%trung tâm khdn%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%trung tam khdn%'
+                THEN 'Trung tâm KHDN'
+                
+                -- Trung tâm Khách hàng chiến lược và Dự án y tế
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%trung tâm khách hàng chiến lược%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%trung tam khach hang chien luoc%'
+                THEN 'Trung tâm Khách hàng chiến lược và Dự án y tế'
+                
+                -- Trung tâm phát triển Đối tác và Bảo hiểm
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%trung tâm phát triển đối tác%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%trung tam phat trien doi tac%'
+                THEN 'Trung tâm phát triển Đối tác và Bảo hiểm'
+                
+                -- Ban kế hoạch
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%ban kế hoạch%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%ban ke hoach%'
+                THEN 'Ban kế hoạch'
+                
+                -- Hệ thống CĐHA TDCN
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%hệ thống cđha tdcn%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%he thong cdha tdcn%'
+                THEN 'Hệ thống CĐHA TDCN'
+                
+                -- Hệ thống giải phẫu bệnh
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%hệ thống giải phẫu bệnh%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%he thong giai phau benh%'
+                THEN 'Hệ thống giải phẫu bệnh'
+                
+                -- Hệ thống KCB ngoại viện
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%hệ thống kcb ngoại viện%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%he thong kcb ngoai vien%'
+                THEN 'Hệ thống KCB ngoại viện'
+                
+                -- Hệ thống khám chữa bệnh
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%hệ thống khám chữa bệnh%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%he thong kham chua benh%'
+                THEN 'Hệ thống khám chữa bệnh'
+                
+                -- Bệnh viện đa khoa Medlatec
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%bệnh viện đa khoa medlatec%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%benh vien da khoa medlatec%'
+                THEN 'Bệnh viện đa khoa Medlatec'
+                
+                -- Phòng Khám đa khoa Cầu Giấy
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%phòng khám đa khoa cầu giấy%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%phong kham da khoa cau giay%'
+                THEN 'Phòng Khám đa khoa Cầu Giấy'
+                
+                -- Phòng Khám đa khoa Tây Hồ
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%phòng khám đa khoa tây hồ%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%phong kham da khoa tay ho%'
+                THEN 'Phòng Khám đa khoa Tây Hồ'
+                
+                -- Phòng Khám đa khoa Thanh Xuân
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%phòng khám đa khoa thanh xuân%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%phong kham da khoa thanh xuan%'
+                THEN 'Phòng Khám đa khoa Thanh Xuân'
+                
+                -- Hệ thống Xét nghiệm
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%hệ thống xét nghiệm%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%he thong xet nghiem%'
+                THEN 'Hệ thống Xét nghiệm'
+                
+                -- Ban Hậu cần - Dự án
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%ban hậu cần%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%ban hau can%'
+                THEN 'Ban Hậu cần - Dự án'
+                
+                -- Phòng Cung ứng
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%phòng cung ứng%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%phong cung ung%'
+                THEN 'Phòng Cung ứng'
+                
+                -- Phòng dự án
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%phòng dự án%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%phong du an%'
+                THEN 'Phòng dự án'
+                
+                -- Phòng Hành chính HCDA
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%phòng hành chính hcda%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%phong hanh chinh hcda%'
+                THEN 'Phòng Hành chính HCDA'
+                
+                -- Phòng Trang thiết bị - Kỹ thuật
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%phòng trang thiết bị%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%phong trang thiet bi%'
+                THEN 'Phòng Trang thiết bị - Kỹ thuật'
+                
+                -- Phòng kế toán Med VN
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%phòng kế toán med vn%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%phong ke toan med vn%'
+                THEN 'Phòng kế toán Med VN'
+                
+                -- Các đơn vị khác giữ nguyên
+                ELSE TRIM(salary_data.department_name)
+            END AS department_name,
             SUM(salary_data.ft_salary_2025) AS ft_salary_2025,
             SUM(salary_data.pt_salary_2025) AS pt_salary_2025,
             SUM(salary_data.ft_salary_2025 + salary_data.pt_salary_2025) AS total_salary_2025
         FROM salary_data
-        GROUP BY salary_data.department_name
+        GROUP BY 
+            -- Chuẩn hóa tên đơn vị dựa trên cấu trúc thực tế
+            CASE 
+                -- Ban Tổng Giám đốc
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%ban tổng giám đốc%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%ban tong giam doc%'
+                THEN 'Ban Tổng Giám đốc'
+                
+                -- Ban kế toán
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%ban kế toán%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%ban ke toan%'
+                THEN 'Ban kế toán'
+                
+                -- Ban Ngân Quỹ
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%ban ngân quỹ%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%ban ngan quy%'
+                THEN 'Ban Ngân Quỹ'
+                
+                -- Ban Tài chính
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%ban tài chính%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%ban tai chinh%'
+                THEN 'Ban Tài chính'
+                
+                -- Ban Công nghệ thông tin và Chuyển đổi số
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%ban công nghệ thông tin%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%ban cong nghe thong tin%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%ban công nghệ thông tin và chuyển đổi số%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%ban cong nghe thong tin va chuyen doi so%'
+                THEN 'Ban Công nghệ thông tin và Chuyển đổi số'
+                
+                -- Ban Kiểm soát
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%ban kiểm soát%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%ban kiem soat%'
+                THEN 'Ban Kiểm soát'
+                
+                -- Ban Tổ chức Pháp chế
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%ban tổ chức pháp chế%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%ban to chuc phap che%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%ban tổ chức pháp chế%'
+                THEN 'Ban Tổ chức Pháp chế'
+                
+                -- Trung tâm Marketing
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%trung tâm marketing%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%trung tam marketing%'
+                THEN 'Trung tâm Marketing'
+                
+                -- Ban Trải nghiệm khách hàng
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%ban trải nghiệm khách hàng%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%ban trai nghiem khach hang%'
+                THEN 'Ban Trải nghiệm khách hàng'
+                
+                -- Trung tâm kinh doanh BV/PK
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%trung tâm kinh doanh bv/pk%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%trung tam kinh doanh bv/pk%'
+                THEN 'Trung tâm kinh doanh BV/PK'
+                
+                -- Trung tâm tại nhà toàn quốc
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%trung tâm tại nhà toàn quốc%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%trung tam tai nha toan quoc%'
+                THEN 'Trung tâm tại nhà toàn quốc'
+                
+                -- Trung tâm KHDN
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%trung tâm khdn%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%trung tam khdn%'
+                THEN 'Trung tâm KHDN'
+                
+                -- Trung tâm Khách hàng chiến lược và Dự án y tế
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%trung tâm khách hàng chiến lược%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%trung tam khach hang chien luoc%'
+                THEN 'Trung tâm Khách hàng chiến lược và Dự án y tế'
+                
+                -- Trung tâm phát triển Đối tác và Bảo hiểm
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%trung tâm phát triển đối tác%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%trung tam phat trien doi tac%'
+                THEN 'Trung tâm phát triển Đối tác và Bảo hiểm'
+                
+                -- Ban kế hoạch
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%ban kế hoạch%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%ban ke hoach%'
+                THEN 'Ban kế hoạch'
+                
+                -- Hệ thống CĐHA TDCN
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%hệ thống cđha tdcn%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%he thong cdha tdcn%'
+                THEN 'Hệ thống CĐHA TDCN'
+                
+                -- Hệ thống giải phẫu bệnh
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%hệ thống giải phẫu bệnh%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%he thong giai phau benh%'
+                THEN 'Hệ thống giải phẫu bệnh'
+                
+                -- Hệ thống KCB ngoại viện
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%hệ thống kcb ngoại viện%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%he thong kcb ngoai vien%'
+                THEN 'Hệ thống KCB ngoại viện'
+                
+                -- Hệ thống khám chữa bệnh
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%hệ thống khám chữa bệnh%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%he thong kham chua benh%'
+                THEN 'Hệ thống khám chữa bệnh'
+                
+                -- Bệnh viện đa khoa Medlatec
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%bệnh viện đa khoa medlatec%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%benh vien da khoa medlatec%'
+                THEN 'Bệnh viện đa khoa Medlatec'
+                
+                -- Phòng Khám đa khoa Cầu Giấy
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%phòng khám đa khoa cầu giấy%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%phong kham da khoa cau giay%'
+                THEN 'Phòng Khám đa khoa Cầu Giấy'
+                
+                -- Phòng Khám đa khoa Tây Hồ
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%phòng khám đa khoa tây hồ%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%phong kham da khoa tay ho%'
+                THEN 'Phòng Khám đa khoa Tây Hồ'
+                
+                -- Phòng Khám đa khoa Thanh Xuân
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%phòng khám đa khoa thanh xuân%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%phong kham da khoa thanh xuan%'
+                THEN 'Phòng Khám đa khoa Thanh Xuân'
+                
+                -- Hệ thống Xét nghiệm
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%hệ thống xét nghiệm%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%he thong xet nghiem%'
+                THEN 'Hệ thống Xét nghiệm'
+                
+                -- Ban Hậu cần - Dự án
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%ban hậu cần%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%ban hau can%'
+                THEN 'Ban Hậu cần - Dự án'
+                
+                -- Phòng Cung ứng
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%phòng cung ứng%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%phong cung ung%'
+                THEN 'Phòng Cung ứng'
+                
+                -- Phòng dự án
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%phòng dự án%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%phong du an%'
+                THEN 'Phòng dự án'
+                
+                -- Phòng Hành chính HCDA
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%phòng hành chính hcda%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%phong hanh chinh hcda%'
+                THEN 'Phòng Hành chính HCDA'
+                
+                -- Phòng Trang thiết bị - Kỹ thuật
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%phòng trang thiết bị%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%phong trang thiet bi%'
+                THEN 'Phòng Trang thiết bị - Kỹ thuật'
+                
+                -- Phòng kế toán Med VN
+                WHEN LOWER(TRIM(salary_data.department_name)) LIKE '%phòng kế toán med vn%'
+                     OR LOWER(TRIM(salary_data.department_name)) LIKE '%phong ke toan med vn%'
+                THEN 'Phòng kế toán Med VN'
+                
+                -- Các đơn vị khác giữ nguyên
+                ELSE TRIM(salary_data.department_name)
+            END
     )
     SELECT 
         s.department_name,

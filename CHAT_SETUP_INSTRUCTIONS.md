@@ -114,3 +114,6 @@ interface Message {
 - Nếu xóa sessionStorage, sẽ tạo user_id và session_id mới
 - Có thể mở rộng để tích hợp với hệ thống authentication thực
 
+
+
+
