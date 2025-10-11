@@ -542,12 +542,22 @@ export const getEmployeeSalaryTool = ai.defineTool(
     try {
       console.log('getEmployeeSalaryTool: Starting query for employee_id:', input.employee_id);
       
+      // Thêm timeout cho query
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Query timeout after 30 seconds')), 30000)
+      );
+      
       // Lấy thông tin cơ bản của nhân viên
-      const { data: employeeData, error: employeeError } = await supabase
+      const employeeQuery = supabase
         .from('MS_CBNV')
         .select('*')
         .eq('"Mã nhân viên"', input.employee_id)
         .single();
+      
+      const { data: employeeData, error: employeeError } = await Promise.race([
+        employeeQuery,
+        timeoutPromise
+      ]) as any;
       
       console.log('getEmployeeSalaryTool: Employee data:', employeeData, 'Error:', employeeError);
 
@@ -577,7 +587,12 @@ export const getEmployeeSalaryTool = ai.defineTool(
         query = query.or(monthConditions.join(','));
       }
 
-      const { data: salaryData, error: salaryError } = await query.order('nam', { ascending: false }).order('thang', { ascending: true });
+      const salaryQuery = query.order('nam', { ascending: false }).order('thang', { ascending: true });
+      
+      const { data: salaryData, error: salaryError } = await Promise.race([
+        salaryQuery,
+        timeoutPromise
+      ]) as any;
 
       console.log('getEmployeeSalaryTool: Salary data:', salaryData?.length, 'records, Error:', salaryError);
 
