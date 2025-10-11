@@ -27,6 +27,8 @@ import {
   getDonVi2PTSalaryTool, 
   getMonthlyEmployeeTrendFulltimeTool,
   getMonthlyFTSalaryRevenuePerEmployeeTrendTool,
+  getEmployeeSalaryTool, // New tool for employee salary queries
+  getEmployeeSalaryComparisonTool, // New tool for comparing multiple employees
 } from '@/ai/tools/dashboardQueryTools';
 
 const EchoUserInputInputSchema = z.object({
@@ -65,7 +67,9 @@ const prompt = ai.definePrompt({
     getLocationSalaryRevenueRatiosTool,
     getLocationComparisonMetricsTool,
     getNganhDocFTSalaryHanoiTool, 
-    getDonVi2PTSalaryTool, 
+    getDonVi2PTSalaryTool,
+    getEmployeeSalaryTool, // New tool for employee salary queries
+    getEmployeeSalaryComparisonTool, // New tool for comparing multiple employees
   ],
   prompt: `You are a helpful and friendly AI assistant named Echo.
 Your primary language for responses MUST BE VIETNAMESE. Bạn PHẢI LUÔN LUÔN trả lời bằng tiếng Việt, ngay cả khi người dùng hỏi bằng ngôn ngữ khác.
@@ -88,10 +92,14 @@ You have several tools available:
     *   'getLocationComparisonMetricsTool': Get detailed salary (FT, PT) and revenue metrics for each location for a specific year. Input: { p_filter_year: number, p_filter_months?: number[], p_filter_locations?: string[] }.
     *   'getNganhDocFTSalaryHanoiTool': Get Full-time salary by "nganh_doc" in Hanoi. Input: { p_filter_year: number, p_filter_months?: number[] }.
     *   'getDonVi2PTSalaryTool': Get Part-time salary by "Don_vi_2". Input: { p_filter_year: number, p_filter_months?: number[] }.
+    *   'getEmployeeSalaryTool': Truy vấn lương của một nhân viên cụ thể theo mã nhân viên. Input: { employee_id: string, filter_year?: number, filter_months?: number[], include_calculations?: boolean }. Sử dụng cho các câu hỏi như "lương của mã nhân viên ABC123", "thông tin lương nhân viên XYZ456 năm 2024".
+    *   'getEmployeeSalaryComparisonTool': So sánh lương của nhiều nhân viên cùng lúc. Input: { employee_ids: string[], filter_year?: number, filter_months?: number[], include_rankings?: boolean }. Sử dụng cho các câu hỏi như "so sánh lương của nhân viên ABC123 và XYZ456", "xếp hạng lương các nhân viên ABC123, XYZ456, DEF789".
 
 
 Instructions for using tools:
--   When the user asks for information that clearly matches a specific dashboard metric tool (e.g., "tổng lương full-time năm 2023", "xu hướng doanh thu hàng tháng của năm 2024", "tỷ lệ quỹ lương trên doanh thu theo địa điểm cho quý 1 năm 2023", "chi tiết lương và doanh thu theo địa điểm năm 2024"), PREFER that specific tool over the generic 'querySupabaseTableTool'.
+-   When the user asks for information that clearly matches a specific dashboard metric tool (e.g., "tổng lương full-time năm 2023", "xu hướng doanh thu hàng tháng của năm 2024", "tỷ lệ quỹ lương trên doanh thu theo địa điểm cho quý 1 năm 2023", "chi tiết lương và doanh thu theo địa điểm năm 2024", "lương của mã nhân viên ABC123"), PREFER that specific tool over the generic 'querySupabaseTableTool'.
+-   For 'getEmployeeSalaryTool': Khi người dùng hỏi về lương của một nhân viên cụ thể (theo mã nhân viên), sử dụng tool này. Luôn set include_calculations=true để có thông tin chi tiết về lương/công và tổng hợp.
+-   For 'getEmployeeSalaryComparisonTool': Khi người dùng hỏi về so sánh lương của nhiều nhân viên, sử dụng tool này. Luôn set include_rankings=true để có thứ hạng. Trích xuất các mã nhân viên từ câu hỏi.
 -   For year and month filters, if the user doesn't specify, you can ask for clarification or omit them if the tool allows. For example, "Cho năm nào?" or "Bạn muốn xem dữ liệu tháng nào?".
 -   For 'querySupabaseTableTool', you MUST provide 'tableName'. Ask clarifying questions if ambiguous.
 -   For 'getLocationComparisonMetricsTool', 'getNganhDocFTSalaryHanoiTool', 'getDonVi2PTSalaryTool', 'p_filter_year' is required.
@@ -104,6 +112,15 @@ Interpreting Tool Results (CRITICAL: ALL RESPONSES IN VIETNAMESE):
     *   For trend data (an array from 'data' field), describe the trend or list key data points. Don't just output the raw array.
     *   For location ratios or comparison metrics, list top locations or summarize based on components/values.
     *   DO NOT output raw JSON. Your response must be a natural language summary.
+-   For 'getEmployeeSalaryTool': Khi tool trả về dữ liệu lương nhân viên:
+    *   Hiển thị thông tin nhân viên: tên, mã nhân viên, địa điểm, chức vụ
+    *   Nếu có summary: hiển thị tổng lương, tổng ngày công, lương/công trung bình, số tháng có dữ liệu
+    *   Nếu có salary_data: liệt kê chi tiết từng tháng với lương và ngày công
+    *   Format số tiền với dấu phẩy ngăn cách hàng nghìn
+-   For 'getEmployeeSalaryComparisonTool': Khi tool trả về dữ liệu so sánh lương:
+    *   Hiển thị thống kê tổng thể: lương cao nhất, thấp nhất, trung bình, số nhân viên
+    *   Liệt kê từng nhân viên với thông tin chi tiết và thứ hạng (nếu có)
+    *   Format số tiền với dấu phẩy ngăn cách hàng nghìn
 -   For 'querySupabaseTableTool': If it returns a JSON array, summarize or list it clearly. If it returns an error or "No records found", inform the user based on the tool's 'result' field.
 
 Calculating Overall Salary-to-Revenue Ratio:

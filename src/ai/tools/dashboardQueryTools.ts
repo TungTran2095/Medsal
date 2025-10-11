@@ -485,8 +485,352 @@ export const getMonthlyFTSalaryRevenuePerEmployeeTrendTool = ai.defineTool(
     }
   }
 );
-    
 
+// Input schema for Employee Salary Query Tool
+const EmployeeSalaryQueryInputSchema = z.object({
+  employee_id: z.string().describe('Mã nhân viên cần truy vấn lương'),
+  filter_year: z.number().optional().describe('Năm cần truy vấn (mặc định là năm mới nhất)'),
+  filter_months: z.array(z.number()).optional().describe('Các tháng cần truy vấn (1-12), mặc định là tất cả tháng'),
+  include_calculations: z.boolean().optional().describe('Có tính toán lương/công và các chỉ số khác không'),
+});
+
+// Output schema for Employee Salary Query Tool
+const EmployeeSalaryQueryOutputSchema = z.object({
+  employee_info: z.object({
+    ma_nhan_vien: z.string(),
+    ho_va_ten: z.string(),
+    dia_diem: z.string().optional(),
+    job_title: z.string().optional(),
+  }).optional(),
+  salary_data: z.array(z.object({
+    thang: z.string(),
+    nam: z.number(),
+    tong_thu_nhap: z.number(),
+    ngay_thuong_chinh_thuc: z.number(),
+    ngay_thuong_thu_viec: z.number(),
+    nghi_tuan: z.number(),
+    le_tet: z.number(),
+    ngay_thuong_chinh_thuc2: z.number(),
+    ngay_thuong_thu_viec3: z.number(),
+    nghi_tuan4: z.number(),
+    le_tet5: z.number(),
+    nghi_nl: z.number(),
+    salary_per_workday: z.number().optional(),
+    total_workdays: z.number().optional(),
+  })).optional(),
+  summary: z.object({
+    total_salary: z.number(),
+    total_workdays: z.number(),
+    average_salary_per_workday: z.number(),
+    months_count: z.number(),
+  }).optional(),
+  message: z.string(),
+});
+
+export type EmployeeSalaryQueryInput = z.infer<typeof EmployeeSalaryQueryInputSchema>;
+export type EmployeeSalaryQueryOutput = z.infer<typeof EmployeeSalaryQueryOutputSchema>;
+
+// Tool for querying employee salary by ID
+export const getEmployeeSalaryTool = ai.defineTool(
+  {
+    name: 'getEmployeeSalaryTool',
+    description: 'Truy vấn thông tin lương của một nhân viên cụ thể theo mã nhân viên. Hỗ trợ lọc theo năm và tháng. Có thể tính toán lương/công và các chỉ số tổng hợp.',
+    inputSchema: EmployeeSalaryQueryInputSchema,
+    outputSchema: EmployeeSalaryQueryOutputSchema,
+  },
+  async (input) => {
+    try {
+      // Lấy thông tin cơ bản của nhân viên
+      const { data: employeeData, error: employeeError } = await supabase
+        .from('MS_CBNV')
+        .select('"Mã nhân viên", "Họ và tên", "Job title", "Địa điểm"')
+        .eq('"Mã nhân viên"', input.employee_id)
+        .single();
+
+      if (employeeError || !employeeData) {
+        return { 
+          message: `Không tìm thấy nhân viên với mã ${input.employee_id}`,
+          employee_info: null,
+          salary_data: null,
+          summary: null
+        };
+      }
+
+      // Xây dựng query cho bảng Fulltime
+      let query = supabase
+        .from('Fulltime')
+        .select('*')
+        .eq('ma_nhan_vien', input.employee_id);
+
+      if (input.filter_year) {
+        query = query.eq('nam', input.filter_year);
+      }
+
+      if (input.filter_months && input.filter_months.length > 0) {
+        const monthConditions = input.filter_months.map(month => 
+          `thang.ilike.%Tháng ${month.toString().padStart(2, '0')}%`
+        );
+        query = query.or(monthConditions.join(','));
+      }
+
+      const { data: salaryData, error: salaryError } = await query.order('nam', { ascending: false }).order('thang', { ascending: true });
+
+      if (salaryError) {
+        throw salaryError;
+      }
+
+      if (!salaryData || salaryData.length === 0) {
+        return {
+          employee_info: {
+            ma_nhan_vien: employeeData['Mã nhân viên'],
+            ho_va_ten: employeeData['Họ và tên'],
+            dia_diem: employeeData['Địa điểm'],
+            job_title: employeeData['Job title'],
+          },
+          message: `Nhân viên ${employeeData['Họ và tên']} (${input.employee_id}) không có dữ liệu lương cho kỳ đã chọn`,
+          salary_data: null,
+          summary: null
+        };
+      }
+
+      // Tính toán các chỉ số nếu được yêu cầu
+      let processedSalaryData = salaryData;
+      let summary = null;
+
+      if (input.include_calculations) {
+        processedSalaryData = salaryData.map(record => {
+          const totalWorkdays = 
+            (record.ngay_thuong_chinh_thuc || 0) +
+            (record.ngay_thuong_thu_viec || 0) +
+            (record.nghi_tuan || 0) +
+            (record.le_tet || 0) +
+            (record.ngay_thuong_chinh_thuc2 || 0) +
+            (record.ngay_thuong_thu_viec3 || 0) +
+            (record.nghi_tuan4 || 0) +
+            (record.le_tet5 || 0) +
+            (record.nghi_nl || 0);
+
+          const salaryPerWorkday = totalWorkdays > 0 
+            ? parseFloat(record.tong_thu_nhap?.toString().replace(/,/g, '') || '0') / totalWorkdays 
+            : 0;
+
+          return {
+            ...record,
+            total_workdays: totalWorkdays,
+            salary_per_workday: salaryPerWorkday,
+            tong_thu_nhap: parseFloat(record.tong_thu_nhap?.toString().replace(/,/g, '') || '0')
+          };
+        });
+
+        // Tính tổng hợp
+        const totalSalary = processedSalaryData.reduce((sum, record) => sum + record.tong_thu_nhap, 0);
+        const totalWorkdays = processedSalaryData.reduce((sum, record) => sum + record.total_workdays, 0);
+        const averageSalaryPerWorkday = totalWorkdays > 0 ? totalSalary / totalWorkdays : 0;
+
+        summary = {
+          total_salary: totalSalary,
+          total_workdays: totalWorkdays,
+          average_salary_per_workday: averageSalaryPerWorkday,
+          months_count: salaryData.length
+        };
+      }
+
+      return {
+        employee_info: {
+          ma_nhan_vien: employeeData['Mã nhân viên'],
+          ho_va_ten: employeeData['Họ và tên'],
+          dia_diem: employeeData['Địa điểm'],
+          job_title: employeeData['Job title'],
+        },
+        salary_data: processedSalaryData,
+        summary: summary,
+        message: `Truy vấn lương thành công cho nhân viên ${employeeData['Họ và tên']} (${input.employee_id})`
+      };
+
+    } catch (e: any) {
+      console.error('Error in getEmployeeSalaryTool:', e);
+      return { 
+        message: `Lỗi khi truy vấn lương nhân viên: ${e.message}`,
+        employee_info: null,
+        salary_data: null,
+        summary: null
+      };
+    }
+  }
+);
+
+// Input schema for Employee Salary Comparison Tool
+const EmployeeSalaryComparisonInputSchema = z.object({
+  employee_ids: z.array(z.string()).describe('Danh sách mã nhân viên cần so sánh lương'),
+  filter_year: z.number().optional().describe('Năm cần truy vấn (mặc định là năm mới nhất)'),
+  filter_months: z.array(z.number()).optional().describe('Các tháng cần truy vấn (1-12), mặc định là tất cả tháng'),
+  include_rankings: z.boolean().optional().describe('Có sắp xếp theo thứ hạng không'),
+});
+
+// Output schema for Employee Salary Comparison Tool
+const EmployeeSalaryComparisonOutputSchema = z.object({
+  comparison_data: z.array(z.object({
+    employee_info: z.object({
+      ma_nhan_vien: z.string(),
+      ho_va_ten: z.string(),
+      dia_diem: z.string().optional(),
+      job_title: z.string().optional(),
+    }),
+    summary: z.object({
+      total_salary: z.number(),
+      total_workdays: z.number(),
+      average_salary_per_workday: z.number(),
+      months_count: z.number(),
+    }),
+    ranking: z.number().optional(),
+  })).optional(),
+  overall_stats: z.object({
+    highest_salary: z.number(),
+    lowest_salary: z.number(),
+    average_salary: z.number(),
+    total_employees: z.number(),
+  }).optional(),
+  message: z.string(),
+});
+
+export type EmployeeSalaryComparisonInput = z.infer<typeof EmployeeSalaryComparisonInputSchema>;
+export type EmployeeSalaryComparisonOutput = z.infer<typeof EmployeeSalaryComparisonOutputSchema>;
+
+// Tool for comparing multiple employees' salaries
+export const getEmployeeSalaryComparisonTool = ai.defineTool(
+  {
+    name: 'getEmployeeSalaryComparisonTool',
+    description: 'So sánh lương của nhiều nhân viên cùng lúc theo mã nhân viên. Hỗ trợ lọc theo năm và tháng. Có thể sắp xếp theo thứ hạng.',
+    inputSchema: EmployeeSalaryComparisonInputSchema,
+    outputSchema: EmployeeSalaryComparisonOutputSchema,
+  },
+  async (input) => {
+    try {
+      const comparisonData = [];
+      
+      // Lấy dữ liệu cho từng nhân viên
+      for (const employeeId of input.employee_ids) {
+        // Lấy thông tin cơ bản của nhân viên
+        const { data: employeeData, error: employeeError } = await supabase
+          .from('MS_CBNV')
+          .select('"Mã nhân viên", "Họ và tên", "Job title", "Địa điểm"')
+          .eq('"Mã nhân viên"', employeeId)
+          .single();
+
+        if (employeeError || !employeeData) {
+          continue; // Bỏ qua nhân viên không tìm thấy
+        }
+
+        // Xây dựng query cho bảng Fulltime
+        let query = supabase
+          .from('Fulltime')
+          .select('*')
+          .eq('ma_nhan_vien', employeeId);
+
+        if (input.filter_year) {
+          query = query.eq('nam', input.filter_year);
+        }
+
+        if (input.filter_months && input.filter_months.length > 0) {
+          const monthConditions = input.filter_months.map(month => 
+            `thang.ilike.%Tháng ${month.toString().padStart(2, '0')}%`
+          );
+          query = query.or(monthConditions.join(','));
+        }
+
+        const { data: salaryData, error: salaryError } = await query.order('nam', { ascending: false }).order('thang', { ascending: true });
+
+        if (salaryError || !salaryData || salaryData.length === 0) {
+          continue; // Bỏ qua nhân viên không có dữ liệu lương
+        }
+
+        // Tính toán các chỉ số
+        const processedSalaryData = salaryData.map(record => {
+          const totalWorkdays = 
+            (record.ngay_thuong_chinh_thuc || 0) +
+            (record.ngay_thuong_thu_viec || 0) +
+            (record.nghi_tuan || 0) +
+            (record.le_tet || 0) +
+            (record.ngay_thuong_chinh_thuc2 || 0) +
+            (record.ngay_thuong_thu_viec3 || 0) +
+            (record.nghi_tuan4 || 0) +
+            (record.le_tet5 || 0) +
+            (record.nghi_nl || 0);
+
+          const salaryPerWorkday = totalWorkdays > 0 
+            ? parseFloat(record.tong_thu_nhap?.toString().replace(/,/g, '') || '0') / totalWorkdays 
+            : 0;
+
+          return {
+            ...record,
+            total_workdays: totalWorkdays,
+            salary_per_workday: salaryPerWorkday,
+            tong_thu_nhap: parseFloat(record.tong_thu_nhap?.toString().replace(/,/g, '') || '0')
+          };
+        });
+
+        // Tính tổng hợp
+        const totalSalary = processedSalaryData.reduce((sum, record) => sum + record.tong_thu_nhap, 0);
+        const totalWorkdays = processedSalaryData.reduce((sum, record) => sum + record.total_workdays, 0);
+        const averageSalaryPerWorkday = totalWorkdays > 0 ? totalSalary / totalWorkdays : 0;
+
+        comparisonData.push({
+          employee_info: {
+            ma_nhan_vien: employeeData['Mã nhân viên'],
+            ho_va_ten: employeeData['Họ và tên'],
+            dia_diem: employeeData['Địa điểm'],
+            job_title: employeeData['Job title'],
+          },
+          summary: {
+            total_salary: totalSalary,
+            total_workdays: totalWorkdays,
+            average_salary_per_workday: averageSalaryPerWorkday,
+            months_count: salaryData.length
+          }
+        });
+      }
+
+      if (comparisonData.length === 0) {
+        return {
+          message: 'Không tìm thấy dữ liệu lương cho bất kỳ nhân viên nào trong danh sách',
+          comparison_data: null,
+          overall_stats: null
+        };
+      }
+
+      // Sắp xếp theo thứ hạng nếu được yêu cầu
+      if (input.include_rankings) {
+        comparisonData.sort((a, b) => b.summary.total_salary - a.summary.total_salary);
+        comparisonData.forEach((item, index) => {
+          item.ranking = index + 1;
+        });
+      }
+
+      // Tính thống kê tổng thể
+      const salaries = comparisonData.map(item => item.summary.total_salary);
+      const overallStats = {
+        highest_salary: Math.max(...salaries),
+        lowest_salary: Math.min(...salaries),
+        average_salary: salaries.reduce((sum, salary) => sum + salary, 0) / salaries.length,
+        total_employees: comparisonData.length
+      };
+
+      return {
+        comparison_data: comparisonData,
+        overall_stats: overallStats,
+        message: `So sánh lương thành công cho ${comparisonData.length} nhân viên`
+      };
+
+    } catch (e: any) {
+      console.error('Error in getEmployeeSalaryComparisonTool:', e);
+      return { 
+        message: `Lỗi khi so sánh lương nhân viên: ${e.message}`,
+        comparison_data: null,
+        overall_stats: null
+      };
+    }
+  }
+);
     
 
     
