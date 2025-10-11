@@ -632,17 +632,17 @@ export default function RevenueDashboardPage() {
                         </div>
                     )}
                     {!isLoadingLocationFilters && !locationFilterError && availableLocationTypes.length > 0 && (
-                        <ScrollArea className="max-h-[380px]">
+                        <ScrollArea className="max-h-[400px] overflow-y-auto">
                         <div className="p-1 space-y-0.5">
                             {availableLocationTypes.map((loai) => (
                             <DropdownMenuSub key={loai}>
-                                <DropdownMenuSubTrigger className="text-xs pl-2 pr-1 py-1.5 w-full justify-start hover:bg-accent">
+                                <DropdownMenuSubTrigger className="text-xs pl-2 pr-1 py-1.5 w-full justify-start hover:bg-accent transition-colors">
                                 {loai}
                                 </DropdownMenuSubTrigger>
                                 <DropdownMenuSubContent className="w-[250px]">
                                 <DropdownMenuLabel className="text-xs">Phòng ban cho: {loai}</DropdownMenuLabel>
                                 <DMSR />
-                                <ScrollArea className="max-h-[300px]">
+                                <ScrollArea className="max-h-[350px] overflow-y-auto">
                                 <div className="p-1">
                                 {(availableDepartmentsByLoai[loai] || []).length > 0 ? (
                                     <>
