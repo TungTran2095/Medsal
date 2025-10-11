@@ -540,12 +540,16 @@ export const getEmployeeSalaryTool = ai.defineTool(
   },
   async (input) => {
     try {
+      console.log('getEmployeeSalaryTool: Starting query for employee_id:', input.employee_id);
+      
       // Lấy thông tin cơ bản của nhân viên
       const { data: employeeData, error: employeeError } = await supabase
         .from('MS_CBNV')
-        .select('"Mã nhân viên", "Họ và tên", "Job title", "Địa điểm"')
+        .select('*')
         .eq('"Mã nhân viên"', input.employee_id)
         .single();
+      
+      console.log('getEmployeeSalaryTool: Employee data:', employeeData, 'Error:', employeeError);
 
       if (employeeError || !employeeData) {
         return { 
@@ -575,19 +579,22 @@ export const getEmployeeSalaryTool = ai.defineTool(
 
       const { data: salaryData, error: salaryError } = await query.order('nam', { ascending: false }).order('thang', { ascending: true });
 
+      console.log('getEmployeeSalaryTool: Salary data:', salaryData?.length, 'records, Error:', salaryError);
+
       if (salaryError) {
+        console.error('getEmployeeSalaryTool: Salary query error:', salaryError);
         throw salaryError;
       }
 
       if (!salaryData || salaryData.length === 0) {
         return {
           employee_info: {
-            ma_nhan_vien: employeeData['Mã nhân viên'],
-            ho_va_ten: employeeData['Họ và tên'],
-            dia_diem: employeeData['Địa điểm'],
-            job_title: employeeData['Job title'],
+            ma_nhan_vien: employeeData['Mã nhân viên'] || input.employee_id,
+            ho_va_ten: employeeData['Họ và tên'] || 'Không rõ',
+            dia_diem: employeeData['Địa điểm'] || 'Không rõ',
+            job_title: employeeData['Job title'] || 'Không rõ',
           },
-          message: `Nhân viên ${employeeData['Họ và tên']} (${input.employee_id}) không có dữ liệu lương cho kỳ đã chọn`,
+          message: `Nhân viên ${employeeData['Họ và tên'] || input.employee_id} (${input.employee_id}) không có dữ liệu lương cho kỳ đã chọn`,
           salary_data: null,
           summary: null
         };
@@ -637,14 +644,14 @@ export const getEmployeeSalaryTool = ai.defineTool(
 
       return {
         employee_info: {
-          ma_nhan_vien: employeeData['Mã nhân viên'],
-          ho_va_ten: employeeData['Họ và tên'],
-          dia_diem: employeeData['Địa điểm'],
-          job_title: employeeData['Job title'],
+          ma_nhan_vien: employeeData['Mã nhân viên'] || input.employee_id,
+          ho_va_ten: employeeData['Họ và tên'] || 'Không rõ',
+          dia_diem: employeeData['Địa điểm'] || 'Không rõ',
+          job_title: employeeData['Job title'] || 'Không rõ',
         },
         salary_data: processedSalaryData,
         summary: summary,
-        message: `Truy vấn lương thành công cho nhân viên ${employeeData['Họ và tên']} (${input.employee_id})`
+        message: `Truy vấn lương thành công cho nhân viên ${employeeData['Họ và tên'] || input.employee_id} (${input.employee_id})`
       };
 
     } catch (e: any) {
@@ -713,7 +720,7 @@ export const getEmployeeSalaryComparisonTool = ai.defineTool(
         // Lấy thông tin cơ bản của nhân viên
         const { data: employeeData, error: employeeError } = await supabase
           .from('MS_CBNV')
-          .select('"Mã nhân viên", "Họ và tên", "Job title", "Địa điểm"')
+          .select('*')
           .eq('"Mã nhân viên"', employeeId)
           .single();
 
@@ -776,10 +783,10 @@ export const getEmployeeSalaryComparisonTool = ai.defineTool(
 
         comparisonData.push({
           employee_info: {
-            ma_nhan_vien: employeeData['Mã nhân viên'],
-            ho_va_ten: employeeData['Họ và tên'],
-            dia_diem: employeeData['Địa điểm'],
-            job_title: employeeData['Job title'],
+            ma_nhan_vien: employeeData['Mã nhân viên'] || employeeId,
+            ho_va_ten: employeeData['Họ và tên'] || 'Không rõ',
+            dia_diem: employeeData['Địa điểm'] || 'Không rõ',
+            job_title: employeeData['Job title'] || 'Không rõ',
           },
           summary: {
             total_salary: totalSalary,
