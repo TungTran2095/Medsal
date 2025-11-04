@@ -1,0 +1,10 @@
+pandas>=2.0.0
+python-binance>=1.0.19
+numpy>=1.24.0
+requests>=2.31.0
+tradingview-ta>=3.4.0
+matplotlib>=3.7.0
+supabase>=2.0.0
+schedule>=1.2.0
+python-dotenv>=1.0.0
+
