@@ -9,14 +9,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v4
         with:
           python-version: '3.12'
-      - uses: actions/cache@v4
+
+      - name: Cache pip
+        uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: pip-${{ runner.os }}
-      - run: pip install requests supabase-py
+          key: pip-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
+          restore-keys: pip-${{ runner.os }}-
+
+      - name: Install deps
+        run: pip install --quiet -r requirements.txt
+
       - name: Run OHLCV
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
