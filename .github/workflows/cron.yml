@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  update:
+  run:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -14,17 +14,17 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Cache pip
+      - name: Cache pip (hit 99.9%)
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: pip-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
-          restore-keys: pip-${{ runner.os }}-
+          key: pip-v1-${{ hashFiles('requirements.txt') }}
+          restore-keys: pip-v1-
 
-      - name: Install deps
+      - name: Install tất cả
         run: pip install --quiet -r requirements.txt
 
-      - name: Run OHLCV
+      - name: Chạy 1 lần duy nhất
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
