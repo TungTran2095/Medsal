@@ -10,7 +10,12 @@ from supabase import create_client, Client
 from dotenv import load_dotenv
 
 
-BINANCE_API_BASE = "https://api.binance.com"
+# Danh sách endpoint công khai cho dữ liệu thị trường (dùng xoay vòng nếu bị chặn khu vực)
+BINANCE_API_BASES = [
+    "https://api.binance.com",             # chính
+    "https://data.binance.com",            # mirror cho public market data
+    "https://data-api.binance.vision",     # mirror khác cho public market data
+]
 BINANCE_SYMBOL = "BTCUSDT"
 INTERVAL = "1m"
 START_DATE = dt.datetime(2025, 1, 1, 0, 0, 0, tzinfo=dt.timezone.utc)
@@ -42,10 +47,40 @@ def fetch_klines(
         "startTime": start_time_ms,
         "limit": limit,
     }
-    url = f"{BINANCE_API_BASE}/api/v3/klines"
-    resp = requests.get(url, params=params, timeout=30)
-    resp.raise_for_status()
-    return resp.json()
+    headers = {
+        "Accept": "application/json",
+        # Một số CDN/edge yêu cầu UA hợp lệ để tránh chặn bot
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+        " AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0 Safari/537.36",
+    }
+
+    last_err: Optional[Exception] = None
+    for base in BINANCE_API_BASES:
+        url = f"{base}/api/v3/klines"
+        try:
+            resp = requests.get(url, params=params, headers=headers, timeout=30)
+            # Xử lý các tình huống phổ biến
+            if resp.status_code in (451, 403):
+                # Bị chặn theo khu vực/luật -> thử endpoint mirror kế tiếp
+                last_err = requests.HTTPError(f"{resp.status_code} from {url}")
+                continue
+            if resp.status_code == 429:
+                # Rate limit – tạm nghỉ ngắn rồi thử lại chính endpoint hiện tại 1 lần
+                retry_after = resp.headers.get("Retry-After")
+                sleep_s = float(retry_after) if retry_after else 1.0
+                time.sleep(sleep_s)
+                resp = requests.get(url, params=params, headers=headers, timeout=30)
+            resp.raise_for_status()
+            return resp.json()
+        except requests.RequestException as e:
+            last_err = e
+            # Thử base tiếp theo
+            continue
+
+    # Nếu tất cả base đều thất bại, ném lỗi cuối cùng
+    if last_err:
+        raise last_err
+    raise RuntimeError("Không thể gọi Binance API: không có base hợp lệ")
 
 
 def transform_binance_klines(
