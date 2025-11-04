@@ -1,31 +1,24 @@
-name: Supabase 1 phút 1 lần
+name: OHLCV 1 phút 1 lần
 on:
   schedule:
-    - cron: '*/1 * * * *'   # Mỗi phút
-  workflow_dispatch:        # Bấm chạy tay
+    - cron: '*/1 * * * *'
+  workflow_dispatch:
 
 jobs:
   update:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - uses: actions/setup-python@v4
         with:
           python-version: '3.12'
-
-      - name: Cache pip
-        uses: actions/cache@v4
+      - uses: actions/cache@v4
         with:
           path: ~/.cache/pip
           key: pip-${{ runner.os }}
-
-      - name: Install deps
-        run: pip install requests supabase-py
-
-      - name: Run Python
+      - run: pip install requests supabase-py
+      - name: Run OHLCV
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-        run: python -c "import upload_ohlcv_1m_to_supabase as m; m.start_minutely_update_loop()"
+        run: python upload_ohlcv_1m_to_supabase.py
