@@ -1,0 +1,15 @@
+# Files không cần deploy lên Railway
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.csv
+*.png
+*.md
+env.sample
+.env
+*.log
+*.bak
+*_copy.py
+

@@ -6,4 +6,20 @@ __pycache__/
 venv/
 .venv/
 
+# Data files
+*.csv
+*.png
+*.jpg
+*.jpeg
+
+# Copy files
+*_copy.py
+*_backup.py
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
 
