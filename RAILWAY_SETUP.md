@@ -65,3 +65,4 @@
 - Monitor logs để theo dõi hoạt động
 - Có thể scale up/down trong Railway Dashboard
 
+
