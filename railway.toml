@@ -2,7 +2,7 @@
 builder = "NIXPACKS"
 
 [deploy]
-startCommand = "python realtime_ohlcv_1m.py"
+startCommand = "sh -c \"$START_CMD\""
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
 
