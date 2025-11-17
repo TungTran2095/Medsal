@@ -10,6 +10,9 @@ import { Loader2, AlertTriangle, TrendingUp, TrendingDown, Minus, BarChart3, Arr
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { LineChart, Line, XAxis, Tooltip, Legend, ResponsiveContainer, LabelList } from 'recharts';
+import { Button } from "@/components/ui/button";
+import { Download } from "lucide-react";
+import Papa from "papaparse";
 
 interface SalaryMechanismData {
   id: string;
@@ -606,12 +609,21 @@ export default function SalaryMechanismCheckTable({
           console.warn(`Available keys in employeeMap:`, Array.from(employeeMap.keys()));
         }
         
+        // Xử lý đơn vị: Thay "Med Huế" và "Med Đà Nẵng" thành "Med Huda"
+        let donVi = item.Don_vi || '';
+        const originalDonVi = donVi;
+        if (donVi === 'Med Huế' || donVi === 'Med Đà Nẵng') {
+          donVi = 'Med Huda';
+          console.log(`Đã thay đổi đơn vị từ "${originalDonVi}" thành "${donVi}"`);
+        }
+        
         // Tính doanh thu chỉ tiêu và thực hiện theo đơn vị
         let doanhThuChiTieu = 0;
         let doanhThuThucHien = 0;
         
         console.log(`=== DEBUG: XỬ LÝ DOANH THU CHO NHÂN VIÊN ${employeeId} ===`);
-        console.log(`Đơn vị của nhân viên: "${item.Don_vi}"`);
+        console.log(`Đơn vị của nhân viên (gốc): "${originalDonVi}"`);
+        console.log(`Đơn vị của nhân viên (sau xử lý): "${donVi}"`);
         console.log(`Tháng được chọn: ${selectedMonth}, Năm được chọn: ${selectedYearState}`);
         console.log(`Có dữ liệu Doanh_thu: ${doanhThuData ? 'Có' : 'Không'}`);
         console.log(`Số lượng bản ghi Doanh_thu: ${doanhThuData?.length || 0}`);
@@ -619,15 +631,25 @@ export default function SalaryMechanismCheckTable({
                  if (doanhThuData && doanhThuData.length > 0) {
                        // Tìm tất cả bản ghi trong Doanh_thu theo điều kiện:
             // 1. "Tên Đơn vị" = "Đơn vị" (có xử lý dấu cách)
-            // 2. "Tháng pro" = "Tháng-Năm" (ví dụ: "01-2024")
+            // 2. Nếu đơn vị là "Med Huda", cần tìm cả "Med Huế", "Med Đà Nẵng", và "Med Huda"
+            // 3. "Tháng pro" = "Tháng-Năm" (ví dụ: "01-2024")
             const donViData = doanhThuData.filter((dt: DoanhThuData) => {
               const tenDonVi = dt['Tên Đơn vị'];
               const thangPro = dt['Tháng pro'];
               
               // Điều kiện 1: So sánh tên đơn vị (có xử lý dấu cách)
               const tenDonViTrimmed = tenDonVi.trim();
-              const donViTrimmed = item.Don_vi.trim();
-              const matchDonVi = tenDonViTrimmed === donViTrimmed;
+              const donViTrimmed = donVi.trim();
+              
+              // Nếu đơn vị là "Med Huda", tìm cả "Med Huế", "Med Đà Nẵng", và "Med Huda"
+              let matchDonVi = false;
+              if (donViTrimmed === 'Med Huda') {
+                matchDonVi = tenDonViTrimmed === 'Med Huế' || 
+                            tenDonViTrimmed === 'Med Đà Nẵng' || 
+                            tenDonViTrimmed === 'Med Huda';
+              } else {
+                matchDonVi = tenDonViTrimmed === donViTrimmed;
+              }
               
                              // Điều kiện 2: So sánh "Tháng pro" với format "Tháng MM-YYYY"
                let matchThangPro = false;
@@ -647,23 +669,33 @@ export default function SalaryMechanismCheckTable({
               
               console.log(`Checking Doanh_thu record:`);
               console.log(`  Tên Đơn vị: "${tenDonVi}" (trimmed: "${tenDonViTrimmed}")`);
-              console.log(`  Đơn vị từ co_che_luong: "${item.Don_vi}" (trimmed: "${donViTrimmed}")`);
+              console.log(`  Đơn vị từ co_che_luong (gốc): "${originalDonVi}"`);
+              console.log(`  Đơn vị từ co_che_luong (sau xử lý): "${donVi}" (trimmed: "${donViTrimmed}")`);
               console.log(`  Tháng pro: "${thangPro}" -> parsed: Tháng=${thangParsed}, Năm=${namParsed}`);
               console.log(`  Match results: DonVi=${matchDonVi}, ThangPro=${matchThangPro}`);
               
               return matchDonVi && matchThangPro;
             });
           
-          console.log(`Found ${donViData.length} matching records for unit: ${item.Don_vi}`);
+          console.log(`Found ${donViData.length} matching records for unit: ${donVi} (original: ${originalDonVi})`);
           console.log('Matching records:', donViData);
           
           if (donViData.length === 0) {
-            console.warn(`Không tìm thấy dữ liệu Doanh_thu cho đơn vị: ${item.Don_vi}, tháng: ${selectedMonth}, năm: ${selectedYearState}`);
+            console.warn(`Không tìm thấy dữ liệu Doanh_thu cho đơn vị: ${donVi} (gốc: ${originalDonVi}), tháng: ${selectedMonth}, năm: ${selectedYearState}`);
             console.warn('Available units in Doanh_thu:', [...new Set(doanhThuData.map((dt: DoanhThuData) => dt['Tên Đơn vị']))]);
             
             // Debug: Kiểm tra xem có dữ liệu Doanh_thu cho đơn vị này không (không filter theo tháng/năm)
-            const donViDataAll = doanhThuData.filter((dt: DoanhThuData) => dt['Tên Đơn vị'] === item.Don_vi);
-            console.warn(`Có ${donViDataAll.length} bản ghi Doanh_thu cho đơn vị "${item.Don_vi}" (tất cả tháng/năm):`);
+            // Nếu đơn vị là "Med Huda", tìm cả "Med Huế", "Med Đà Nẵng", và "Med Huda"
+            let donViDataAll: DoanhThuData[] = [];
+            if (donVi === 'Med Huda') {
+              donViDataAll = doanhThuData.filter((dt: DoanhThuData) => {
+                const tenDonVi = dt['Tên Đơn vị']?.trim();
+                return tenDonVi === 'Med Huế' || tenDonVi === 'Med Đà Nẵng' || tenDonVi === 'Med Huda';
+              });
+            } else {
+              donViDataAll = doanhThuData.filter((dt: DoanhThuData) => dt['Tên Đơn vị'] === donVi);
+            }
+            console.warn(`Có ${donViDataAll.length} bản ghi Doanh_thu cho đơn vị "${donVi}" (gốc: "${originalDonVi}") (tất cả tháng/năm):`);
             if (donViDataAll.length > 0) {
               console.warn('Sample records:', donViDataAll.slice(0, 3));
             }
@@ -719,14 +751,14 @@ export default function SalaryMechanismCheckTable({
              }
            }, 0);
           
-          console.log(`Final totals for ${item.Don_vi}: DT chỉ tiêu=${doanhThuChiTieu}, DT thực hiện=${doanhThuThucHien}`);
+          console.log(`Final totals for ${donVi} (gốc: ${originalDonVi}): DT chỉ tiêu=${doanhThuChiTieu}, DT thực hiện=${doanhThuThucHien}`);
         } else {
           console.warn('Không có dữ liệu Doanh_thu để xử lý');
         }
         
         const phanTramHoanThanh = doanhThuChiTieu > 0 ? (doanhThuThucHien / doanhThuChiTieu) * 100 : 0;
         
-        console.log(`=== KẾT QUẢ DOANH THU CHO ${item.Don_vi} ===`);
+        console.log(`=== KẾT QUẢ DOANH THU CHO ${donVi} (gốc: ${originalDonVi}) ===`);
         console.log(`DT chỉ tiêu: ${doanhThuChiTieu}`);
         console.log(`DT thực hiện: ${doanhThuThucHien}`);
         console.log(`% hoàn thành: ${phanTramHoanThanh}%`);
@@ -783,7 +815,7 @@ export default function SalaryMechanismCheckTable({
         return {
           id: employeeId || 'N/A',
           ho_va_ten: hoVaTen,
-          don_vi: item.Don_vi || '',
+          don_vi: donVi, // Sử dụng donVi đã được xử lý (Med Huda thay vì Med Huế/Med Đà Nẵng)
           luong_co_ban: luongCoBan,
           uu_dai_nghe: uuDaiNghe,
           xang_xe: xangXe,
@@ -895,6 +927,39 @@ export default function SalaryMechanismCheckTable({
     if (value > 0) return <TrendingUp className="h-4 w-4 text-green-600" />;
     if (value < 0) return <TrendingDown className="h-4 w-4 text-red-600" />;
     return <Minus className="h-4 w-4 text-gray-600" />;
+  };
+
+  // Export CSV for main table
+  const handleExportCSV = () => {
+    const rows = sortedData.map((row) => ({
+      'ID': row.id,
+      'Họ và tên': row.ho_va_ten,
+      'Đơn vị': row.don_vi,
+      'Lương cơ bản': row.luong_co_ban,
+      'Ưu đãi nghề': row.uu_dai_nghe,
+      'Xăng xe': row.xang_xe,
+      'Điện thoại': row.dien_thoai,
+      'Thưởng HS': row.thuong_hieu_suat,
+      'Gross theo cơ chế': row.gross_theo_co_che,
+      'DT chỉ tiêu': row.doanh_thu_chi_tieu,
+      'DT thực hiện': row.doanh_thu_thuc_hien,
+      '% hoàn thành': Number(row.phan_tram_hoan_thanh.toFixed(2)),
+      'Thưởng HS theo cơ chế': row.thuong_hieu_suat_theo_co_che,
+      'Lương Gross thực tế': row.luong_gross_thuc_te,
+      'Lương Gross đơn vị đề xuất': row.luong_gross_don_vi_de_xuat,
+      'Chênh lệch cơ chế': row.chenh_lech_co_che,
+    }));
+
+    const csv = Papa.unparse(rows, { quotes: true });
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Check_co_che_luong_GD_tinh_GD_DVTV_${selectedYearState}_Thang_${selectedMonth}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   // Hàm xử lý mở rộng dòng
@@ -1038,11 +1103,20 @@ export default function SalaryMechanismCheckTable({
         // Lấy dữ liệu doanh thu cho đơn vị của nhân viên này
         const employeeData = data.find(item => item.id === employeeId);
         if (employeeData) {
-          const { data: doanhThuData, error: doanhThuError } = await supabase
+          // Nếu đơn vị là "Med Huda", cần lấy dữ liệu từ cả "Med Huế", "Med Đà Nẵng", và "Med Huda"
+          let doanhThuQuery = supabase
             .from('Doanh_thu')
             .select('"Tên Đơn vị", "Tháng pro", "Chỉ tiêu", "Kỳ báo cáo"')
-            .eq('"Tên Đơn vị"', employeeData.don_vi)
             .like('"Tháng pro"', `%2025`);
+          
+          if (employeeData.don_vi === 'Med Huda') {
+            // Lấy dữ liệu từ cả 3 đơn vị
+            doanhThuQuery = doanhThuQuery.in('"Tên Đơn vị"', ['Med Huế', 'Med Đà Nẵng', 'Med Huda']);
+          } else {
+            doanhThuQuery = doanhThuQuery.eq('"Tên Đơn vị"', employeeData.don_vi);
+          }
+          
+          const { data: doanhThuData, error: doanhThuError } = await doanhThuQuery;
 
           if (!doanhThuError && doanhThuData) {
             console.log('Dữ liệu doanh thu theo tháng:', doanhThuData);
@@ -1222,6 +1296,13 @@ export default function SalaryMechanismCheckTable({
               value={filterChenhLechMax}
               onChange={e => setFilterChenhLechMax(e.target.value)}
             />
+          </div>
+
+          <div className="ml-auto">
+            <Button size="sm" variant="outline" onClick={handleExportCSV} title="Xuất Excel (CSV)">
+              <Download className="h-4 w-4" />
+              Xuất Excel (CSV)
+            </Button>
           </div>
         </div>
 

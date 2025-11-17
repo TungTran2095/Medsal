@@ -32,6 +32,7 @@ interface SalaryRevenueRatioData {
   doanh_thu: number;
   ty_le_luong_doanh_thu: number;
   ty_le_fulltime_doanh_thu: number;
+  ty_le_ql_dt_duoc_phep: number;
 }
 
 interface TargetRevenueChartProps {
@@ -51,6 +52,11 @@ const chartConfig = {
   ty_le_fulltime_doanh_thu: {
     label: 'Tỷ lệ lương Fulltime/doanh thu (%)',
     color: 'hsl(var(--chart-2))', 
+    icon: TrendingUp,
+  },
+  ty_le_ql_dt_duoc_phep: {
+    label: 'QL/DT được phép (%)',
+    color: 'hsl(var(--chart-3))', 
     icon: TrendingUp,
   },
 } satisfies ChartConfig;
@@ -111,7 +117,7 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
         p_filter_donvi2?: string[] | null;
       } = {};
       
-      if (selectedYear !== null) {
+      if (selectedYear !== null && selectedYear !== undefined) {
         rpcArgs.p_filter_year = selectedYear;
       }
       if (selectedMonths && selectedMonths.length > 0) {
@@ -135,70 +141,216 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
         rpcArgs.p_filter_donvi2 = null;
       }
 
-      console.log('LocationSalaryRevenueColumnChart - RPC args:', rpcArgs);
+      console.log('LocationSalaryRevenueColumnChart - RPC args:', JSON.stringify(rpcArgs, null, 2));
 
       const { data: rawData, error: queryError } = await supabase.rpc(
         'get_salary_revenue_ratio_by_location',
         rpcArgs
       );
 
+      console.log('LocationSalaryRevenueColumnChart - RPC response:', { 
+        hasData: !!rawData, 
+        dataLength: rawData?.length || 0,
+        hasError: !!queryError,
+        error: queryError 
+      });
+
+      // Xử lý lỗi một cách chi tiết hơn
       if (queryError) {
+        console.error('Supabase RPC Error Details:', {
+          message: queryError.message,
+          details: queryError.details,
+          hint: queryError.hint,
+          code: queryError.code,
+          fullError: JSON.stringify(queryError, Object.getOwnPropertyNames(queryError))
+        });
         throw queryError;
       }
 
+      // Kiểm tra nếu không có dữ liệu
+      if (!rawData || !Array.isArray(rawData)) {
+        console.warn('LocationSalaryRevenueColumnChart - No data returned from RPC');
+        setChartData([]);
+        return;
+      }
+
       // Xử lý dữ liệu từ SQL function và chuyển đổi tỷ lệ thành phần trăm
-      const processedData = (rawData || []).map((item: any) => ({
-        ten_don_vi: item.ten_don_vi,
+      // Lưu ý: ty_le_ql_dt_duoc_phep từ SQL là decimal (0.2 = 20%), chúng ta sẽ giữ nguyên để tính weighted average
+      const processedData = (rawData || []).map((item: any) => {
+        try {
+          return {
+            ten_don_vi: item.ten_don_vi || 'Không xác định',
         tong_luong_fulltime: Number(item.tong_luong_fulltime) || 0,
         tong_luong_parttime: Number(item.tong_luong_parttime) || 0,
         tong_luong: Number(item.tong_luong) || 0,
         doanh_thu: Number(item.doanh_thu) || 0,
-        ty_le_luong_doanh_thu: (Number(item.ty_le_luong_doanh_thu) || 0) * 100, // Chuyển thành phần trăm
-        ty_le_fulltime_doanh_thu: item.doanh_thu > 0 ? (Number(item.tong_luong_fulltime) / Number(item.doanh_thu)) * 100 : 0, // Tính tỷ lệ Fulltime/doanh thu
-      }));
+            ty_le_luong_doanh_thu: (Number(item.ty_le_luong_doanh_thu) || 0) * 100,
+            ty_le_fulltime_doanh_thu: item.doanh_thu > 0 ? (Number(item.tong_luong_fulltime) / Number(item.doanh_thu)) * 100 : 0,
+            // Giữ nguyên giá trị decimal từ SQL để tính weighted average chính xác
+            ty_le_ql_dt_duoc_phep_raw: Number(item.ty_le_ql_dt_duoc_phep) || 0, // Decimal: 0.2 = 20%
+            // Giá trị phần trăm để hiển thị (sẽ được cập nhật sau khi gộp và áp dụng giá trị mặc định)
+            ty_le_ql_dt_duoc_phep: (Number(item.ty_le_ql_dt_duoc_phep) || 0) * 100,
+          };
+        } catch (itemError) {
+          console.error('Error processing item:', item, itemError);
+          return null;
+        }
+      }).filter((item): item is SalaryRevenueRatioData & { ty_le_ql_dt_duoc_phep_raw: number } => item !== null);
 
-      // Lọc và sắp xếp dữ liệu theo tỷ lệ lương/doanh thu
-      const filteredData = processedData
+      // Loại bỏ các địa điểm không cần thiết
+      const excludedLocations = ['Medim', 'Medlatec Group', 'Med Mê Linh', 'Medcom', 'Medon', 'Med Group', 'Med Campuchia'];
+      const filteredByExclusion = processedData.filter(
+        item => !excludedLocations.includes(item.ten_don_vi)
+      );
+
+      // Gộp các địa điểm theo yêu cầu
+      const locationMap = new Map<string, {
+        data: SalaryRevenueRatioData;
+        totalDoanhThu: number;
+        weightedQLDT: number; // Tổng (ty_le_ql_dt_duoc_phep_raw * doanh_thu) để tính trung bình có trọng số
+      }>();
+      
+      filteredByExclusion.forEach(item => {
+        let locationKey = item.ten_don_vi;
+        
+        // Gộp Med Huế và Med Đà Nẵng thành Med Huda
+        if (item.ten_don_vi === 'Med Huế' || item.ten_don_vi === 'Med Đà Nẵng') {
+          locationKey = 'Med Huda';
+        }
+        // Gộp Med TP.HCM, Med Bình Dương, Med Bình Phước, Med Đồng Nai thành Med Đông Nam Bộ
+        else if (['Med TP.HCM', 'Med Bình Dương', 'Med Bình Phước', 'Med Đồng Nai'].includes(item.ten_don_vi)) {
+          locationKey = 'Med Đông Nam Bộ';
+        }
+
+        if (locationMap.has(locationKey)) {
+          const existing = locationMap.get(locationKey)!;
+          existing.data.tong_luong_fulltime += item.tong_luong_fulltime;
+          existing.data.tong_luong_parttime += item.tong_luong_parttime;
+          existing.data.tong_luong += item.tong_luong;
+          existing.data.doanh_thu += item.doanh_thu;
+          existing.totalDoanhThu += item.doanh_thu;
+          // Tính trung bình có trọng số cho QL/DT được phép dựa trên doanh thu (sử dụng giá trị decimal)
+          if (item.ty_le_ql_dt_duoc_phep_raw > 0 && item.doanh_thu > 0) {
+            existing.weightedQLDT += item.ty_le_ql_dt_duoc_phep_raw * item.doanh_thu;
+          }
+        } else {
+          locationMap.set(locationKey, {
+            data: {
+              ...item,
+              ten_don_vi: locationKey,
+              // Loại bỏ ty_le_ql_dt_duoc_phep_raw khỏi data object
+              ty_le_ql_dt_duoc_phep: item.ty_le_ql_dt_duoc_phep
+            },
+            totalDoanhThu: item.doanh_thu,
+            weightedQLDT: item.ty_le_ql_dt_duoc_phep_raw > 0 && item.doanh_thu > 0 
+              ? item.ty_le_ql_dt_duoc_phep_raw * item.doanh_thu 
+              : 0
+          });
+        }
+      });
+
+      // Định nghĩa giá trị mặc định QL/DT được phép cho các địa điểm cụ thể (đơn vị: phần trăm, ví dụ 20 = 20%)
+      const defaultQLDTValues: Record<string, number> = {
+        'Med Ba Đình': 20,
+        'Med Cầu Giấy': 18,
+        'Med Thanh Xuân': 18,
+        'Med Tây Hồ': 18,
+      };
+
+      // Tính lại các tỷ lệ và QL/DT được phép sau khi gộp
+      const finalData = Array.from(locationMap.values()).map(({ data, totalDoanhThu, weightedQLDT }) => {
+        // Tính lại tỷ lệ sau khi gộp
+        data.ty_le_luong_doanh_thu = data.doanh_thu > 0 
+          ? (data.tong_luong / data.doanh_thu) * 100 
+          : 0;
+        data.ty_le_fulltime_doanh_thu = data.doanh_thu > 0 
+          ? (data.tong_luong_fulltime / data.doanh_thu) * 100 
+          : 0;
+        
+        // Tính trung bình có trọng số cho QL/DT được phép (chuyển từ decimal sang phần trăm)
+        let calculatedQLDT = 0;
+        if (totalDoanhThu > 0 && weightedQLDT > 0) {
+          // weightedQLDT là tổng (decimal * doanh_thu), chia cho totalDoanhThu để được decimal, rồi nhân 100 để được phần trăm
+          calculatedQLDT = (weightedQLDT / totalDoanhThu) * 100;
+        }
+        
+        // Áp dụng giá trị mặc định cho các địa điểm cụ thể
+        if (defaultQLDTValues.hasOwnProperty(data.ten_don_vi)) {
+          // Luôn sử dụng giá trị mặc định cho các địa điểm này
+          data.ty_le_ql_dt_duoc_phep = defaultQLDTValues[data.ten_don_vi];
+        } else {
+          // Nếu không có giá trị mặc định, sử dụng giá trị tính được từ database
+          data.ty_le_ql_dt_duoc_phep = calculatedQLDT;
+        }
+        
+        return data;
+      });
+
+      // Lọc và sắp xếp dữ liệu
+      const sortedData = finalData
         .filter(item => item.tong_luong > 0 || item.doanh_thu > 0)
         .sort((a, b) => b.ty_le_luong_doanh_thu - a.ty_le_luong_doanh_thu);
 
-      setChartData(filteredData);
+      console.log('LocationSalaryRevenueColumnChart - Final processed data:', sortedData.length, 'items');
+      setChartData(sortedData);
 
     } catch (err: any) {
+      console.error("Error fetching salary revenue ratio data:", err);
+      console.error("Error type:", typeof err);
+      console.error("Error keys:", err ? Object.keys(err) : 'null');
+      console.error("Error stringified:", JSON.stringify(err, Object.getOwnPropertyNames(err)));
+      
       let errorMessage = 'Không thể tải dữ liệu tỷ lệ lương/doanh thu theo địa điểm.';
       
-      console.error("Error fetching salary revenue ratio data:", err);
-      
-      if (err && typeof err === 'object') {
+      // Xử lý lỗi chi tiết hơn
+      if (err) {
+        if (typeof err === 'string') {
+          errorMessage = err;
+        } else if (typeof err === 'object') {
+          // Kiểm tra các thuộc tính lỗi phổ biến của Supabase
           if (err.message) {
               errorMessage = `Lỗi: ${err.message}`;
           } else if (err.details) {
               errorMessage = `Lỗi chi tiết: ${err.details}`;
-          } else if (err.code) {
-              errorMessage = `Lỗi query với mã: ${err.code}`;
           } else if (err.hint) {
               errorMessage = `Gợi ý: ${err.hint}`;
+          } else if (err.code) {
+            errorMessage = `Lỗi với mã: ${err.code}`;
           } else {
-              // Kiểm tra xem có phải lỗi bảng không tồn tại không
-              const errorString = err.toString();
-              if (errorString.includes('does not exist') || errorString.includes('relation') || errorString.includes('column')) {
-                  errorMessage = 'Bảng hoặc cột không tồn tại trong database. Vui lòng kiểm tra cấu trúc database.';
+            // Thử stringify để xem có thông tin gì không
+            try {
+              const errorStr = JSON.stringify(err, Object.getOwnPropertyNames(err), 2);
+              if (errorStr && errorStr !== '{}' && errorStr !== 'null') {
+                // Nếu error object rỗng hoặc không có thông tin hữu ích, hiển thị thông báo chung
+                if (errorStr === '{}') {
+                  errorMessage = 'Lỗi không xác định từ server. Vui lòng kiểm tra console để biết thêm chi tiết.';
+                  // Không set error, chỉ log và hiển thị dữ liệu rỗng
+                  console.warn('Empty error object received. Setting empty data instead of error.');
+                  setChartData([]);
+                  setIsLoading(false);
+                  return;
               } else {
-                  try {
-                      const stringifiedError = JSON.stringify(err);
-                      if (stringifiedError !== '{}' && stringifiedError !== 'null') {
-                          errorMessage = `Lỗi không xác định: ${stringifiedError}`;
-                      }
-                  } catch (e) {
-                      errorMessage = `Lỗi không xác định: ${errorString}`;
-                  }
+                  errorMessage = `Lỗi: ${errorStr}`;
+                }
               }
+            } catch (stringifyError) {
+              const errorString = String(err);
+              if (errorString && errorString !== '[object Object]') {
+                errorMessage = errorString;
+              }
+            }
           }
-      } else if (typeof err === 'string') {
-          errorMessage = err;
+        }
       }
       
+      // Chỉ set error nếu có thông báo lỗi hữu ích
+      if (errorMessage && errorMessage !== 'Không thể tải dữ liệu tỷ lệ lương/doanh thu theo địa điểm.') {
       setError(errorMessage);
+      } else {
+        // Nếu không có thông báo lỗi rõ ràng, chỉ log và hiển thị dữ liệu rỗng
+        console.warn('No clear error message. Setting empty data.');
+        setChartData([]);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -215,7 +367,7 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
       return 100;
     }
     const maxValue = Math.max(
-      ...chartData.map(item => Math.max(item.ty_le_luong_doanh_thu, item.ty_le_fulltime_doanh_thu))
+      ...chartData.map(item => Math.max(item.ty_le_luong_doanh_thu, item.ty_le_fulltime_doanh_thu, item.ty_le_ql_dt_duoc_phep))
     );
     return Math.ceil(maxValue * 1.1);
   }, [chartData]);
@@ -269,7 +421,7 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
       <CardHeader className="pb-2 pt-3">
         <CardTitle className="text-base font-semibold flex items-center gap-1.5"><TrendingUp className="h-4 w-4" />Tỷ lệ lương/doanh thu theo địa điểm</CardTitle>
         <CardDescription className="text-xs truncate" title={filterDescription}>
-          Dữ liệu cho {filterDescription}. Hiển thị tỷ lệ tổng lương và lương Fulltime so với doanh thu.
+          Dữ liệu cho {filterDescription}. Hiển thị tỷ lệ tổng lương, lương Fulltime và QL/DT được phép so với doanh thu.
         </CardDescription>
       </CardHeader>
       <CardContent className="pt-2 flex-grow overflow-hidden">
@@ -318,7 +470,8 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
                                     const data = payload[0].payload;
                                     const tyLeTong = data.ty_le_luong_doanh_thu.toFixed(1);
                                     const tyLeFT = data.ty_le_fulltime_doanh_thu.toFixed(1);
-                                    return `${label} (Tổng: ${tyLeTong}%, FT: ${tyLeFT}%)`;
+                                    const tyLeQLDT = data.ty_le_ql_dt_duoc_phep.toFixed(1);
+                                    return `${label} (Tổng: ${tyLeTong}%, FT: ${tyLeFT}%, QL/DT: ${tyLeQLDT}%)`;
                                 }
                                 return label;
                             }} 
@@ -362,6 +515,16 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
                         dot={{ fill: 'var(--color-ty_le_fulltime_doanh_thu)', strokeWidth: 2, r: 4 }}
                         activeDot={{ r: 6, stroke: 'var(--color-ty_le_fulltime_doanh_thu)', strokeWidth: 2 }}
                         name={chartConfig.ty_le_fulltime_doanh_thu.label}
+                    />
+                    <Line 
+                        type="monotone" 
+                        dataKey="ty_le_ql_dt_duoc_phep" 
+                        stroke="var(--color-ty_le_ql_dt_duoc_phep)" 
+                        strokeWidth={3}
+                        strokeDasharray="5 5"
+                        dot={{ fill: 'var(--color-ty_le_ql_dt_duoc_phep)', strokeWidth: 2, r: 4 }}
+                        activeDot={{ r: 6, stroke: 'var(--color-ty_le_ql_dt_duoc_phep)', strokeWidth: 2 }}
+                        name={chartConfig.ty_le_ql_dt_duoc_phep.label}
                     />
                 </DynamicLineChart>
                 </ResponsiveContainer>

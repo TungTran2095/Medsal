@@ -9,6 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button } from "@/components/ui/button";
+import { Download } from "lucide-react";
+import Papa from "papaparse";
 
 interface MonthlySalaryProvinceTableProps {
   orgHierarchyData: any[];
@@ -43,9 +46,66 @@ export default function MonthlySalaryProvinceTable({ orgHierarchyData, flatOrgUn
           return;
         }
 
+        // Xử lý dữ liệu: Gộp "Med Bình Định" và "Med Đắk Lắk" thành "Med Bình Đắk"
+        const processedRows: any[] = [];
+        const binhDinhData = (salaryRows || []).find((row: any) => row.department_name?.trim() === 'Med Bình Định');
+        const dakLakData = (salaryRows || []).find((row: any) => row.department_name?.trim() === 'Med Đắk Lắk');
+        
+        // Gộp dữ liệu "Med Bình Định" và "Med Đắk Lắk" thành "Med Bình Đắk"
+        if (binhDinhData || dakLakData) {
+          const binhDakData = {
+            department_name: 'Med Bình Đắk',
+            ft_salary_month: (binhDinhData?.ft_salary_month || 0) + (dakLakData?.ft_salary_month || 0),
+            pt_salary_month: (binhDinhData?.pt_salary_month || 0) + (dakLakData?.pt_salary_month || 0),
+            total_salary_month: (binhDinhData?.total_salary_month || 0) + (dakLakData?.total_salary_month || 0),
+            total_revenue_month: (binhDinhData?.total_revenue_month || 0) + (dakLakData?.total_revenue_month || 0),
+            target_revenue_month: (binhDinhData?.target_revenue_month || 0) + (dakLakData?.target_revenue_month || 0),
+            chi_tieu_dt: (binhDinhData?.chi_tieu_dt || 0) + (dakLakData?.chi_tieu_dt || 0),
+            quy_cung_2025: (binhDinhData?.quy_cung_2025 || 0) + (dakLakData?.quy_cung_2025 || 0),
+            // Tính lại các tỷ lệ sau khi gộp
+            completion_ratio: 0,
+            salary_revenue_ratio: 0,
+            cumulative_salary_revenue_ratio: binhDinhData?.cumulative_salary_revenue_ratio || dakLakData?.cumulative_salary_revenue_ratio || 0,
+            allowed_salary_revenue_ratio: 0,
+            allowed_salary_fund: 0,
+            excess_salary_fund: 0
+          };
+          
+          // Tính completion_ratio
+          if (binhDakData.target_revenue_month > 0) {
+            binhDakData.completion_ratio = binhDakData.total_revenue_month / binhDakData.target_revenue_month;
+          }
+          
+          // Tính salary_revenue_ratio
+          if (binhDakData.total_revenue_month > 0) {
+            binhDakData.salary_revenue_ratio = binhDakData.total_salary_month / binhDakData.total_revenue_month;
+          }
+          
+          // Tính allowed_salary_revenue_ratio (tỷ lệ QL/DT được phép)
+          if (binhDakData.chi_tieu_dt > 0) {
+            binhDakData.allowed_salary_revenue_ratio = binhDakData.quy_cung_2025 / binhDakData.chi_tieu_dt;
+          }
+          
+          // Tính allowed_salary_fund
+          binhDakData.allowed_salary_fund = binhDakData.total_revenue_month * binhDakData.allowed_salary_revenue_ratio;
+          
+          // Tính excess_salary_fund
+          binhDakData.excess_salary_fund = binhDakData.total_salary_month - binhDakData.allowed_salary_fund;
+          
+          processedRows.push(binhDakData);
+        }
+        
+        // Thêm các bản ghi khác (loại trừ "Med Bình Định" và "Med Đắk Lắk")
+        (salaryRows || []).forEach((row: any) => {
+          const departmentName = row.department_name?.trim() || '';
+          if (departmentName !== 'Med Bình Định' && departmentName !== 'Med Đắk Lắk') {
+            processedRows.push(row);
+          }
+        });
+        
         // Map theo tên department_name để tra cứu nhanh
         const map: Record<string, any> = {};
-        (salaryRows || []).forEach((row: any) => {
+        processedRows.forEach((row: any) => {
           map[row.department_name?.trim() || ''] = row;
         });
         setSalaryData(map);
@@ -205,6 +265,60 @@ export default function MonthlySalaryProvinceTable({ orgHierarchyData, flatOrgUn
     return totals;
   };
 
+  // Export CSV
+  const handleExportCSV = () => {
+    const entries = Object.entries(sortedSalaryData)
+      .filter(([departmentName, data]) => {
+        if (departmentName === 'Medcom' || departmentName === 'Medon') return false;
+        if (!data) return false;
+        if ((data.ft_salary_month === 0 && data.pt_salary_month === 0 && data.total_salary_month === 0)) return false;
+        return true;
+      });
+
+    const rows = entries.map(([departmentName, data]) => ({
+      'Ngành dọc/Đơn vị/Chi nhánh': departmentName,
+      [`Lương FT tháng ${selectedMonth}`]: data.ft_salary_month || 0,
+      [`Lương PT tháng ${selectedMonth}`]: data.pt_salary_month || 0,
+      [`Tổng quỹ lương tháng ${selectedMonth}`]: data.total_salary_month || 0,
+      [`Tổng doanh thu tháng ${selectedMonth}`]: data.total_revenue_month || 0,
+      [`Chỉ tiêu doanh thu tháng ${selectedMonth}`]: data.target_revenue_month || 0,
+      'Tỷ lệ hoàn thành chỉ tiêu (%)': data.completion_ratio ? Number((data.completion_ratio * 100).toFixed(2)) : 0,
+      'Quỹ lương/Doanh thu (%)': data.salary_revenue_ratio ? Number((data.salary_revenue_ratio * 100).toFixed(2)) : 0,
+      'Quỹ lương/Doanh thu lũy kế (%)': data.cumulative_salary_revenue_ratio ? Number((data.cumulative_salary_revenue_ratio * 100).toFixed(2)) : 0,
+      'QL/DT được phép (%)': data.allowed_salary_revenue_ratio ? Number((data.allowed_salary_revenue_ratio * 100).toFixed(2)) : 0,
+      'Quỹ lương được phép chia': data.allowed_salary_fund || 0,
+      'Vượt quỹ lương tháng': data.excess_salary_fund || 0,
+    }));
+
+    // Add totals row
+    const totals = calculateTotals();
+    rows.push({
+      'Ngành dọc/Đơn vị/Chi nhánh': 'TỔNG CỘNG',
+      [`Lương FT tháng ${selectedMonth}`]: totals.ft_salary_month,
+      [`Lương PT tháng ${selectedMonth}`]: totals.pt_salary_month,
+      [`Tổng quỹ lương tháng ${selectedMonth}`]: totals.total_salary_month,
+      [`Tổng doanh thu tháng ${selectedMonth}`]: totals.total_revenue_month,
+      [`Chỉ tiêu doanh thu tháng ${selectedMonth}`]: totals.target_revenue_month,
+      'Tỷ lệ hoàn thành chỉ tiêu (%)': totals.completion_ratio ? Number((totals.completion_ratio * 100).toFixed(2)) : 0,
+      'Quỹ lương/Doanh thu (%)': totals.salary_revenue_ratio ? Number((totals.salary_revenue_ratio * 100).toFixed(2)) : 0,
+      'Quỹ lương/Doanh thu lũy kế (%)': totals.cumulative_salary_revenue_ratio ? Number((totals.cumulative_salary_revenue_ratio * 100).toFixed(2)) : 0,
+      'QL/DT được phép (%)': totals.allowed_salary_revenue_ratio ? Number((totals.allowed_salary_revenue_ratio * 100).toFixed(2)) : 0,
+      'Quỹ lương được phép chia': totals.allowed_salary_fund,
+      'Vượt quỹ lương tháng': totals.excess_salary_fund,
+    });
+
+    const csv = Papa.unparse(rows, { quotes: true });
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Bang_duyet_quy_luong_tinh_thang_${selectedMonth}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   // Render rows
   const renderRows = (): React.ReactNode[] => {
     const rows = Object.entries(sortedSalaryData).map(([departmentName, data]) => {
@@ -352,6 +466,12 @@ export default function MonthlySalaryProvinceTable({ orgHierarchyData, flatOrgUn
           <CardTitle className="text-base font-semibold flex items-center gap-1.5">
             Bảng duyệt quỹ lương các tỉnh tháng {selectedMonth}
           </CardTitle>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={handleExportCSV} title="Xuất Excel (CSV)">
+              <Download className="h-4 w-4" />
+              Xuất Excel (CSV)
+            </Button>
+          </div>
         </div>
         <div className="flex items-center gap-2 mt-2">
           <Label htmlFor="selectedMonth" className="text-sm font-medium">
