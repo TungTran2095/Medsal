@@ -217,6 +217,10 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
         if (item.ten_don_vi === 'Med Huế' || item.ten_don_vi === 'Med Đà Nẵng') {
           locationKey = 'Med Huda';
         }
+        // Gộp Med Đắk Lawsk và Med Bình Định thành Med Bình Đắk
+        else if (item.ten_don_vi === 'Med Đắk Lawsk' || item.ten_don_vi === 'Med Bình Định') {
+          locationKey = 'Med Bình Đắk';
+        }
         // Gộp Med TP.HCM, Med Bình Dương, Med Bình Phước, Med Đồng Nai thành Med Đông Nam Bộ
         else if (['Med TP.HCM', 'Med Bình Dương', 'Med Bình Phước', 'Med Đồng Nai'].includes(item.ten_don_vi)) {
           locationKey = 'Med Đông Nam Bộ';
@@ -255,6 +259,7 @@ export default function LocationSalaryRevenueColumnChart({ selectedYear, selecte
         'Med Cầu Giấy': 18,
         'Med Thanh Xuân': 18,
         'Med Tây Hồ': 18,
+        'Med Bình Đắk': 18,
       };
 
       // Tính lại các tỷ lệ và QL/DT được phép sau khi gộp
