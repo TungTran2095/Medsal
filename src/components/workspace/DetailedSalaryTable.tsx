@@ -6,8 +6,9 @@ import { supabase } from '@/lib/supabaseClient';
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
 import { Loader2, AlertTriangle, ListChecks, ArrowUpDown, ArrowUp, ArrowDown, TrendingUp, TrendingDown, Minus, ChevronDown, ChevronRight } from 'lucide-react';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { LineChart, Line, XAxis, Tooltip, Legend, ResponsiveContainer, LabelList } from 'recharts';
 
@@ -39,6 +40,17 @@ interface SortConfig {
   direction: 'ascending' | 'descending';
 }
 
+interface SalaryMonthChartPoint {
+  month: number;
+  salary: number;
+  workdays: number;
+  per_workday: number;
+  per_workday_prev: number;
+}
+
+type SalaryMonthRow = Record<string, any>;
+type SalaryMonthMap = Record<string, { chartData: SalaryMonthChartPoint[]; rows: SalaryMonthRow[] }>;
+
 // Hàm rút gọn số: 2.000.000 => 2tr
 const compactNumber = (value: number) => {
   if (value == null) return '';
@@ -65,8 +77,10 @@ export default function DetailedSalaryTable({
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailData, setDetailData] = useState<Record<string, any>>({});
-  const [salaryMonthData, setSalaryMonthData] = useState<Record<string, any[]>>({});
+  const [salaryMonthData, setSalaryMonthData] = useState<SalaryMonthMap>({});
   const [salaryMonthLoading, setSalaryMonthLoading] = useState(false);
+  const [filterMaNv, setFilterMaNv] = useState('');
+  const [filterHoTen, setFilterHoTen] = useState('');
 
   // Hàm lấy thông tin hành chính từ MS_CBNV
   const fetchEmployeeDetail = async (ma_nv: string) => {
@@ -95,21 +109,23 @@ export default function DetailedSalaryTable({
       const maxYear = yearData?.[0]?.nam;
       if (!maxYear) throw new Error('Không tìm thấy năm');
       
-      // Lấy lương từng tháng năm nay
-      const { data: curData, error: curErr } = await supabase
+      // Lấy toàn bộ cột (trừ stt) cho năm hiện tại
+      const { data: curDataRaw, error: curErr } = await supabase
         .from('Fulltime')
-        .select('thang, tong_thu_nhap, ngay_thuong_chinh_thuc, ngay_thuong_thu_viec, nghi_tuan, le_tet, ngay_thuong_chinh_thuc2, ngay_thuong_thu_viec3, nghi_tuan4, le_tet5, nghi_nl')
+        .select('*')
         .eq('ma_nhan_vien', ma_nv)
         .eq('nam', maxYear);
       if (curErr) throw curErr;
+      const curData = (curDataRaw || []).map(({ stt, ...rest }) => rest);
       
       // Lấy lương/công từng tháng năm ngoái
-      const { data: prevData, error: prevErr } = await supabase
+      const { data: prevDataRaw, error: prevErr } = await supabase
         .from('Fulltime')
-        .select('thang, tong_thu_nhap, ngay_thuong_chinh_thuc, ngay_thuong_thu_viec, nghi_tuan, le_tet, ngay_thuong_chinh_thuc2, ngay_thuong_thu_viec3, nghi_tuan4, le_tet5, nghi_nl')
+        .select('*')
         .eq('ma_nhan_vien', ma_nv)
         .eq('nam', maxYear - 1);
       if (prevErr) throw prevErr;
+      const prevData = (prevDataRaw || []).map(({ stt, ...rest }) => rest);
       
       // Xử lý dữ liệu
       const parseMonth = (thang: string) => parseInt((thang || '').replace(/\D/g, ''), 10);
@@ -138,7 +154,7 @@ export default function DetailedSalaryTable({
       const prevMonthMap = groupByMonth(prevData || []);
 
       // Tạo dữ liệu cho biểu đồ
-      const chartData = [];
+      const chartData: SalaryMonthChartPoint[] = [];
       for (let month = 1; month <= 12; month++) {
         const curMonth = curMonthMap[month];
         const prevMonth = prevMonthMap[month];
@@ -154,10 +170,10 @@ export default function DetailedSalaryTable({
         }
       }
 
-      setSalaryMonthData(prev => ({ ...prev, [ma_nv]: chartData }));
+      setSalaryMonthData(prev => ({ ...prev, [ma_nv]: { chartData, rows: curData } }));
     } catch (e) {
       console.error('Error fetching salary month data:', e);
-      setSalaryMonthData(prev => ({ ...prev, [ma_nv]: [] }));
+      setSalaryMonthData(prev => ({ ...prev, [ma_nv]: { chartData: [], rows: [] } }));
     } finally {
       setSalaryMonthLoading(false);
     }
@@ -274,8 +290,19 @@ export default function DetailedSalaryTable({
     }));
   }, [data]);
 
+  const filteredData = useMemo(() => {
+    const maNvKeyword = filterMaNv.trim().toLowerCase();
+    const hoTenKeyword = filterHoTen.trim().toLowerCase();
+
+    return dataWithGrowth.filter(row => {
+      const matchesMaNv = maNvKeyword ? row.ma_nv.toLowerCase().includes(maNvKeyword) : true;
+      const matchesHoTen = hoTenKeyword ? row.ho_ten.toLowerCase().includes(hoTenKeyword) : true;
+      return matchesMaNv && matchesHoTen;
+    });
+  }, [dataWithGrowth, filterMaNv, filterHoTen]);
+
   const sortedData = useMemo(() => {
-    let sortableItems = [...dataWithGrowth];
+    let sortableItems = [...filteredData];
     if (sortConfig.key) {
       sortableItems.sort((a, b) => {
         const valA = a[sortConfig.key!];
@@ -302,7 +329,7 @@ export default function DetailedSalaryTable({
       });
     }
     return sortableItems;
-  }, [dataWithGrowth, sortConfig]);
+  }, [filteredData, sortConfig]);
 
   const formatCurrency = (value: number | null) => {
     if (value === null || value === undefined) return 'N/A';
@@ -379,6 +406,20 @@ export default function DetailedSalaryTable({
         </CardDescription>
       </CardHeader>
       <CardContent className="flex-grow flex flex-col overflow-hidden p-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-3">
+          <Input
+            placeholder="Lọc theo Mã NV..."
+            value={filterMaNv}
+            onChange={(e) => setFilterMaNv(e.target.value)}
+            className="h-9 text-xs"
+          />
+          <Input
+            placeholder="Lọc theo Họ và Tên..."
+            value={filterHoTen}
+            onChange={(e) => setFilterHoTen(e.target.value)}
+            className="h-9 text-xs"
+          />
+        </div>
         <div className="flex-grow min-h-0">
           {isLoading && (
             <div className="flex items-center justify-center h-full text-muted-foreground">
@@ -403,8 +444,13 @@ export default function DetailedSalaryTable({
                 <p className="text-muted-foreground text-center py-4 text-sm">Không có dữ liệu lương chi tiết cho bộ lọc hiện tại.</p>
             </div>
           )}
-          {!isLoading && !error && data.length > 0 && (
-            <ScrollArea className="border rounded-md h-full">
+          {!isLoading && !error && data.length > 0 && sortedData.length === 0 && (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-muted-foreground text-center py-4 text-sm">Không có nhân viên phù hợp bộ lọc Mã NV/Họ tên.</p>
+            </div>
+          )}
+          {!isLoading && !error && sortedData.length > 0 && (
+            <ScrollArea className="border rounded-md h-full overflow-x-hidden">
               <Table>
                 <TableHeader className="sticky top-0 bg-card z-10">
                   <TableRow>
@@ -464,16 +510,16 @@ export default function DetailedSalaryTable({
                             {/* Section 2: Biểu đồ lương Fulltime theo tháng */}
                             <div>
                               <div className="font-semibold mb-2 text-sm">Lương Fulltime theo tháng</div>
-                              {salaryMonthLoading && (!salaryMonthData[row.ma_nv] || salaryMonthData[row.ma_nv].length === 0) && (
+                              {salaryMonthLoading && (!salaryMonthData[row.ma_nv] || salaryMonthData[row.ma_nv].rows.length === 0) && (
                                 <div className="text-xs text-muted-foreground">Đang tải dữ liệu lương theo tháng...</div>
                               )}
-                              {salaryMonthData[row.ma_nv] && salaryMonthData[row.ma_nv].length > 0 && (
+                              {salaryMonthData[row.ma_nv]?.chartData && salaryMonthData[row.ma_nv].chartData.length > 0 && (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                   {/* Line chart: Lương theo tháng */}
                                   <div>
                                     <div className="text-xs font-semibold mb-1">Lương theo tháng (năm hiện tại)</div>
                                     <ResponsiveContainer width="100%" height={180}>
-                                      <LineChart data={salaryMonthData[row.ma_nv]}>
+                                      <LineChart data={salaryMonthData[row.ma_nv].chartData}>
                                         <XAxis dataKey="month" tickFormatter={m => `Th${m}`} fontSize={11} />
                                         <Tooltip formatter={v => compactNumber(Number(v))} labelFormatter={m => `Tháng ${m}`} />
                                         <Line type="monotone" dataKey="salary" stroke="#3b82f6" name="Lương" dot={{ r: 3 }} activeDot={{ r: 5 }}>
@@ -486,7 +532,7 @@ export default function DetailedSalaryTable({
                                   <div>
                                     <div className="text-xs font-semibold mb-1">Lương/Công theo tháng (so sánh 2 năm)</div>
                                     <ResponsiveContainer width="100%" height={180}>
-                                      <LineChart data={salaryMonthData[row.ma_nv]}>
+                                      <LineChart data={salaryMonthData[row.ma_nv].chartData}>
                                         <XAxis dataKey="month" tickFormatter={m => `Th${m}`} fontSize={11} />
                                         <Tooltip formatter={v => compactNumber(Number(v))} labelFormatter={m => `Tháng ${m}`} />
                                         <Legend />
@@ -501,7 +547,52 @@ export default function DetailedSalaryTable({
                                   </div>
                                 </div>
                               )}
-                              {salaryMonthData[row.ma_nv] && salaryMonthData[row.ma_nv].length === 0 && !salaryMonthLoading && (
+                              {salaryMonthData[row.ma_nv]?.rows && salaryMonthData[row.ma_nv].rows.length > 0 && (
+                                <div className="mt-3">
+                                  <div className="text-xs font-semibold mb-1">Bảng lương theo tháng (năm hiện tại)</div>
+                                  <div className="relative border rounded-sm bg-background max-h-80 w-full max-w-full overflow-x-auto overflow-y-auto">
+                                    <div className="min-w-[2600px]">
+                                      <Table className="w-full">
+                                        <TableHeader className="sticky top-0 z-30 bg-background">
+                                          <TableRow>
+                                            {Object.keys(salaryMonthData[row.ma_nv].rows[0] || {}).map((col) => (
+                                              <TableHead
+                                                key={col}
+                                                className={cn(
+                                                  "text-xs py-1.5 px-2 whitespace-nowrap sticky top-0 bg-background",
+                                                  (col === 'ma_nhan_vien' || col === 'ma_nv') ? 'left-0 z-50 min-w-[140px]' : '',
+                                                  col === 'ho_va_ten' ? 'left-[140px] z-40 min-w-[200px]' : ''
+                                                )}
+                                              >
+                                                {col}
+                                              </TableHead>
+                                            ))}
+                                          </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                          {salaryMonthData[row.ma_nv].rows.map((item, idx) => (
+                                            <TableRow key={`${row.ma_nv}-row-${idx}`}>
+                                              {Object.keys(item).map((col, colIdx) => (
+                                                <TableCell
+                                                  key={`${row.ma_nv}-cell-${idx}-${colIdx}`}
+                                                  className={cn(
+                                                  "text-xs py-1.5 px-2 whitespace-nowrap",
+                                                  (col === 'ma_nhan_vien' || col === 'ma_nv') ? 'sticky left-0 bg-background z-30 min-w-[140px]' : '',
+                                                  col === 'ho_va_ten' ? 'sticky left-[140px] bg-background z-20 min-w-[200px]' : ''
+                                                  )}
+                                                >
+                                                  {item[col] !== null && item[col] !== undefined ? String(item[col]) : 'N/A'}
+                                                </TableCell>
+                                              ))}
+                                            </TableRow>
+                                          ))}
+                                        </TableBody>
+                                      </Table>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                              {salaryMonthData[row.ma_nv]?.rows && salaryMonthData[row.ma_nv].rows.length === 0 && !salaryMonthLoading && (
                                 <div className="text-xs text-destructive">Không có dữ liệu lương theo tháng.</div>
                               )}
                             </div>
